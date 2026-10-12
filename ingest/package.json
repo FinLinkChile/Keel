@@ -1,0 +1,14 @@
+{
+  "name": "@keel/ingest",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@keel/schemas": "*"
+  }
+}

@@ -1,0 +1,10 @@
+# Each area owns its folders. Changes to schemas/ need Area 2, changes to contracts/ need Area 1.
+/contracts/  @Mrnooqmal
+/schemas/    @darlopezp
+/engine/     @darlopezp
+/ingest/     @dvni7
+/app/        @2Chrisss
+/bot/        @2Chrisss
+/redteam/    @Benjasncz2
+/docs/       @Benjasncz2
+/evidence/   @Benjasncz2

@@ -1,0 +1,19 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# secrets: keys never enter the repository (see docs and .env.example)
+.env
+.env.*
+!.env.example
+
+# Foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
