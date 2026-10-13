@@ -20,6 +20,7 @@ export {
   type PaymentDestination,
 } from "./parser";
 export { HIDDEN_REASONS, type HiddenReason } from "./pdf/hidden";
+export { PII_PATTERNS, transferLog } from "./privacy";
 
 import type { InvoiceExtraction } from "@keel/schemas";
 
