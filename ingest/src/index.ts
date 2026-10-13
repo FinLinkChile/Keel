@@ -7,13 +7,21 @@ export {
   normalizePeriod,
   normalizeRut,
 } from "./normalize";
+export {
+  findPaymentDestinations,
+  mentionsAccountChange,
+  parseInvoice,
+  ParseError,
+  PARSE_FAILURES,
+  type AliasEntry,
+  type AliasTable,
+  type ParsedInvoice,
+  type ParseFailure,
+  type PaymentDestination,
+} from "./parser";
+export { HIDDEN_REASONS, type HiddenReason } from "./pdf/hidden";
 
 import type { InvoiceExtraction } from "@keel/schemas";
-
-// Deterministic parser: PDF text plus regular expressions. T3.3, issue #20.
-export async function parseInvoice(_pdf: Uint8Array): Promise<InvoiceExtraction> {
-  throw new Error("not implemented: T3.3 (#20)");
-}
 
 // Quarantined LLM extractor: no tools, strict schema output. T3.4, issue #21.
 export async function extractInvoice(_pdf: Uint8Array): Promise<InvoiceExtraction> {
