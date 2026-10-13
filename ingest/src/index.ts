@@ -8,6 +8,12 @@ export {
   type InvoiceReading,
 } from "./agreement";
 export {
+  CHANGE_TRIGGERS,
+  detectBeneficiaryChange,
+  type ChangeRequest,
+  type ChangeTrigger,
+} from "./beneficiaryChange";
+export {
   AUTH_FAILURES,
   authenticateEmail,
   type AuthFailure,
