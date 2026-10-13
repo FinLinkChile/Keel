@@ -22,6 +22,15 @@ export {
   type Envelope,
 } from "./email/auth";
 export { MIME_FAILURES, type MimeFailure } from "./email/mime";
+export { receiveEmail, type EmailOutcome, type QuarantineReason } from "./email/receive";
+export {
+  CHANGE_COOLDOWN_DAYS,
+  CHANGE_RESOLUTIONS,
+  IngestStore,
+  MAX_EMAILS_PER_SENDER_PER_DAY,
+  type ChangeResolution,
+  type StoredChangeRequest,
+} from "./store";
 export { invoiceKey } from "./invoiceKey";
 export {
   foldHomoglyphs,
