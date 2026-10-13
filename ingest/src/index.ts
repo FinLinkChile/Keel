@@ -7,6 +7,15 @@ export {
   type FieldDiff,
   type InvoiceReading,
 } from "./agreement";
+export {
+  AUTH_FAILURES,
+  authenticateEmail,
+  type AuthFailure,
+  type AuthSummary,
+  type EmailAuthResult,
+  type Envelope,
+} from "./email/auth";
+export { MIME_FAILURES, type MimeFailure } from "./email/mime";
 export { invoiceKey } from "./invoiceKey";
 export {
   foldHomoglyphs,
