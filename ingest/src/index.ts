@@ -23,6 +23,15 @@ export {
 } from "./email/auth";
 export { MIME_FAILURES, type MimeFailure } from "./email/mime";
 export { receiveEmail, type EmailOutcome, type QuarantineReason } from "./email/receive";
+export { createHandler, ServerConfigError, startServer, type LogEntry } from "./server";
+export {
+  IngestSettings,
+  KEY_ENV,
+  SettingsError,
+  SettingsStore,
+  type SettingsAudit,
+  type StoredSettings,
+} from "./settings";
 export {
   CHANGE_COOLDOWN_DAYS,
   CHANGE_RESOLUTIONS,
