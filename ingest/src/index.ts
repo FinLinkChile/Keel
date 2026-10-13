@@ -1,4 +1,12 @@
 // Invoice ingestion. Owned by Area 3.
+export {
+  COMPARED_FIELDS,
+  compareReadings,
+  readInvoice,
+  type ComparedField,
+  type FieldDiff,
+  type InvoiceReading,
+} from "./agreement";
 export { invoiceKey } from "./invoiceKey";
 export {
   foldHomoglyphs,
