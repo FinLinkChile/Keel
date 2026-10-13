@@ -21,10 +21,16 @@ export {
 } from "./parser";
 export { HIDDEN_REASONS, type HiddenReason } from "./pdf/hidden";
 export { PII_PATTERNS, transferLog } from "./privacy";
-
-import type { InvoiceExtraction } from "@keel/schemas";
-
-// Quarantined LLM extractor: no tools, strict schema output. T3.4, issue #21.
-export async function extractInvoice(_pdf: Uint8Array): Promise<InvoiceExtraction> {
-  throw new Error("not implemented: T3.4 (#21)");
-}
+export {
+  configFromEnv,
+  createExtractor,
+  EXTRACTION_FAILURES,
+  ExtractionError,
+  ExtractorConfigError,
+  extractInvoice,
+  PROVIDERS,
+  type ExtractionFailure,
+  type ExtractorConfig,
+  type ExtractorProvider,
+  type ProviderName,
+} from "./extractor";

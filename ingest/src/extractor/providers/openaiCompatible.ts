@@ -1,0 +1,44 @@
+// Any endpoint that speaks the OpenAI Chat Completions API: Qwen (Alibaba DashScope),
+// DeepSeek, Kimi, or a self-hosted model. Not all of them support strict JSON Schema,
+// so the output is requested as a JSON object and contract.ts validates it strictly.
+import OpenAI from "openai";
+import { ExtractionError, LLM_OUTPUT_SCHEMA, SYSTEM_PROMPT, userMessage, type ExtractorProvider, type InvoiceDocument } from "../contract";
+
+export class OpenAICompatibleProvider implements ExtractorProvider {
+  readonly provider = "openai-compatible";
+  private readonly client: OpenAI;
+
+  constructor(
+    apiKey: string,
+    readonly model: string,
+    baseURL: string,
+  ) {
+    this.client = new OpenAI({ apiKey, baseURL });
+  }
+
+  async complete(doc: InvoiceDocument): Promise<string> {
+    let res: OpenAI.Chat.ChatCompletion;
+    try {
+      res = await this.client.chat.completions.create({
+        model: this.model,
+        temperature: 0,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: `${SYSTEM_PROMPT}\n\nReply with one JSON object that matches this JSON Schema exactly:\n${JSON.stringify(LLM_OUTPUT_SCHEMA)}`,
+          },
+          { role: "user", content: userMessage(doc.text) },
+        ],
+      });
+    } catch (e) {
+      throw new ExtractionError("provider_error", { cause: e });
+    }
+    const choice = res.choices[0];
+    if (choice?.message.refusal || choice?.finish_reason === "content_filter") throw new ExtractionError("refused");
+    if (choice?.finish_reason === "length") throw new ExtractionError("truncated");
+    const content = choice?.message.content;
+    if (!content) throw new ExtractionError("invalid_output");
+    return content;
+  }
+}
