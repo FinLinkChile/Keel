@@ -8,6 +8,10 @@ coverage/
 .env.*
 !.env.example
 
+# Local ingest state (hashes, change requests) and admin settings
+*.db
+ingest/settings.json
+
 # Foundry
 contracts/out/
 contracts/cache/
