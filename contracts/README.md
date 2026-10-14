@@ -12,18 +12,53 @@ The network for Keel Trade is a permissioned one and is not chosen yet (T1.0). U
 
 ```sh
 curl -L https://foundry.paradigm.xyz | bash && foundryup
+git submodule update --init --recursive
 cd contracts
-forge install foundry-rs/forge-std
 forge build
 forge test
 ```
 
+Dependencies are git submodules under `contracts/lib/` (forge-std v1.17.0 and OpenZeppelin Contracts v5.6.1, pinned in `foundry.lock`; see `.gitmodules` at the repository root). CI checks them out with `submodules: recursive`.
+
+Fork tests read `BASE_SEPOLIA_RPC_URL` from the environment through `rpc_endpoints.base_sepolia` in `foundry.toml` (see `.env.example` at the repository root). CI does not run them:
+
+```sh
+forge test --match-path 'test/fork/*' -vv
+```
+
 ## What is here
 
-* `src/KeelTypes.sol`: `PaymentIntent` and `PolicyDecision`, mirrored in `schemas/src/index.ts`. They are the Keel Personal types. `PurchaseOrder`, `ShipmentAttestation`, `FundIntent` and `DocumentDecision` are added once Area 2 freezes the Keel Trade interfaces.
-* `src/IPDRGate.sol`: `execute`, events and typed errors of Keel Personal. Whether the same gate also takes `FundIntent` or there is one gate per mode is an open decision ([docs/interfaces/pdr.md](../docs/interfaces/pdr.md)).
-* `test/`, `script/`: empty, ready for the negative battery, the escrow invariants and the deployment script.
-* `deployments/<chainId>.json`: addresses consumed by the other areas (to be written by the deployment script).
+| Path | Contents |
+| --- | --- |
+| `src/KeelTypes.sol` | `PaymentIntent` and `PolicyDecision`, mirrored in `schemas/src/index.ts`. They are the Keel Personal types. `PurchaseOrder`, `ShipmentAttestation`, `FundIntent` and `DocumentDecision` are added once Area 2 freezes the Keel Trade interfaces. Owned by Area 2. |
+| `src/IPDRGate.sol` | `execute`, events and typed errors of Keel Personal. Whether the same gate also takes `FundIntent` or there is one gate per mode is an open decision ([docs/interfaces/pdr.md](../docs/interfaces/pdr.md)). |
+| `src/KeelHashing.sol` | EIP-712 typehashes and struct hashes for the shared structs. Kept apart so `KeelTypes.sol` stays untouched. |
+| `src/PDRGate.sol` | The Keel Personal gate (T1.6). Sole member of the AGENT role; verifies the signed PDR and executes `USDC.transfer` through the Roles Modifier. |
+| `src/IRoles.sol` | Minimal interface of Zodiac Roles v2 `execTransactionWithRole`. |
+| `script/DeployPDRGate.s.sol` | Deploys `PDRGate` against an existing Safe and Roles Modifier and writes `deployments/<chainId>.json`. |
+| `test/PDRGate.t.sol` | One revert per typed error, compromised-signer cases, panic button, Safe-only configuration and two fuzz properties. |
+| `test/Eip712Vectors.t.sol` | Writes the EIP-712 test vector (`out-vectors/eip712.json`) that the TypeScript side must reproduce byte for byte. |
+| `test/DeployPDRGate.t.sol` | Runs the deployment script end to end against mocks. |
+| `test/mocks/Mocks.sol` | USDC, Safe and Roles mocks. Roles errors mirror the real contract (`NoMembership`, `ConditionViolation`). |
+| `deployments/<chainId>.json` | Addresses consumed by the other areas (written by the deployment script). |
+
+## How PDRGate executes a payment
+
+`execute(intent, decision, sigPolicy, sigCosigner)` is permissionless: authority comes from the signatures, the relayer only pays gas. In order:
+
+1. Reverts if paused (`GateIsPaused`).
+2. Recomputes the EIP-712 struct hash of the intent and compares it with `decision.intentHash` (`IntentMismatch`).
+3. Builds the calldata itself with `abi.encodeCall(IERC20.transfer, (recipient, amount))` and compares its hash with `decision.calldataHash` (`CalldataMismatch`). Only tiers 1 and 3 reach the gate (`InvalidTier`).
+4. Verifies the policy signature over the EIP-712 digest of the decision (`BadPolicySignature`). EOA and ERC-1271 signers are accepted.
+5. Checks the policy version (`StalePolicy`).
+6. Checks the decision expiry and the intent deadline (`Expired`).
+7. Consumes the nonce (`NonceUsed`).
+8. Marks the invoice as paid; on-chain idempotency (`InvoiceAlreadyPaid`).
+9. For tier 3, requires the cosigner signature over the same digest (`MissingCosignature`).
+10. Executes through the Roles Modifier with the AGENT role. Roles re-checks target, selector, recipient allowlist and monthly allowance.
+11. Emits `PaymentExecuted(intentHash, pdrHash, tier, invoiceKey)`, where `pdrHash` is the EIP-712 digest of the decision.
+
+Configuration (`setPolicySigner`, `setPolicyHash`, `setCosigner`, `pause`, `unpause`) is callable only by the Safe (`OnlySafe`). In production these calls must arrive through the Delay Modifier.
 
 ## Invariants of the escrow
 
@@ -31,6 +66,18 @@ forge test
 2. No funds leave to an address other than the importer or the payout address of the order.
 3. A final state never moves funds again.
 4. One bill of lading never settles two orders.
+
+## Interface notes for the other areas
+
+* **`invoiceKey` encoding.** It is `keccak256(abi.encode(rut, folio, period))` over normalized strings, as implemented by Area 3 in `ingest/src/invoiceKey.ts` (RUT without dots or hyphen with a verified check digit, folio without leading zeros, period `YYYYMM`). Packed concatenation would collide: RUT 7.612.345-4 with invoice 448213 and RUT 76.123.454-4 with invoice 48213 produce identical bytes (`InvoiceKeyCollisionTest`).
+* **`AgentRoleRevoked` is not emitted by the gate.** Revoking the agent role happens in the Roles Modifier, not in `PDRGate`. Monitors and the activity log must listen to the Roles Modifier `AssignRoles(module, roleKeys, memberOf)` event with `module == PDRGate` and `memberOf == false`.
+* **Events and errors added by the gate** (proposed, beyond the frozen list): errors `InvalidTier` and `OnlySafe`; events `GateUnpaused`, `PolicySignerSet`, `PolicyHashSet` and `CosignerSet`.
+* **Roles errors are codes, not text.** A rejected call reverts with `NoMembership()` or `ConditionViolation(Status status, bytes32 info)`. Area 1 provides the `status` to message table with a real hash for each case.
+
+## Known limitations
+
+* Current tests use a Roles mock. Fork tests against the real Zodiac Roles v2 on Base Sepolia are pending (T1.7).
+* The gate cannot tell whether a configuration call came through the Delay Modifier or directly from the Safe owner. Closing that gap is the ConfigGuard (T1.5); until then it is declared as a known risk.
 
 ## Tasks
 

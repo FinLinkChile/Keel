@@ -16,6 +16,7 @@ ingest/settings.json
 contracts/out/
 contracts/cache/
 contracts/broadcast/
+contracts/out-vectors/
 
 .DS_Store
 Thumbs.db

@@ -29,3 +29,5 @@ jobs:
           submodules: recursive
       - uses: foundry-rs/foundry-toolchain@v1
       - run: forge build
+      # Fork tests need an RPC endpoint and secrets; they run locally, not in CI.
+      - run: forge test --no-match-path 'test/fork/*' -vv
