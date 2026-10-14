@@ -12,7 +12,9 @@ stateDiagram-v2
     [*] --> Abierto: open (orden firmada por ambos)
     Abierto --> Depositado: fund (importador deposita el total)
     Depositado --> AnticipoPagado: releaseAdvance (gatillo 1)
-    AnticipoPagado --> Liquidado: submitShipment (gatillo 2)
+    AnticipoPagado --> Embarcado: submitShipment (atestación de la naviera)
+    Embarcado --> Liquidado: releaseBalance (gatillo 2: DocumentDecision o aprobación del importador)
+    Embarcado --> EnDisputa: raiseDispute
     AnticipoPagado --> Reembolsado: refundAfterDeadline
     AnticipoPagado --> EnDisputa: raiseDispute
     EnDisputa --> Resuelto: resolve (firma del árbitro)
@@ -29,6 +31,7 @@ stateDiagram-v2
 
 - Cada transición tiene un único estado de origen permitido. Cualquier otra llamada revierte con `InvalidState`.
 - Liquidado, Reembolsado, Resuelto y Cancelado son finales: no se vuelve a mover dinero de esa orden.
+- Embarcado no tiene salida por vencimiento: con el embarque probado, el saldo sale por el gatillo 2 o por una disputa ([decisión 3](../decisiones/abiertas.md)).
 
 # Invariantes que se prueban con fuzz
 

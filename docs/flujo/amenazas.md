@@ -19,6 +19,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
 | Llave de política robada | PDR falsos | El Roles limita destino y cupo; el escrow solo paga a las partes de la orden | Puede depositar órdenes firmadas dentro del cupo y aprobar documentos no conformes |
 | Importador retira tras ver el embarque | Deja al exportador sin cobrar | El contrato no tiene función de retiro unilateral | Disputa de mala fe, que resuelve el árbitro |
 | Exportador nunca embarca | Se queda con el anticipo | Reembolso del saldo por vencimiento | El anticipo solo se recupera por disputa |
+| El motor no puede leer el BL o no responde | Saldo trabado aunque el embarque ocurrió | El importador aprueba a mano (`BalanceApproval`); una orden Embarcado no se reembolsa por vencimiento y va a disputa | Si el importador no aprueba, el exportador depende del árbitro |
 | Colusión de exportador y naviera | Atestación de un embarque que no ocurrió | Ventana de disputa, árbitro, reputación e identidad verificada | Riesgo residual declarado |
 | Árbitro corrupto | Reparte a favor de una parte | Solo puede repartir entre las partes; opción de 2 de 3 | Reparto injusto |
 | Evento externo que amplía permisos (estilo Bankr) | Un NFT o un mensaje que cambia la configuración | Solo la Safe gobierna los módulos, por el Delay | Compromiso de la propia Safe |
