@@ -2,6 +2,7 @@
 import type { InvoiceExtraction, PaymentIntent, Tier } from "@keel/schemas";
 
 export * from "./funding";
+export * from "./keys";
 export * from "./pdr";
 
 export interface RuleResult<R extends string = string, C extends string = string> {
