@@ -30,7 +30,6 @@ Una celda vacía en "quién decide" significa que las fuentes no lo asignan toda
 
 # Otras cuestiones abiertas, registradas en su concepto
 
-- Cómo acepta PDRGate las dos intenciones (un gate con dos entradas o un gate por modo): [PDR](../interfaces/pdr.md). La deciden las Áreas 1 y 2.
 - Aprobación exacta más `fund`, o `fundWithPermit`: tarea T1.2 del [Área 1](../trabajo/area-1-contratos.md). Depende de la decisión 7.
 - Qué actos de Keel Personal entran en el deck y en el video: [demo](../entrega/demo.md). Depende de la decisión 14.
 - Dónde entra Keel Personal en el orden de recorte: [recortes](../trabajo/recortes.md). Depende de la decisión 14.

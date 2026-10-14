@@ -84,9 +84,9 @@ Cada Safe lleva la configuración de su modo: la Safe de una persona no tiene pe
 
 **Personal (base):** la intención es `PaymentIntent`. El calldata es `abi.encodeCall(IERC20.transfer, (intent.recipient, intent.amountUsdc))`. Antes de ejecutar, verifica y marca `invoiceKey` como pagada (`InvoiceAlreadyPaid`): la idempotencia queda en cadena, así que ni un motor comprometido puede pagar dos veces la misma factura (crítica 11). Emite `PaymentExecuted(intentHash, pdrHash, tier, invoiceKey)`. Este gate ya tiene código y pruebas locales.
 
-**Trade (agregado):** la intención es `FundIntent`. El calldata es la llamada de depósito al escrow. La idempotencia queda en el escrow: una orden solo se deposita una vez (`InvalidState`). Emite `FundingExecuted(intentHash, pdrHash, tier, orderId)`.
+**Trade (agregado):** un gate propio, separado de PDRGate (nombre provisional `FundingGate`), que hereda con PDRGate un contrato base con la verificación del PDR. La intención es `FundIntent`. El calldata es la llamada de depósito al escrow. La idempotencia queda en el escrow: una orden solo se deposita una vez (`InvalidState`). Emite `FundingExecuted(intentHash, pdrHash, tier, orderId)`.
 
-`setPolicySigner` y `setPolicyHash` solo pueden llamarse desde la Safe, y solo por el camino del Delay (T1.4). Si es un gate con dos entradas o un gate por modo es una decisión abierta ([PDR](../interfaces/pdr.md)).
+`setPolicySigner` y `setPolicyHash` solo pueden llamarse desde la Safe, y solo por el camino del Delay (T1.4). Se decidió un gate por modo ([PDR](../interfaces/pdr.md)): PDRGate no se modifica para Trade.
 
 **T1.7 Batería de pruebas negativas (crítica 14).**
 Con Foundry y la configuración real de Roles. Cada caso debe revertir con el error esperado.

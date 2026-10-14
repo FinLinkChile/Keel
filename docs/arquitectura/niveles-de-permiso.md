@@ -34,7 +34,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
 | Cambiar `payoutAddress`, naviera o árbitro de una orden firmada | Nadie: exige una orden nueva | 4 |
 | Enviar fondos fuera del contrato de escrow | Nadie con el rol del agente | 4 |
 
-Cómo se hace cumplir en la cadena: el rol del agente en el Roles Modifier solo permite llamar al contrato de escrow, con cupo por periodo. El único miembro de ese rol es PDRGate, que exige un PDR válido. Cada empresa opera desde su Safe, y cambiar roles o cupos pasa por el Delay.
+Cómo se hace cumplir en la cadena: el rol del agente en el Roles Modifier solo permite llamar al contrato de escrow, con cupo por periodo. El único miembro de ese rol es el gate de Trade, que exige un PDR válido. Cada empresa opera desde su Safe, y cambiar roles o cupos pasa por el Delay.
 
 Firmar la orden de compra, abrir una disputa y cancelar son siempre actos de personas.
 

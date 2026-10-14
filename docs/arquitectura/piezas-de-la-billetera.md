@@ -18,7 +18,7 @@ Vienen de Keel Personal y las comparten los dos modos:
 | Safe | La cuenta de la empresa. Los dueños son personas, nunca el agente |
 | Zodiac Roles Modifier v2 | Limita al agente: a qué contrato puede llamar, qué función y con qué cupo |
 | Zodiac Delay Modifier | Los cambios de configuración esperan N horas, con aviso y ventana de veto |
-| PDRGate | Único miembro del rol del agente (D4). Sin un PDR válido no se mueve nada |
+| Gate (PDRGate en Personal, gate de Trade en Trade) | Único miembro del rol del agente (D4). Sin un PDR válido no se mueve nada. Hay un gate por modo, con la verificación del PDR compartida |
 | PDR (Registro de Decisión de Política) | Decisión firmada con EIP-712 que ata la intención, la política y el calldata exacto |
 | Motor de política | Función determinista, sin LLM ni red. Decide el nivel y firma el PDR |
 | Extractor en cuarentena | El único LLM. Lee documentos no confiables y devuelve un esquema sin texto libre (D2, D3) |
@@ -36,7 +36,7 @@ El agente es la cadena completa: extractor en cuarentena, parser determinista, m
 # Billetera de la empresa
 
 - Cada empresa opera desde su Safe. Los dueños son personas (por ejemplo 2 de 3 socios), nunca el agente.
-- Rol del agente: solo puede llamar al contrato de escrow para depositar una orden ya firmada, con cupo por periodo. El único miembro del rol es PDRGate (D4): la llave del agente sola no mueve fondos.
+- Rol del agente: solo puede llamar al contrato de escrow para depositar una orden ya firmada, con cupo por periodo. El único miembro del rol es el gate de Trade (D4): la llave del agente sola no mueve fondos.
 - El Roles Modifier intercepta la llamada y valida destino, selector de cuatro bytes y argumentos contra las condiciones configuradas.
 - El dueño del Roles Modifier es la Safe de la empresa, nunca el agente. Nada externo puede ampliar permisos (la lección Bankr).
 - Los cambios de configuración (cupos, quién puede comprar, firmante de la política) pasan por el Delay Modifier, con espera y veto.

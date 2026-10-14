@@ -2,6 +2,8 @@
 
 ## 2026-10-14
 
+* **Decisión**: un gate por modo. PDRGate queda para Keel Personal y Keel Trade tiene su propio gate (nombre provisional `FundingGate`), con la verificación del PDR compartida en un contrato base. D4 pasa a decir "el gate de cada Safe es el único miembro del rol del agente". La tomó Darienn (Área 2); si a un área le genera un problema, se revisa con él. Se retiró de las cuestiones abiertas. Conceptos: [PDR](interfaces/pdr.md), [transversales](decisiones/transversales.md), [piezas de la billetera](arquitectura/piezas-de-la-billetera.md), [niveles de permiso](arquitectura/niveles-de-permiso.md), [eventos y errores](interfaces/eventos-y-errores.md), [amenazas](flujo/amenazas.md), [Área 1](trabajo/area-1-contratos.md).
+* **Decisión**: el archivo del PDR se llama `evidence/pdr/<pdrHash>.json`, con `pdrHash` igual al digest EIP-712 que PDRGate emite en `PaymentExecuted`, y en nivel 3 el motor entrega al Área 4 una solicitud de cofirma con ese mismo digest ([PDR](interfaces/pdr.md), [evidencia y bitácora](arquitectura/evidencia-y-bitacora.md)). Lo decidió el Área 2 (Darienn) al implementar T2.4; cierra el nombre pendiente del 13 de octubre.
 * **Actualización**: [README](README.md) y la skill `keel-docs` indican ahora cuándo se actualiza la documentación. Criterio definido por Darienn: la prioridad es el avance del proyecto y la documentación sirve para mantener al equipo al día con las decisiones, así que nunca detiene una tarea y toda decisión que afecte a otra área se registra en el mismo cambio.
 
 ## 2026-10-13
