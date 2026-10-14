@@ -1,5 +1,6 @@
 # Arquitectura
 
+* [Custodia y rotación de llaves](custodia-de-llaves.md) - Qué llaves existen, quién tiene cada una, qué puede hacer un atacante que robe una, dónde se limita y con qué prueba, cómo se rota y qué falta construir.
 * [Evidencia y bitácora](evidencia-y-bitacora.md) - Qué queda registrado de cada intento, dónde se guardan los PDR y por qué los reverts deliberados son la evidencia más fuerte.
 * [Identidad de las empresas](identidad-de-empresas.md) - Cómo se vincula una billetera con una empresa verificada: PartyRegistry en el prototipo, credenciales verificables y WeIdentity en producción.
 * [Niveles de permiso (0 a 4)](niveles-de-permiso.md) - Los cinco niveles, dónde se hace cumplir cada uno y qué nivel tiene cada acción del agente en Keel Trade y en Keel Personal.

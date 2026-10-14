@@ -31,4 +31,4 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
 
 Una celda vacía en riesgo residual significa que las fuentes todavía no lo declaran, no que no exista (D9).
 
-Los riesgos declarados del prototipo y las métricas del red team están en [seguridad y red team](../entrega/seguridad-y-red-team.md). Las amenazas propias de Keel Personal y las de llaves comunes están en [amenazas de Keel Personal](../personal/amenazas.md). La custodia de llaves es la tarea T2.7 del [Área 2](../trabajo/area-2-motor.md).
+Los riesgos declarados del prototipo y las métricas del red team están en [seguridad y red team](../entrega/seguridad-y-red-team.md). Las amenazas propias de Keel Personal y las de llaves comunes están en [amenazas de Keel Personal](../personal/amenazas.md). La custodia de llaves, con qué puede hacer cada llave robada y cómo se rota, está en [custodia de llaves](../arquitectura/custodia-de-llaves.md) (tarea T2.7).
