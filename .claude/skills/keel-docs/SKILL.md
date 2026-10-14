@@ -57,30 +57,33 @@ Leer `docs/flujo/checklist-componente.md` y responder sus ocho preguntas abriend
 
 ## Cuándo actualizar la documentación
 
-Al terminar una tarea, revisar si ocurrió alguno de estos casos. Si ninguno aplica, no tocar `docs/`.
+La prioridad es que el proyecto avance. La documentación existe para que el equipo se entere de las decisiones, no para frenar el trabajo. Dos reglas:
 
-Se actualiza directamente, en el mismo cambio, cuando solo se refleja un hecho que el equipo ya decidió:
+1. **La documentación nunca detiene una tarea.** Si algo no calza o falta, se sigue trabajando y se deja anotado.
+2. **Toda decisión que afecte a otra área queda registrada en el mismo cambio**, para que el resto del equipo la vea sin tener que preguntar.
 
-| Qué pasó | Qué se actualiza |
+Qué se registra al terminar una tarea:
+
+| Qué pasó | Qué se hace |
 | --- | --- |
-| El equipo cambió el objetivo o el flujo | `docs/flujo/` primero, después el código |
-| El equipo cerró una decisión abierta | El concepto afectado, luego `decisiones/abiertas.md`, después el código |
-| El equipo confirmó o descartó algo marcado **[PROPUESTA]** o `status: draft` | Quitar la marca o el `status`, o retirar el contenido descartado |
-| Cambió una interfaz compartida en `schemas/` o `contracts/src/` con aprobación del área dueña | El concepto de `docs/interfaces/` o `docs/flujo/datos-firmados-e-interfaz.md` |
-| Se completó algo marcado **[EN CURSO]** o **[DISEÑO]** | Cambiar la marca a **[HECHO]** |
-| Cambió una tarea, el calendario, un recorte o un entregable por decisión del equipo | El concepto de `docs/trabajo/` o `docs/entrega/` |
-| Se agregó, renombró o eliminó un concepto | El `index.md` de la carpeta y los enlaces que apuntaban a él |
+| Se tomó una decisión de diseño, interfaz, alcance, seguridad o plan | Actualizar el concepto que la cubre para que diga lo que rige ahora |
+| Se cerró una decisión abierta | Actualizar el concepto afectado y dejar la respuesta en `decisiones/abiertas.md` |
+| El código quedó distinto de lo documentado | Actualizar el concepto. La documentación sigue al proyecto, no al revés |
+| Cambió una interfaz compartida en `schemas/` o `contracts/src/` | Actualizar `docs/interfaces/` o `docs/flujo/datos-firmados-e-interfaz.md` |
+| Se confirmó, descartó o completó algo marcado **[PROPUESTA]**, **[EN CURSO]** o **[DISEÑO]** | Cambiar la marca o retirar lo descartado |
+| Cambió una tarea, el calendario, un recorte o un entregable | Actualizar `docs/trabajo/` o `docs/entrega/` |
+| Surgió una pregunta que nadie ha decidido | Agregarla a `decisiones/abiertas.md`, seguir con el supuesto más razonable y anotarlo ahí |
+| Apareció una amenaza o un riesgo nuevo | Agregarlo a `docs/flujo/amenazas.md` |
 
-Se avisa a la persona antes de editar, porque implica una decisión que no es del agente:
+En todos los casos se agrega una línea en `docs/log.md` con qué se decidió, quién lo decidió y por qué. Esa línea es la que mantiene al equipo al día.
 
-- El código que se va a escribir, o que ya existe, contradice un concepto. No se ajusta la documentación para que coincida con el código sin preguntar.
-- Dos conceptos se contradicen. Vale `docs/flujo/`, pero se informa cuál es la diferencia.
-- Aparece una amenaza nueva, se debilita una defensa o cambia un riesgo residual (`docs/flujo/amenazas.md`).
-- Algo nuevo queda dentro o fuera del alcance (`docs/flujo/alcance.md`).
-- Surge una pregunta que nadie ha decidido: se propone agregarla a `decisiones/abiertas.md`, no se responde.
-- Un concepto pasó su `stale_after`, o un dato marcado "por verificar" se va a usar como hecho.
+Cómo registrar sin frenar:
 
-No se actualiza la documentación para registrar trabajo hecho, estados de avance ni detalles de implementación que el código ya muestra.
+- Si la decisión la tomó una sola persona y afecta a otras áreas, se registra igual y se marca **[PROPUESTA]** hasta que el equipo la confirme. El trabajo sigue.
+- Si lo decidido contradice `docs/flujo/`, se actualiza `flujo/` en el mismo cambio y se dice en el resumen final de la tarea. No se deja la documentación desactualizada.
+- Lo único que sí se consulta antes de avanzar es romper uno de los principios de `CLAUDE.md`.
+
+No se registran avances, estados de tareas ni detalles de implementación que el código ya muestra: eso es ruido para quien busca decisiones.
 
 ## Cómo actualizar la documentación
 

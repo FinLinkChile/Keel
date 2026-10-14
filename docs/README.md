@@ -4,7 +4,7 @@ title: "Conventions of the Keel documentation"
 description: "How the docs are stored and referenced: one concept per file, frontmatter, folders, links, identifiers, precedence, and when and how to change them."
 tags: [okf, conventions, docs]
 modo: ambos
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T04:10:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T04:40:00Z }
 ---
 
 # docs (Area 5)
@@ -75,17 +75,16 @@ verified: { by: human:<github-user>, at: 2026-10-15T12:00:00Z }
 
 # When to change the documentation
 
-Update a concept in the same pull request as the change that makes it outdated:
+The priority is that the project moves forward. The documentation exists so the team stays up to date with the decisions, not to slow the work down:
 
-* The team changed the goal or the flow, or closed an open decision. The documentation changes first, the code after.
-* The team confirmed or dropped something marked **[PROPUESTA]** or `status: draft`.
-* A shared interface in `schemas/` or `contracts/src/` changed with the approval of the owning area.
-* Something marked **[EN CURSO]** or **[DISEÑO]** is done.
-* A task, the calendar, a cut rule or a deliverable changed.
+* The documentation never blocks a task. If something does not match or is missing, keep working and write it down.
+* Every decision that affects another area is recorded in the same pull request as the change, so the rest of the team sees it without asking.
 
-Raise it with the team before editing when a decision is involved: the code contradicts a concept, two concepts contradict each other, a new threat or residual risk appears, something moves in or out of scope, or a question nobody has decided comes up (add it to [decisiones/abiertas.md](decisiones/abiertas.md), do not answer it). Never edit a concept just to make it match the code.
+Record it when: a design, interface, scope, security or plan decision was made; an open decision was closed; the code ended up different from what is documented (the documentation follows the project); a shared interface in `schemas/` or `contracts/src/` changed; something marked **[PROPUESTA]**, **[EN CURSO]** or **[DISEÑO]** was confirmed, dropped or done; a task, the calendar, a cut rule or a deliverable changed; a new threat or risk appeared.
 
-The documentation does not record progress or implementation details that the code already shows.
+Each of them adds a line to [log.md](log.md) saying what was decided, who decided it and why. A decision taken by one person that affects other areas is recorded anyway and marked **[PROPUESTA]** until the team confirms it. A question nobody has decided goes to [decisiones/abiertas.md](decisiones/abiertas.md) with the assumption the work continued on.
+
+The documentation does not record progress, task status or implementation details that the code already shows.
 
 # Changing the documentation
 

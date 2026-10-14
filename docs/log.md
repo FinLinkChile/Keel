@@ -2,7 +2,7 @@
 
 ## 2026-10-14
 
-* **Actualización**: [README](README.md) y la skill `keel-docs` indican ahora cuándo se actualiza la documentación, qué casos se editan directamente y cuáles se avisan primero.
+* **Actualización**: [README](README.md) y la skill `keel-docs` indican ahora cuándo se actualiza la documentación. Criterio definido por Darienn: la prioridad es el avance del proyecto y la documentación sirve para mantener al equipo al día con las decisiones, así que nunca detiene una tarea y toda decisión que afecte a otra área se registra en el mismo cambio.
 
 ## 2026-10-13
 

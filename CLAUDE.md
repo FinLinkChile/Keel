@@ -8,7 +8,7 @@ Contexto: importación de productos desde China por empresas chilenas, con el co
 
 `docs/` es un bundle OKF: conceptos cortos, uno por archivo, con frontmatter y un `index.md` por carpeta. Antes de abrir, buscar o editar cualquier archivo de `docs/`, invocar la skill `keel-docs`: trae el mapa de qué concepto responde cada necesidad y las reglas para actualizar. Leer solo los conceptos que la tarea necesita, nunca la carpeta completa.
 
-Al terminar una tarea que cambie contratos, esquemas, reglas del motor, alcance o plan, revisar la sección "Cuándo actualizar la documentación" de la skill: si el cambio refleja algo que el equipo ya decidió, actualizar el concepto en el mismo cambio; si el código contradice un concepto o hay una decisión de por medio, avisar antes de editar.
+La prioridad es que el proyecto avance: la documentación sirve para mantener al equipo al día con las decisiones y nunca detiene una tarea. Al terminar una tarea en la que se tomó una decisión que afecta a otra área (diseño, interfaz, alcance, seguridad o plan), registrarla en el mismo cambio: actualizar el concepto que la cubre y agregar una línea en `docs/log.md` con qué se decidió, quién y por qué. La sección "Cuándo actualizar la documentación" de la skill detalla los casos.
 
 ## Regla general: alinearse con el flujo clave
 
