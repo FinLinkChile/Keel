@@ -25,6 +25,7 @@ import {
   typedDataDigest,
 } from "./hash";
 import {
+  type BalanceApproval,
   type CancelOrder,
   type DisputeResolution,
   type DocumentDecision,
@@ -86,6 +87,7 @@ const order: PurchaseOrder = {
   disputeWindow: 604_800n,
   carrier: address(0xd5),
   arbiter: address(0xe6),
+  documentVerifier: address(0xe7),
   incoterm: bytes32Text("CIF"),
   termsHash: word("terms"),
   requiredDocsHash: requiredDocsHash(["BILL_OF_LADING", "COMMERCIAL_INVOICE"]),
@@ -99,6 +101,8 @@ const attestation: ShipmentAttestation = {
   portOfLoading: bytes32Text("CNSZX"),
   docsHash: docsHash([word("bl.pdf"), word("invoice.pdf")]),
 };
+
+const approval: BalanceApproval = { orderId: order.orderId, attestationHash: structHash("ShipmentAttestation", attestation) };
 
 const cancel: CancelOrder = { orderId: order.orderId, nonce: 8n };
 
@@ -134,6 +138,7 @@ const documentDecision: DocumentDecision = {
 const samples: { [T in Eip712Type]: Eip712Messages[T] } = {
   PurchaseOrder: order,
   ShipmentAttestation: attestation,
+  BalanceApproval: approval,
   CancelOrder: cancel,
   DisputeResolution: resolution,
   FundIntent: intent,

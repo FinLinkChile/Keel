@@ -5,6 +5,7 @@ import {
     PurchaseOrder,
     ShipmentAttestation,
     CancelOrder,
+    BalanceApproval,
     DisputeResolution,
     FundIntent,
     PolicyDecision,
@@ -20,7 +21,7 @@ library KeelHash {
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
     bytes32 internal constant PURCHASE_ORDER_TYPEHASH = keccak256(
-        "PurchaseOrder(bytes32 orderId,address importer,address exporter,address payoutAddress,address token,uint256 totalAmount,uint16 advanceBps,uint64 shipmentDeadline,uint64 disputeWindow,address carrier,address arbiter,bytes32 incoterm,bytes32 termsHash,bytes32 requiredDocsHash,uint256 nonce)"
+        "PurchaseOrder(bytes32 orderId,address importer,address exporter,address payoutAddress,address token,uint256 totalAmount,uint16 advanceBps,uint64 shipmentDeadline,uint64 disputeWindow,address carrier,address arbiter,address documentVerifier,bytes32 incoterm,bytes32 termsHash,bytes32 requiredDocsHash,uint256 nonce)"
     );
 
     bytes32 internal constant SHIPMENT_ATTESTATION_TYPEHASH = keccak256(
@@ -28,6 +29,9 @@ library KeelHash {
     );
 
     bytes32 internal constant CANCEL_ORDER_TYPEHASH = keccak256("CancelOrder(bytes32 orderId,uint256 nonce)");
+
+    bytes32 internal constant BALANCE_APPROVAL_TYPEHASH =
+        keccak256("BalanceApproval(bytes32 orderId,bytes32 attestationHash)");
 
     bytes32 internal constant DISPUTE_RESOLUTION_TYPEHASH =
         keccak256("DisputeResolution(bytes32 orderId,uint256 toImporter,uint256 toExporter)");
@@ -73,6 +77,7 @@ library KeelHash {
                     po.disputeWindow,
                     po.carrier,
                     po.arbiter,
+                    po.documentVerifier,
                     po.incoterm,
                     po.termsHash,
                     po.requiredDocsHash,
@@ -97,6 +102,10 @@ library KeelHash {
 
     function hash(CancelOrder memory c) internal pure returns (bytes32) {
         return keccak256(abi.encode(CANCEL_ORDER_TYPEHASH, c.orderId, c.nonce));
+    }
+
+    function hash(BalanceApproval memory a) internal pure returns (bytes32) {
+        return keccak256(abi.encode(BALANCE_APPROVAL_TYPEHASH, a.orderId, a.attestationHash));
     }
 
     function hash(DisputeResolution memory r) internal pure returns (bytes32) {
