@@ -4,7 +4,7 @@
 
 In Keel Personal, `PDRGate` verifies a `PaymentIntent` and the Safe transfers to a whitelisted beneficiary, inside the allowance of the agent role. Each invoice is paid at most once (`invoiceKey`).
 
-In Keel Trade, `TradeEscrow` holds the funds of each purchase order and moves them only through its state machine: advance when the order is signed by both parties and funded, balance when the shipment is proven, refund when the shipment deadline passes. The design is in section 5 of [docs/KEEL_SOLUCION_ALCANCE.md](../docs/KEEL_SOLUCION_ALCANCE.md), and the flow in [docs/flujo_clave.md](../docs/flujo_clave.md).
+In Keel Trade, `TradeEscrow` holds the funds of each purchase order and moves them only through its state machine: advance when the order is signed by both parties and funded, balance when the shipment is proven, refund when the shipment deadline passes. The design is in [docs/flujo/estados-del-escrow.md](../docs/flujo/estados-del-escrow.md) and [docs/flujo/datos-firmados-e-interfaz.md](../docs/flujo/datos-firmados-e-interfaz.md), and the flow in [docs/flujo/flujo-clave.md](../docs/flujo/flujo-clave.md).
 
 The network for Keel Trade is a permissioned one and is not chosen yet (T1.0). Until then there is no chain id or RPC to configure. Keel Personal was designed on Base Sepolia with USDC; T1.0 also decides whether it moves to the same network.
 
@@ -21,7 +21,7 @@ forge test
 ## What is here
 
 * `src/KeelTypes.sol`: `PaymentIntent` and `PolicyDecision`, mirrored in `schemas/src/index.ts`. They are the Keel Personal types. `PurchaseOrder`, `ShipmentAttestation`, `FundIntent` and `DocumentDecision` are added once Area 2 freezes the Keel Trade interfaces.
-* `src/IPDRGate.sol`: `execute`, events and typed errors of Keel Personal. Whether the same gate also takes `FundIntent` or there is one gate per mode is an open decision (section 2.3 of the work split).
+* `src/IPDRGate.sol`: `execute`, events and typed errors of Keel Personal. Whether the same gate also takes `FundIntent` or there is one gate per mode is an open decision ([docs/interfaces/pdr.md](../docs/interfaces/pdr.md)).
 * `test/`, `script/`: empty, ready for the negative battery, the escrow invariants and the deployment script.
 * `deployments/<chainId>.json`: addresses consumed by the other areas (to be written by the deployment script).
 
@@ -34,7 +34,7 @@ forge test
 
 ## Tasks
 
-Tasks are described in [docs/keel_division_trabajo.md](../docs/keel_division_trabajo.md). A task that exists in both modes keeps one number: its base text is Keel Personal and Keel Trade adds to it.
+Tasks are described in [docs/trabajo/area-1-contratos.md](../docs/trabajo/area-1-contratos.md) (tasks T1.x). A task that exists in both modes keeps one number: its base text is Keel Personal and Keel Trade adds to it.
 
 | Task | Issue |
 |---|---|

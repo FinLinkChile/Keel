@@ -15,7 +15,7 @@ Metrics to report: attack block rate, false positives on legitimate documents, s
 
 ## Tasks
 
-Tasks are described in [docs/keel_division_trabajo.md](../docs/keel_division_trabajo.md).
+Tasks are described in [docs/trabajo/area-5-redteam-evidencia.md](../docs/trabajo/area-5-redteam-evidencia.md) (tasks T5.x).
 
 | Task | Issue |
 |---|---|

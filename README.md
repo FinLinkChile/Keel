@@ -34,7 +34,7 @@ Nothing in an email or a PDF can become a payment address: the payout address co
 
 Both modes share the wallet: a Safe with the Zodiac Roles and Delay modifiers. The agent (a quarantined LLM extractor, a deterministic policy engine and a relayer) can only act through `PDRGate`, inside a role with a spending allowance. In Keel Trade that role is limited to the escrow contract; in Keel Personal, to transfers to the whitelisted beneficiaries.
 
-[docs/flujo_clave.md](docs/flujo_clave.md) defines the goal of the project and the Keel Trade flow in detail. It is the reference to check before designing or creating any component. Keel Personal is designed in section 4 of [docs/KEEL_SOLUCION_ALCANCE.md](docs/KEEL_SOLUCION_ALCANCE.md).
+[docs/flujo/](docs/flujo/index.md) defines the goal of the project and the Keel Trade flow in detail. It is the reference to check before designing or creating any component, starting at [docs/flujo/checklist-componente.md](docs/flujo/checklist-componente.md). Keel Personal is designed in [docs/personal/keel-personal.md](docs/personal/keel-personal.md). The documentation is split into short files, one concept each: [docs/index.md](docs/index.md) lists them.
 
 ## Repository layout
 
@@ -52,7 +52,7 @@ Both modes share the wallet: a Safe with the Zodiac Roles and Delay modifiers. T
 
 Each folder has a README with its tasks and how to run it.
 
-The focus moved from utility bill payments to trade escrow on October 13, 2026, and Keel Personal came back into scope the same day as the second mode. The code scaffolding carries the Keel Personal interfaces; the Keel Trade ones are added as each area builds them. How deep Keel Personal goes in the submission is still to be confirmed by the team (open decision 14 in `docs/flujo_clave.md`).
+The focus moved from utility bill payments to trade escrow on October 13, 2026, and Keel Personal came back into scope the same day as the second mode. The code scaffolding carries the Keel Personal interfaces; the Keel Trade ones are added as each area builds them. How deep Keel Personal goes in the submission is still to be confirmed by the team (open decision 14 in `docs/decisiones/abiertas.md`).
 
 ## Getting started
 

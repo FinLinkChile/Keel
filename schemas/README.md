@@ -14,7 +14,7 @@ The files here hold the Keel Personal interfaces, frozen on Monday Oct 12:
 
 ## Interfaces added by Keel Trade
 
-Proposed in section 2 of [docs/keel_division_trabajo.md](../docs/keel_division_trabajo.md), to be frozen on Wednesday Oct 14 at 20:00 (Chile time):
+Proposed in [docs/interfaces/](../docs/interfaces/index.md), to be frozen on Wednesday Oct 14 at 20:00 (Chile time):
 
 * Document extraction, with no free text: transport document (bill of lading or air waybill) and commercial invoice.
 * `PurchaseOrder` and `ShipmentAttestation`, signed with EIP-712.

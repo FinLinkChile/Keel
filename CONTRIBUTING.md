@@ -30,7 +30,8 @@ The focus moved on October 13 from utility bill payments to trade escrow, so the
 
 ## Rules that apply everywhere
 
-* [docs/flujo_clave.md](docs/flujo_clave.md) defines the goal of the project and the flow it implements. Check it before designing or creating any component. If an idea contradicts it, raise it with the team and update that document first.
+* [docs/flujo/](docs/flujo/index.md) defines the goal of the project and the flow it implements. Before designing or creating any component, answer [docs/flujo/checklist-componente.md](docs/flujo/checklist-componente.md). If an idea contradicts `docs/flujo/`, raise it with the team and update those documents first.
+* The documentation is split into short files, one concept each. [docs/README.md](docs/README.md) explains how they are stored, linked and changed.
 * The payout address never comes from a document. In Keel Trade it comes from the purchase order signed by both parties; in Keel Personal, from the table of registered beneficiaries.
 * The project is called Keel in code, documents and deck.
 * There is no operational LLM. The only LLM is the quarantined extractor, and its output schema has no free text.

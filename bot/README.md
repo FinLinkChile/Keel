@@ -2,7 +2,7 @@
 
 Telegram bot. It sends template messages built from typed fields only, answers only to registered chats and signs nothing: its buttons open the Keel app.
 
-It never forwards text from a document or an email. In Keel Personal the notices cover executed payments, held payments with their due date and the manual alternative, and beneficiary change requests. In Keel Trade they cover the steps of the flow in [docs/flujo_clave.md](../docs/flujo_clave.md): deposit, advance, shipment, balance, refund, held operations, approaching shipment deadlines and account change alerts.
+It never forwards text from a document or an email. In Keel Personal the notices cover executed payments, held payments with their due date and the manual alternative, and beneficiary change requests. In Keel Trade they cover the steps of the flow in [docs/flujo/flujo-clave.md](../docs/flujo/flujo-clave.md): deposit, advance, shipment, balance, refund, held operations, approaching shipment deadlines and account change alerts.
 
 ```sh
 npm run start -w bot

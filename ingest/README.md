@@ -115,7 +115,7 @@ npm run extract -w ingest -- invoice.pdf   # calls the real API, prints LLM vs p
 
 ## Tasks
 
-Tasks are described in [docs/keel_division_trabajo.md](../docs/keel_division_trabajo.md). A task that exists in both modes keeps one number: its base text is Keel Personal and Keel Trade adds to it.
+Tasks are described in [docs/trabajo/area-3-ingesta.md](../docs/trabajo/area-3-ingesta.md) (tasks T3.x). A task that exists in both modes keeps one number: its base text is Keel Personal and Keel Trade adds to it.
 
 | Task | Issue |
 |---|---|

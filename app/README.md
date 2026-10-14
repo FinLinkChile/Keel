@@ -9,7 +9,7 @@ The cosigner view is shared by both.
 
 React Native with Expo and TypeScript. It runs on Android, iOS and the web from the same code. `App.tsx` is a placeholder shell. Each party signs from their own wallet (WalletConnect or a browser wallet on the web build): no owner key on any server.
 
-The Keel Trade flow is in [docs/flujo_clave.md](../docs/flujo_clave.md), and the Keel Personal one in section 4 of [docs/KEEL_SOLUCION_ALCANCE.md](../docs/KEEL_SOLUCION_ALCANCE.md). The payout address shown to the user never comes from a document: it comes from the signed order and the party registry, or from the table of registered beneficiaries.
+The Keel Trade flow is in [docs/flujo/flujo-clave.md](../docs/flujo/flujo-clave.md), and the Keel Personal one in [docs/personal/keel-personal.md](../docs/personal/keel-personal.md). The payout address shown to the user never comes from a document: it comes from the signed order and the party registry, or from the table of registered beneficiaries.
 
 ```sh
 npm install            # from the repository root
@@ -24,7 +24,7 @@ The shared interfaces are imported from `@keel/schemas`. Metro resolves the work
 
 ## Tasks
 
-Tasks are described in [docs/keel_division_trabajo.md](../docs/keel_division_trabajo.md). A task that exists in both modes keeps one number: its base text is Keel Personal and Keel Trade adds to it.
+Tasks are described in [docs/trabajo/area-4-producto.md](../docs/trabajo/area-4-producto.md) (tasks T4.x). A task that exists in both modes keeps one number: its base text is Keel Personal and Keel Trade adds to it.
 
 | Task | Issue |
 |---|---|

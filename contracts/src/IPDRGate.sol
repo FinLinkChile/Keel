@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {PaymentIntent, PolicyDecision} from "./KeelTypes.sol";
 
-// Interface of the gate. Event and error names are fixed (shared interfaces, section 2.4).
+// Interface of the gate. Event and error names are fixed (docs/interfaces/eventos-y-errores.md).
 // EIP-712 domain: name = "Keel", version = "1", chainId, verifyingContract = PDRGate.
 interface IPDRGate {
     event PaymentExecuted(bytes32 indexed intentHash, bytes32 pdrHash, uint8 tier, bytes32 indexed invoiceKey);
