@@ -1,6 +1,7 @@
 // Policy engine. Owned by Area 2.
 import type { InvoiceExtraction, PaymentIntent, Tier } from "@keel/schemas";
 
+export * from "./documents";
 export * from "./funding";
 export * from "./keys";
 export * from "./pdr";
