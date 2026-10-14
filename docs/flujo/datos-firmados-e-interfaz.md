@@ -23,7 +23,7 @@ struct PurchaseOrder {
     address carrier;            // quién puede firmar la atestación de embarque
     address arbiter;            // árbitro acordado
     bytes32 incoterm;           // EXW, FOB, CIF, CFR...
-    bytes32 termsHash;          // hash del documento completo de la orden
+    bytes32 termsHash;          // hash EIP-712 de OrderTerms (términos estructurados de la orden)
     bytes32 requiredDocsHash;   // hash de la lista de documentos exigidos
     uint256 nonce;              // evita reutilizar la firma
 }

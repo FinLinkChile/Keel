@@ -22,10 +22,12 @@ Lo que queda escrito y firmado:
 | Quién prueba el embarque | `carrier` | Naviera o agente de carga registrado |
 | Quién resuelve disputas | `arbiter` | Tercero independiente |
 | Incoterm | `incoterm` | CIF |
-| Documento completo | `termsHash` | Hash de la orden con la proforma |
+| Términos de la orden | `termsHash` | Hash EIP-712 de `OrderTerms`: número de orden, moneda y monto de la factura, códigos arancelarios y hash del documento completo con la proforma |
 | Documentos exigidos | `requiredDocsHash` | BL y factura |
 
 **La consecuencia antifraude más importante:** `payoutAddress` va dentro de lo firmado por ambos. Un correo que diga "cambiamos de cuenta" no sirve de nada: cambiar la cuenta de cobro exige una orden nueva firmada por ambas partes.
+
+Con los términos pasa lo mismo: como `termsHash` es el hash de datos estructurados (`OrderTerms`) y va dentro de la orden, ambas partes firman también el número de orden, el monto y la moneda de la factura y la mercancía. En el gatillo 2 el motor compara la factura contra esos términos; si no son exactamente los firmados, el saldo se retiene. Se calcula con `termsHash` de `schemas/src/hash.ts`.
 
 Esto también resuelve el dolor del papel: sin la firma del exportador no hay orden, y sin orden no hay anticipo.
 

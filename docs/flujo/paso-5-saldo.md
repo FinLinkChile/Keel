@@ -27,6 +27,8 @@ Lo que el motor compara para emitir ese PDR:
 | Partes | Importador y exportador de la orden |
 | Mercancía | La descrita en la orden |
 
+El número de orden, el monto y la moneda de la factura y los códigos arancelarios salen de `OrderTerms`, los términos que ambas partes firmaron a través de `termsHash` ([paso 1](paso-1-firma-orden.md)). Si faltan o no son los firmados, el saldo se retiene.
+
 **Efecto:** se transfiere el saldo a `payoutAddress`. Si la orden tiene ventana de disputa, el saldo se libera al terminar la ventana, salvo que el importador abra una disputa.
 
 **[ABIERTO]** Si el PDR del motor es obligatorio para liberar el saldo o solo informativo. Recomendación: obligatorio, porque es la parte del gatillo que valida BL y factura, y es lo que hace que el flujo sea de un agent wallet y no solo de un escrow.
