@@ -2,14 +2,14 @@
 
 **Para qué sirve este documento:** que todo el equipo tenga la misma imagen de qué es Keel, qué construimos para el 2026 Shenzhen FinTechathon, hacia dónde puede crecer y cómo funciona cada parte del flujo. Es la referencia a la que volvemos cuando haya una duda de diseño o de desarrollo.
 
-**Versión:** 13 de octubre de 2026, actualizada el mismo día por el cambio de rumbo. **Estado:** propuesta para revisión del equipo.
+**Versión:** 13 de octubre de 2026, actualizada el mismo día por el cambio de rumbo y otra vez para volver a incluir Keel Personal en el alcance. **Estado:** propuesta para revisión del equipo.
 
-**Cambio de rumbo:** Keel dejó de ser un pagador de cuentas. El proyecto es ahora Keel Trade: la aplicación del flujo de escrow a la importación de productos desde China por empresas chilenas, con el corredor Chile y Hong Kong como objetivo, sobre una red cerrada. El objetivo y el flujo están en [flujo_clave.md](flujo_clave.md), que manda si hay diferencias con este documento. Keel Personal queda como la propuesta anterior: ya no se construye.
+**Cambio de rumbo:** el foco del proyecto pasó del pago de cuentas a Keel Trade: la aplicación del flujo de escrow a la importación de productos desde China por empresas chilenas, con el corredor Chile y Hong Kong como objetivo, sobre una red cerrada. El objetivo y el flujo están en [flujo_clave.md](flujo_clave.md), que manda si hay diferencias con este documento. Keel Personal vuelve a estar dentro del alcance como segundo modo de la misma billetera. **[PROPUESTA: la profundidad de Keel Personal en la entrega la confirma el equipo, pregunta 14 de flujo_clave.md]**
 
 **Cómo leerlo:**
 - Las secciones 1 a 3 son para todos: qué es Keel, el alcance y las ideas de fondo.
-- La sección 4 es Keel Personal. Es histórica: se conserva porque de ahí vienen las piezas de la billetera (Safe, Roles, Delay, PDRGate, niveles) que Keel Trade reutiliza.
-- La sección 5 es Keel Trade: comercio exterior con escrow. **Es el proyecto**, y su diseño es la referencia para construirlo.
+- La sección 4 es Keel Personal: pago de cuentas. Es el segundo modo, y de ahí vienen las piezas de la billetera (Safe, Roles, Delay, PDRGate, niveles) que Keel Trade reutiliza.
+- La sección 5 es Keel Trade: comercio exterior con escrow. **Es el modo principal y la demo**, y su diseño es la referencia para construirlo.
 - Las secciones 6 a 9 cubren sistema de pago, seguridad, regulación y preguntas abiertas.
 
 Cada afirmación lleva una etiqueta de estado:
@@ -40,16 +40,16 @@ Todo pago automático tiene el mismo punto débil: alguien le dice al sistema a 
 
 ### 1.3 Los dos modos
 
-Keel Trade es el proyecto. Keel Personal fue la propuesta anterior y se muestra para comparar.
+Keel tiene dos modos sobre la misma billetera. Keel Trade es el modo principal y la demo. Keel Personal es el segundo modo y está dentro del alcance.
 
-| | Keel Personal (anterior) | Keel Trade (el proyecto) |
+| | Keel Personal | Keel Trade (modo principal) |
 | --- | --- | --- |
 | Para quién | Personas y hogares | Empresas importadoras y exportadoras |
 | Qué paga | Cuentas recurrentes: arriendo, luz, internet | Órdenes de compra internacionales: anticipo y saldo |
 | Contra qué paga | Facturas autenticadas, a beneficiarios ya registrados | Orden de compra firmada por ambas partes y prueba de embarque firmada por la naviera |
 | Pieza central en cadena | PDRGate sobre una Safe con Zodiac Roles y Delay | Contrato de escrow (TradeEscrow) más las mismas piezas de seguridad |
 | Quién decide | El motor de política, determinista; la IA solo lee | Las firmas de las partes y de la naviera; el motor verifica documentos |
-| Estado en la competencia | Propuesta anterior; no se construye | **Se construye y se demuestra** |
+| Estado en la competencia | Dentro del alcance como segundo modo **[PROPUESTA: profundidad por confirmar]** | **Se construye y se demuestra** |
 
 ---
 
@@ -64,9 +64,9 @@ Keel Trade es el proyecto. Keel Personal fue la propuesta anterior y se muestra 
 4. Perfiles de importador y exportador, bitácora y avisos por Telegram. **[EN CURSO]**
 5. Los cuatro actos de la demo: orden completa, fraude documental (cambio de cuenta y BL falso), proveedor que no embarca y llave robada. **[EN CURSO]**
 6. Batería de red team, evidencia con hashes e informe de seguridad. **[EN CURSO]**
+7. Keel Personal como segundo modo: pago de cuentas recurrentes contra facturas autenticadas, a beneficiarios registrados, con cambio de beneficiario con espera y veto (sección 4). En la aplicación es un tipo de cuenta junto al de empresa. **[PROPUESTA: la profundidad en la entrega la confirma el equipo]**
 
 **Fuera (trabajo futuro, se declara así):**
-- Keel Personal (pago de cuentas).
 - Integración con BL electrónico de navieras, identidad empresarial (WeIdentity o similar), bancos y rampas de entrada y salida de dinero fiat.
 - Financiamiento, KYC, KYB y AML/KYT.
 - Aduana, impuestos de importación y flete.
@@ -104,9 +104,9 @@ Estas seis ideas son el núcleo de Keel. Si un diseño nuevo rompe alguna, está
 
 ---
 
-## 4. Keel Personal: pago de cuentas (propuesta anterior, histórica)
+## 4. Keel Personal: pago de cuentas (segundo modo)
 
-**Esta sección ya no describe lo que se construye.** Se conserva como referencia de las piezas de la billetera que Keel Trade reutiliza: actores, PDR, PDRGate, niveles de permiso y el cambio con espera y veto. Las etiquetas de estado de esta sección reflejan el momento en que se escribió.
+Keel Personal está dentro del alcance como segundo modo. Además es la referencia de las piezas de la billetera que Keel Trade reutiliza: actores, PDR, PDRGate, niveles de permiso y el cambio con espera y veto. Las etiquetas de estado de esta sección reflejan el momento en que se escribió (antes del cambio de rumbo); la red y el token se deciden junto con los de Keel Trade.
 
 ### 4.1 Actores
 
@@ -383,16 +383,16 @@ Una firma de billetera prueba que firmó **una llave**, no **quién** está detr
 | --- | --- | --- | --- |
 | Trade (competencia) | Stablecoin disponible en la red elegida, o un token de prueba declarado como tal **[ABIERTO]** | Red cerrada por definir; FISCO BCOS es la candidata natural **[ABIERTO]** | Participantes identificados y un entorno que un banco puede operar |
 | Trade (piloto) | Stablecoin regulada en la jurisdicción del pago (Hong Kong) | La que soporte esa stablecoin | Las partes necesitan un activo legal en su país |
-| Personal (anterior) | USDC | Base Sepolia | Ya no aplica |
+| Personal | USDC en el diseño original; se alinea con el token de la red elegida **[ABIERTO]** | Base Sepolia en el diseño original; se decide junto con la red de Trade **[ABIERTO]** | Estable y con costos bajos por pago |
 
 ### 6.2 Entrada y salida de dinero fiat
 
-- **Personal en Chile (propuesta anterior):** el usuario compra USDC con pesos en un exchange local y lo deposita en su Safe. El beneficiario recibe USDC; si quiere pesos, los convierte en un exchange. El puente directo a pesos es trabajo futuro y se declara así.
+- **Personal en Chile:** el usuario compra USDC con pesos en un exchange local y lo deposita en su Safe. El beneficiario recibe USDC; si quiere pesos, los convierte en un exchange. El puente directo a pesos es trabajo futuro y se declara así.
 - **Trade:** cada parte necesita convertir entre su moneda y la stablecoin. Este es el mayor obstáculo práctico y depende de la regulación de cada país (sección 8).
 
 ### 6.3 Tipo de cambio
 
-- Personal (propuesta anterior): dos fuentes (dólar observado del Banco Central y un exchange local). Si difieren más de 1,5% se retiene el pago; se paga con la tasa menos favorable más un margen. El cupo del Roles acota el daño aunque se manipule una fuente.
+- Personal: dos fuentes (dólar observado del Banco Central y un exchange local). Si difieren más de 1,5% se retiene el pago; se paga con la tasa menos favorable más un margen. El cupo del Roles acota el daño aunque se manipule una fuente.
 - Trade: el monto se pacta en la orden directamente en la stablecoin, así que el contrato no necesita tipo de cambio. La conversión ocurre fuera, al entrar y al salir.
 
 ### 6.4 Tres modelos de liquidación (para responder "¿y los bancos?")
@@ -413,9 +413,9 @@ Una carta de crédito también financia: el importador paga a 30 o 60 días. Un 
 
 ## 7. Seguridad
 
-### 7.1 Modelo de amenazas de Keel Personal (propuesta anterior)
+### 7.1 Modelo de amenazas de Keel Personal
 
-Las filas de llaves, cosignatario y dueño siguen aplicando a la billetera de Keel Trade. Las de facturas de cuentas ya no.
+Las filas de llaves, cosignatario y dueño aplican también a la billetera de Keel Trade. Las de facturas de cuentas aplican solo a Keel Personal.
 
 | Amenaza | Defensa | Dónde se prueba |
 | --- | --- | --- |
@@ -486,8 +486,8 @@ Las filas de llaves, cosignatario y dueño siguen aplicando a la billetera de Ke
 | Entregable | Qué va de este documento |
 | --- | --- |
 | Deck (10 minutos) | Secciones 1 y 3 como problema y principios; Keel Trade como demo, con el flujo de 6 pasos (5.3) y la frase de la sección 6.4 |
-| Documento técnico | Sección 5 completa como diseño central; de la sección 4, solo las piezas de billetera que se reutilizan |
-| Informe de seguridad | Sección 7.2 completa; de la 7.1, las amenazas de llaves y permisos que siguen aplicando |
+| Documento técnico | Sección 5 completa como diseño central; la sección 4 como segundo modo y como origen de las piezas de billetera |
+| Informe de seguridad | Sección 7.2 completa; la 7.1 para Keel Personal y para las amenazas de llaves y permisos comunes |
 | README | Alcance (2.1) y trabajo futuro |
 | Respuestas al jurado | Secciones 5.6 (por qué confía el exportador), 6.4 (bancos), 8 (regulación) |
 

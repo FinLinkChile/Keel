@@ -1,8 +1,8 @@
 # ingest (Area 3)
 
-Authenticated intake of trade documents, deterministic PDF parser, quarantined LLM extractor and the comparison between both.
+Authenticated intake of documents, deterministic PDF parser, quarantined LLM extractor and the comparison between both.
 
-The documents are the bill of lading (or air waybill) and the commercial invoice of a purchase order. Both readers return schemas from `@keel/schemas` that have no free text. Nothing found in a document can become a payout address: a document that mentions a different account only raises an alert, and the payout address changes only with a new order signed by both parties.
+In Keel Personal the documents are utility bills that arrive by email. In Keel Trade the documents are the bill of lading (or air waybill) and the commercial invoice of a purchase order. Both readers return schemas from `@keel/schemas` that have no free text. Nothing found in a document can become a payout address: in Keel Trade a document that mentions a different account only raises an alert, and the payout address changes only with a new order signed by both parties; in Keel Personal it opens a beneficiary change request that goes through the Delay.
 
 The extractor reads data. It does not validate signatures: the proof of shipment is the attestation signed by the carrier, not a scanned signature in a PDF.
 
@@ -10,9 +10,9 @@ Bills of lading have no standard format across carriers. The parser covers the f
 
 ## Current state
 
-Everything implemented here was built for the previous scope (utility bill payments): invoices arriving by email, read into the `InvoiceExtraction` schema, with beneficiary aliases and an `invoiceKey`. The sections below describe that code as it is today.
+Everything implemented here is the Keel Personal pipeline: invoices arriving by email, read into the `InvoiceExtraction` schema, with beneficiary aliases and an `invoiceKey`. The sections below describe that code as it is today.
 
-Most of it carries over to trade documents: the quarantined extractor and its provider adapters, the privacy layer, hidden text detection, the two source agreement, flood protection and the admin API. What has to change once Area 2 freezes the new extraction schemas: the fields the parser and the extractor read (transport document and commercial invoice instead of a utility bill), the keys (`blNumberHash` and `docsHash` instead of `invoiceKey`), the intake channel (upload by a party of the order, with email as a secondary channel) and the account change flow (an alert only, because the payout address changes only with a new signed order).
+Most of it is shared with Keel Trade: the quarantined extractor and its provider adapters, the privacy layer, hidden text detection, the two source agreement, flood protection and the admin API. What Keel Trade adds once Area 2 freezes its extraction schemas: the fields the parser and the extractor read (transport document and commercial invoice), the keys (`blNumberHash` and `docsHash`), the intake channel (upload by a party of the order, with email as a secondary channel) and its account change flow (an alert only, because the payout address changes only with a new signed order).
 
 ```sh
 npm run serve -w ingest       # inbound webhook, needs INGEST_* and LLM_* in .env
@@ -115,15 +115,15 @@ npm run extract -w ingest -- invoice.pdf   # calls the real API, prints LLM vs p
 
 ## Tasks
 
-Tasks are described in [docs/keel_division_trabajo.md](../docs/keel_division_trabajo.md). Tasks that keep their number changed scope with the change of direction of October 13.
+Tasks are described in [docs/keel_division_trabajo.md](../docs/keel_division_trabajo.md). A task that exists in both modes keeps one number: its base text is Keel Personal and Keel Trade adds to it.
 
 | Task | Issue |
 |---|---|
-| T3.1 Authenticated inbound channel (upload by a party of the order) | #18 |
+| T3.1 Authenticated inbound channel (email; upload by a party of the order) | #18 |
 | T3.2 Flood protection | #19 |
-| T3.3 Deterministic parser for transport documents and invoices | #20 |
+| T3.3 Deterministic parser (utility bills; transport documents and invoices) | #20 |
 | T3.4 Quarantined LLM extractor | #21 |
 | T3.5 Two source agreement | #22 |
-| T3.6 Account change detection (alert only) | #23 |
-| T3.7 Document keys (`blNumberHash`, `docsHash`) | #24 |
+| T3.6 Account change detection (change request; alert only in Trade) | #23 |
+| T3.7 Idempotency and document keys (`invoiceKey`; `blNumberHash`, `docsHash`) | #24 |
 | T3.8 Document corpus | #25 |

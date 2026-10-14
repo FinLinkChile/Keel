@@ -1,12 +1,17 @@
 # Keel
 
-An agent wallet for cross-border trade. It pays international purchase orders only when verifiable conditions are met, using a programmable escrow instead of the bank custody of a letter of credit. The AI interprets once, the contract always obeys.
+An agent wallet that pays only when verifiable conditions are met. The AI interprets once, the contract always obeys.
+
+Keel has two modes on the same wallet:
+
+* **Keel Trade**, the main mode and the demo: it pays international purchase orders through a programmable escrow, instead of the bank custody of a letter of credit.
+* **Keel Personal**, the second mode: it pays a person's recurring bills (rent, electricity, internet) against authenticated invoices, to beneficiaries that are already registered.
 
 Built for the 2026 Shenzhen FinTechathon, International Track, Topic F: Agent Wallet.
 
-Use case: Chilean companies importing goods from China, with Chile and Hong Kong as the target corridor, on a permissioned network.
+Keel Trade use case: Chilean companies importing goods from China, with Chile and Hong Kong as the target corridor, on a permissioned network.
 
-## How it works
+## How Keel Trade works
 
 1. Importer and exporter sign the purchase order as EIP-712 structured data. The payout address, amounts, deadlines, carrier and arbiter are fixed in what both sign.
 2. The importer deposits the full amount in the escrow contract. The funds are locked: the importer cannot withdraw them unilaterally and the exporter has not received them yet.
@@ -17,9 +22,19 @@ Use case: Chilean companies importing goods from China, with Chile and Hong Kong
 
 Nothing in an email or a PDF can become a payment address: the payout address comes from the purchase order signed by both parties, and changing it requires a new signed order.
 
-The wallet side is a Safe with the Zodiac Roles and Delay modifiers. The agent (a quarantined LLM extractor, a deterministic policy engine and a relayer) can only act through `PDRGate`, inside a role limited to the escrow contract and a spending allowance.
+## How Keel Personal works
 
-[docs/flujo_clave.md](docs/flujo_clave.md) defines the goal of the project and the flow in detail. It is the reference to check before designing or creating any component.
+1. A bill arrives by email. The sender domain is authenticated against the domain registered for that beneficiary.
+2. A deterministic parser and a quarantined LLM extractor read the invoice, and both must agree.
+3. The policy engine decides the permission tier and signs a Policy Decision Record (PDR). The recipient comes from the table of registered beneficiaries, never from the invoice.
+4. `PDRGate` verifies the PDR and the Safe pays, inside the allowance of the agent role.
+5. An invoice that mentions a new account never pays: it opens a beneficiary change request that waits in the Delay, where the cosigner can veto it.
+
+## The wallet
+
+Both modes share the wallet: a Safe with the Zodiac Roles and Delay modifiers. The agent (a quarantined LLM extractor, a deterministic policy engine and a relayer) can only act through `PDRGate`, inside a role with a spending allowance. In Keel Trade that role is limited to the escrow contract; in Keel Personal, to transfers to the whitelisted beneficiaries.
+
+[docs/flujo_clave.md](docs/flujo_clave.md) defines the goal of the project and the Keel Trade flow in detail. It is the reference to check before designing or creating any component. Keel Personal is designed in section 4 of [docs/KEEL_SOLUCION_ALCANCE.md](docs/KEEL_SOLUCION_ALCANCE.md).
 
 ## Repository layout
 
@@ -28,8 +43,8 @@ The wallet side is a Safe with the Zodiac Roles and Delay modifiers. The agent (
 | `contracts/` | Solidity, Foundry, deployment scripts: escrow, `PDRGate`, Safe configuration | 1 |
 | `schemas/` | JSON Schema, TypeScript types, EIP-712 structs | 2 |
 | `engine/` | Policy engine, PDR, signatures, verifier | 2 |
-| `ingest/` | Trade document intake, parser, quarantined extractor | 3 |
-| `app/` | React Native (Expo) app: importer and exporter profiles, order signing, readable diff, cosigner view | 4 |
+| `ingest/` | Intake of bills and trade documents, parser, quarantined extractor | 3 |
+| `app/` | React Native (Expo) app: personal and company accounts, importer and exporter profiles, signing, readable diff, cosigner view | 4 |
 | `bot/` | Telegram bot with template messages | 4 |
 | `redteam/` | Scenarios, adversarial corpus, metrics | 5 |
 | `docs/` | Project goal, technical document, security report, evidence, deck | 5 |
@@ -37,7 +52,7 @@ The wallet side is a Safe with the Zodiac Roles and Delay modifiers. The agent (
 
 Each folder has a README with its tasks and how to run it.
 
-The project changed direction on October 13, 2026: it was a utility bill payer before. The code scaffolding and the folder READMEs still carry the interfaces of that scope until each area migrates them.
+The focus moved from utility bill payments to trade escrow on October 13, 2026, and Keel Personal came back into scope the same day as the second mode. The code scaffolding carries the Keel Personal interfaces; the Keel Trade ones are added as each area builds them. How deep Keel Personal goes in the submission is still to be confirmed by the team (open decision 14 in `docs/flujo_clave.md`).
 
 ## Getting started
 

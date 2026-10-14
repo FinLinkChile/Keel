@@ -2,7 +2,7 @@
 
 Keel es un agent wallet para comercio exterior: una billetera operada por un agente de IA que paga órdenes de compra internacionales solo cuando se cumplen condiciones verificables, con un contrato de escrow programable (anticipo al firmarse la orden, saldo al probarse el embarque, reembolso si vence el plazo).
 
-Contexto: importación de productos desde China por empresas chilenas, con el corredor Chile y Hong Kong como objetivo, sobre una red cerrada. Keel ya no es un pagador de cuentas (el cambio de rumbo fue el 13 de octubre de 2026). Lo que todavía lo describe así es anterior al cambio y está pendiente de migrar: los README de cada carpeta, las interfaces en `schemas/` y `contracts/src/`, `.env.example` y la sección 4 (Keel Personal, histórica) de `docs/KEEL_SOLUCION_ALCANCE.md`. No tomar esos nombres ni esas interfaces como modelo para componentes nuevos.
+Contexto: importación de productos desde China por empresas chilenas, con el corredor Chile y Hong Kong como objetivo, sobre una red cerrada. El foco pasó del pago de cuentas al comercio exterior el 13 de octubre de 2026. Keel Trade es el modo principal y la demo. Keel Personal (pago de cuentas, sección 4 de `docs/KEEL_SOLUCION_ALCANCE.md`) vuelve a estar dentro del alcance como segundo modo; su profundidad en la entrega está por confirmar (decisión abierta 14 de `docs/flujo_clave.md`). Los README de cada carpeta, las interfaces en `schemas/` y `contracts/src/` y `.env.example` son anteriores al cambio: sirven para Keel Personal, pero no son modelo para los componentes de Keel Trade.
 
 ## Regla general: alinearse con el flujo clave
 

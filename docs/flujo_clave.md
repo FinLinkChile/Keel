@@ -2,16 +2,18 @@
 
 **Para qué sirve este documento:** define el objetivo de Keel y el flujo que el proyecto implementa. Se consulta cada vez que se idea o se crea un componente nuevo, para confirmar que está alineado con el objetivo del equipo. Si un diseño contradice este documento, se cambia el diseño o se discute el cambio con el equipo y se actualiza aquí primero.
 
-**Versión:** 13 de octubre de 2026.
+**Versión:** 13 de octubre de 2026. Actualizada el mismo día para volver a incluir Keel Personal en el alcance.
 
 **Fuentes:**
 
 - [KEEL_SOLUCION_ALCANCE.md](KEEL_SOLUCION_ALCANCE.md): solución, alcance y diseño detallado. Su sección 5 (Keel Trade) es el diseño de referencia de este flujo, y sus secciones 3, 6, 7 y 8 aportan principios, sistema de pago, seguridad y regulación.
 - [reunion_comercio_exterior.md](reunion_comercio_exterior.md): entrevista con un importador chileno.
-- [keel-documento-tecnico.md](keel-documento-tecnico.md): la propuesta anterior (pago de cuentas), de donde viene la base de agent wallet.
+- [keel-documento-tecnico.md](keel-documento-tecnico.md): la propuesta original (pago de cuentas), de donde viene la base de agent wallet.
 - [keel_division_trabajo.md](keel_division_trabajo.md): decisiones transversales D1 a D10 y áreas.
 
-**Cambio de rumbo:** Keel dejó de ser un pagador de cuentas. El proyecto es ahora la aplicación del flujo de escrow a la importación de productos. Donde este documento y los anteriores no coincidan, vale este. En particular, queda sin efecto el reparto de [KEEL_SOLUCION_ALCANCE.md](KEEL_SOLUCION_ALCANCE.md) (secciones 1.3, 2.1 y 4) que dejaba el pago de cuentas como lo que se construye y el comercio exterior como visión.
+**Cambio de rumbo:** el 13 de octubre el foco del proyecto pasó del pago de cuentas a la aplicación del flujo de escrow a la importación de productos. Donde este documento y los anteriores no coincidan, vale este.
+
+**Dos modos:** Keel tiene dos modos sobre la misma billetera. **Keel Trade** (empresas, comercio exterior con escrow) es el flujo clave de este documento y la demo principal. **Keel Personal** (personas, pago de cuentas) vuelve a estar dentro del alcance como segundo modo; su diseño está en la sección 4 de [KEEL_SOLUCION_ALCANCE.md](KEEL_SOLUCION_ALCANCE.md). **[PROPUESTA: la profundidad de Keel Personal en la entrega la confirma el equipo, sección 14]**
 
 Lo marcado como **[ABIERTO]** falta decidirlo o verificarlo. Lo marcado como **[PROPUESTA]** es un diseño sugerido que el equipo todavía no confirma.
 
@@ -29,7 +31,7 @@ En una carta de crédito, los bancos guardan la plata y la liberan cuando se cum
 4. **Gatillo 2:** embarque probado, con BL y factura validados. Se libera el saldo.
 5. **Vencimiento:** si pasa la fecha de embarque y no llega la prueba, el saldo vuelve al importador.
 
-**Contexto:** la importación de productos desde China por parte de empresas chilenas, que es el caso validado en la entrevista.
+**Contexto:** la importación de productos desde China por parte de empresas chilenas, que es el caso validado en la entrevista. El mismo principio, pagar solo contra condiciones verificables, se aplica en Keel Personal a las cuentas recurrentes de una persona (arriendo, luz, internet), contra facturas autenticadas y a beneficiarios ya registrados.
 
 **Corredor objetivo:** Chile con Hong Kong, sobre una **red cerrada** (permisionada, con participantes identificados). En China continental el comercio con criptomonedas está prohibido desde 2021, por lo que la liquidación se plantea en Hong Kong.
 
@@ -45,7 +47,7 @@ Keel no es solo un contrato de escrow. Es una billetera en la que un agente hace
 
 ### 2.1 Las piezas de la billetera
 
-Vienen de la propuesta anterior y se mantienen:
+Vienen de Keel Personal y las comparten los dos modos:
 
 | Pieza | Qué hace |
 | --- | --- |
@@ -423,6 +425,7 @@ Al abrir, el contrato verifica: que la orden no exista, que ambas firmas sean v�
 - Lectura y validación del BL (o guía aérea) y de la factura contra la orden.
 - Billetera de empresa con rol del agente, cupos, espera y cosignatario.
 - Perfiles de importador y exportador, con la aplicación en inglés.
+- Keel Personal como segundo modo de la misma billetera: pago de cuentas recurrentes contra facturas autenticadas, a beneficiarios registrados, con cambio de beneficiario con espera y veto (sección 4 de [KEEL_SOLUCION_ALCANCE.md](KEEL_SOLUCION_ALCANCE.md)). En la aplicación es un tipo de cuenta junto al de empresa. **[PROPUESTA: la profundidad de Keel Personal en la entrega la confirma el equipo, sección 14]**
 - Evidencia con hashes de cada pago, bloqueo y revert.
 
 **Fuera (trabajo futuro, se declara así):**
@@ -435,7 +438,6 @@ Al abrir, el contrato verifica: que la orden no exista, que ambas firmas sean v�
 - Desaduanamiento: agente de aduana, declaración de ingreso, derechos e IVA.
 - Pago del flete a la naviera.
 - Certificados por tipo de producto (origen, análisis, salud, Sernapesca, Seremi de Salud).
-- Pago de cuentas personales (la propuesta anterior).
 - Otros corredores y la exportación desde Chile.
 
 **Lo que no prometemos:**
@@ -479,3 +481,4 @@ Antes de diseñar o crear algo nuevo, responder:
 | 11 | ¿Se puede citar al importador entrevistado, aunque sea de forma anónima? |
 | 12 | ¿Se confirman las tareas, las interfaces y el calendario propuestos en [keel_division_trabajo.md](keel_division_trabajo.md) tras el cambio de rumbo? |
 | 13 | ¿Cómo verifica el jurado las transacciones si la red es cerrada? |
+| 14 | Keel Personal vuelve al alcance: ¿con qué profundidad entra en la entrega (aplicación, contratos, demo) y en qué red y con qué token corre? |

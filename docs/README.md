@@ -4,9 +4,9 @@ Everything delivered to the jury, in English. Internal working documents are in 
 
 | Internal document | What it is |
 |---|---|
-| [flujo_clave.md](flujo_clave.md) | Goal of the project and the flow it implements. Check it before designing or creating any component |
-| [KEEL_SOLUCION_ALCANCE.md](KEEL_SOLUCION_ALCANCE.md) | Solution, scope and detailed design of the escrow (section 5) |
-| [keel_division_trabajo.md](keel_division_trabajo.md) | Work split in five areas, tasks, shared interfaces and calendar |
+| [flujo_clave.md](flujo_clave.md) | Goal of the project and the Keel Trade flow. Check it before designing or creating any component |
+| [KEEL_SOLUCION_ALCANCE.md](KEEL_SOLUCION_ALCANCE.md) | Solution, scope and detailed design: Keel Personal (section 4) and the escrow of Keel Trade (section 5) |
+| [keel_division_trabajo.md](keel_division_trabajo.md) | Work split in five areas, tasks of both modes, shared interfaces and calendar |
 | [keel-documento-tecnico.md](keel-documento-tecnico.md) | Positioning, architecture, security and demo |
 | [reunion_comercio_exterior.md](reunion_comercio_exterior.md) | Interview with a Chilean importer |
 
