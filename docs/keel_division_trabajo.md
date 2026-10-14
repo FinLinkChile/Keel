@@ -1,21 +1,29 @@
 # Keel: división del trabajo en 5 áreas
 
-**Proyecto:** Keel (antes Leash), pagador de cuentas básicas resistente a facturas fraudulentas
+**Proyecto:** Keel, agent wallet para comercio exterior: paga órdenes de compra internacionales solo cuando se cumplen condiciones verificables, con un contrato de escrow
 **Competencia:** 2026 Shenzhen FinTechathon, International Track, Topic F: Agent Wallet
 **Cierre:** martes 20 de octubre, 23:59 hora de Beijing, que en Chile es **martes 20 a las 12:59**. Planificamos entregar el **lunes 19 a las 22:00** (hora de Chile) y dejar el martes como margen.
 **Lema:** la IA interpreta una vez, el contrato obedece siempre.
+
+**Cambio de rumbo (13 de octubre de 2026):** Keel dejó de ser un pagador de cuentas básicas. Ahora aplica el flujo de escrow a la importación de productos desde China por empresas chilenas, con el corredor Chile y Hong Kong como objetivo, sobre una red cerrada. El objetivo y el flujo están en [flujo_clave.md](flujo_clave.md), que manda si hay diferencias.
+
+Este documento se adaptó a ese cambio con tres criterios:
+
+- Las áreas, sus dueños y los identificadores de tarea se mantienen. Una tarea que sigue vigente conserva su número y cambia su contenido. Las tareas nuevas tienen números nuevos.
+- Lo que ya no aplica queda marcado como **retirada**, para no perder la referencia en el tablero.
+- Las tareas nuevas, el calendario desde el martes 13 y las interfaces de la sección 2 son una **propuesta**. Las confirma el equipo: las interfaces el Área 2, el calendario el Área 5.
 
 ---
 
 ## 0. Cómo leer este documento
 
 1. **Decisiones transversales** (sección 1): lo que ya se definió y nadie cambia sin avisar al equipo.
-2. **Interfaces compartidas** (sección 2): estructuras que se congelan el lunes 12 para que las 5 áreas trabajen en paralelo sin bloquearse.
-3. **Las 5 áreas** (secciones 3 a 7): objetivo, entregables, tareas detalladas, criterio de "listo", críticas que resuelve, dependencias y qué se recorta si falta tiempo.
+2. **Interfaces compartidas** (sección 2): estructuras que se congelan para que las 5 áreas trabajen en paralelo sin bloquearse.
+3. **Las 5 áreas** (secciones 3 a 7): objetivo, entregables, tareas detalladas, criterio de "listo", dependencias y qué se recorta si falta tiempo.
 4. **Calendario, integración y reglas de recorte** (secciones 8 a 10).
 5. **Mapa de críticas** (sección 11): cada crítica recibida, con el área y la tarea que la resuelve.
 
-Las críticas 1 a 7 no venían en la captura que revisé; esta propuesta cubre de la 8 a la 19. Cuando lleguen las anteriores, se asignan con el mismo formato.
+Las críticas 1 a 7 no venían en la captura revisada; el mapa cubre de la 8 a la 19.
 
 ---
 
@@ -24,84 +32,147 @@ Las críticas 1 a 7 no venían en la captura que revisé; esta propuesta cubre d
 | # | Decisión | Por qué |
 |---|---|---|
 | D1 | El proyecto se llama **Keel** en código, documentos, repositorio y deck. No queda ninguna mención a "Leash". | Hay un repositorio competidor del mismo tema con ese nombre. |
-| D2 | **Se elimina el LLM operativo.** El flujo queda así: extractor LLM en cuarentena, validador determinista, motor de política, PDR, contrato. Si existe un chat, es de solo lectura (nivel 0) y explica decisiones con plantillas. | Crítica 8: el motor ya es determinista y ese LLM solo agrega superficie de ataque. |
+| D2 | **No hay LLM operativo.** El flujo queda así: extractor LLM en cuarentena, validador determinista, motor de política, PDR, contrato. Si existe un chat, es de solo lectura (nivel 0) y explica decisiones con plantillas. | Crítica 8: el motor ya es determinista y ese LLM solo agrega superficie de ataque. |
 | D3 | **El esquema de extracción no tiene texto libre.** Solo enums, números y campos validados con expresiones regulares. | Crítica 8. |
-| D4 | **PDRGate es el único miembro del rol del agente** en el Roles Modifier. La llave del agente sola no puede mover fondos: solo sirve para pagar gas. | Sin esto, el PDR no se exige en cadena y Keel quedaría igual que el competidor. |
-| D5 | **Los cambios de configuración pasan por el Delay Modifier:** lista blanca, cupos, firmante de la política y miembros de roles. Tienen aviso y ventana de veto. | Hace verificable el nivel 2 y responde a la crítica 16. |
+| D4 | **PDRGate es el único miembro del rol del agente** en el Roles Modifier. La llave del agente sola no puede mover fondos: solo sirve para pagar gas. | Sin esto, el PDR no se exige en cadena. |
+| D5 | **Los cambios de configuración pasan por el Delay Modifier:** proveedores conocidos, cupos, firmante de la política y miembros de roles. Tienen aviso y ventana de veto. | Hace verificable el nivel 2 y responde a la crítica 16. |
 | D6 | **El cosignatario no es dueño de la Safe.** Tiene un rol propio que solo le permite vetar, pausar y revocar el rol del agente. | Crítica 15: en una Safe, cualquier dueño puede proponer. |
-| D7 | **La simulación en tiempo de ejecución es `eth_call`.** Anvil se usa solo para las pruebas con fork. | Crítica 18. |
-| D8 | **Fallar cerrado siempre avisa:** todo pago retenido notifica el motivo, la fecha de vencimiento y la alternativa manual. | Crítica 19. |
+| D7 | **La simulación en tiempo de ejecución es `eth_call`.** Anvil se usa solo para las pruebas. | Crítica 18. |
+| D8 | **Fallar cerrado siempre avisa:** toda operación retenida notifica el motivo, la fecha límite y la alternativa manual. | Crítica 19. |
 | D9 | **Nada de sobreafirmaciones.** Ninguna celda dice "ninguno conocido" ni "imposible para cualquiera". Cada afirmación de seguridad dice para quién vale, dónde se hace cumplir y qué prueba lo demuestra. | Crítica 16. |
 | D10 | Todo lo que se entrega al jurado va en inglés. El trabajo interno puede ir en español. | Bases del concurso. |
+| D11 | **El objetivo del proyecto es el flujo de [flujo_clave.md](flujo_clave.md).** Se consulta antes de idear o crear un componente. | Cambio de rumbo del 13 de octubre. |
+| D12 | **La cuenta de cobro nunca sale de un documento.** Sale de la orden de compra firmada por ambas partes; cambiarla exige una orden nueva. | Es la defensa contra el fraude de cambio de cuenta. |
+| D13 | **La prueba de embarque es una firma de un tercero, no un PDF.** La IA lee datos, no valida firmas. | Una firma escaneada es una imagen. |
+| D14 | **Quien frena o arbitra no puede cobrar.** El contrato de escrow solo paga al importador o a la cuenta de cobro de la orden. | Extiende D6 al árbitro. |
 
 ---
 
-## 2. Interfaces compartidas (se congelan el lunes 12 a las 20:00)
+## 2. Interfaces compartidas (propuesta, se congelan el miércoles 14 a las 20:00)
 
 El Área 2 es dueña de estas definiciones. Viven en `schemas/`, como JSON Schema y tipos TypeScript (zod), y como structs en Solidity. Cambiarlas después del congelamiento exige avisar a las 5 áreas.
 
-### 2.1 Extracción de factura (salida del extractor en cuarentena)
+Las interfaces congeladas el lunes 12 eran las del pago de cuentas (`InvoiceExtraction`, `PaymentIntent`). Se reemplazan por las siguientes. `PolicyDecision` se conserva.
+
+### 2.1 Extracción de documentos (salida del extractor en cuarentena)
+
+Documento de transporte:
 
 ```json
 {
-  "alias_id": "ARRIENDO | LUZ | INTERNET | GASTOS_COMUNES",
-  "issuer_tax_id": "RUT normalizado, sin puntos ni guion, regex ^[0-9]{7,8}[0-9K]$",
-  "invoice_number": "regex ^[0-9]{1,12}$",
-  "period": "regex ^20[0-9]{2}(0[1-9]|1[0-2])$",
-  "amount_clp": "entero positivo",
-  "due_date": "timestamp unix",
+  "doc_type": "BILL_OF_LADING | AIR_WAYBILL",
+  "document_number": "regex ^[A-Z0-9]{6,20}$",
+  "on_board_date": "timestamp unix",
+  "port_of_loading": "UN/LOCODE, regex ^[A-Z]{2}[A-Z0-9]{3}$",
+  "port_of_discharge": "UN/LOCODE, regex ^[A-Z]{2}[A-Z0-9]{3}$",
+  "hidden_text_detected": "boolean"
+}
+```
+
+Factura comercial:
+
+```json
+{
+  "invoice_number": "regex ^[A-Z0-9]{1,20}$",
+  "order_number": "regex ^[A-Z0-9]{1,20}$",
+  "amount_minor": "entero positivo, en la unidad mínima de la moneda",
+  "currency": "USD | EUR | CNY | HKD",
+  "incoterm": "EXW | FOB | CIF | CFR",
+  "importer_tax_id": "RUT normalizado, regex ^[0-9]{7,8}[0-9K]$",
+  "hs_code": "código arancelario, regex ^[0-9]{6,10}$",
   "mentions_account_change": "boolean",
   "hidden_text_detected": "boolean"
 }
 ```
 
-No hay campo de nombre del emisor, notas ni dirección de destino. El nombre visible del beneficiario sale de la tabla de alias registrada en el onboarding, nunca de la factura.
+No hay nombres, descripciones, notas, datos bancarios ni direcciones de destino. Lo que se muestra a las personas (nombre del proveedor, cuenta de cobro) sale de la orden firmada y del registro de partes, nunca del documento.
 
-### 2.2 Intención (TIS de Keel)
+### 2.2 Orden de compra y atestación de embarque
 
 ```solidity
-struct PaymentIntent {
-    uint8   aliasId;        // enum de beneficiarios registrados
-    address recipient;      // resuelto desde la tabla de alias, nunca desde el documento
-    uint256 amountUsdc;     // 6 decimales
-    bytes32 invoiceKey;     // keccak256(issuerTaxId, invoiceNumber, period)
-    uint64  deadline;
+struct PurchaseOrder {
+    bytes32 orderId;
+    address importer;
+    address exporter;
+    address payoutAddress;      // firmada por ambos; nunca sale de un documento
+    address token;
+    uint256 totalAmount;
+    uint16  advanceBps;         // 5000 = 50%
+    uint64  shipmentDeadline;
+    uint64  disputeWindow;
+    address carrier;
+    address arbiter;
+    bytes32 incoterm;
+    bytes32 termsHash;
+    bytes32 requiredDocsHash;
     uint256 nonce;
+}
+
+struct ShipmentAttestation {
+    bytes32 orderId;
+    bytes32 blNumberHash;
+    uint64  onBoardDate;
+    bytes32 portOfLoading;
+    bytes32 docsHash;
 }
 ```
 
-### 2.3 Decisión (PDR de Keel)
+El detalle de cada campo está en la sección 5.5 y 5.8 de [KEEL_SOLUCION_ALCANCE.md](KEEL_SOLUCION_ALCANCE.md).
+
+### 2.3 Intención de depósito y decisiones (PDR de Keel)
 
 ```solidity
+struct FundIntent {
+    bytes32 orderId;
+    address escrow;         // el contrato TradeEscrow
+    address token;
+    uint256 amount;         // igual al totalAmount de la orden
+    uint64  deadline;
+    uint256 nonce;
+}
+
 struct PolicyDecision {
-    bytes32 intentHash;     // hash EIP 712 de PaymentIntent
-    bytes32 calldataHash;   // keccak256 del calldata exacto de USDC.transfer
+    bytes32 intentHash;     // hash EIP 712 de FundIntent
+    bytes32 calldataHash;   // keccak256 del calldata exacto que ejecuta la Safe
     bytes32 policyHash;     // versión vigente de las reglas
-    bytes32 inputsHash;     // tipo de cambio, fuentes, versión de lista blanca
+    bytes32 inputsHash;     // orden, registro de proveedores, cupo usado
     uint8   tier;           // 1 o 3 (los niveles 0, 2 y 4 no llegan al gate)
+    uint64  expiresAt;
+}
+
+struct DocumentDecision {
+    bytes32 orderId;
+    bytes32 attestationHash; // hash EIP 712 de ShipmentAttestation
+    bytes32 docsHash;        // hash del paquete de documentos leído
+    bytes32 policyHash;
+    bytes32 inputsHash;      // extracciones del BL y de la factura
     uint64  expiresAt;
 }
 ```
 
-* Dominio EIP 712: `name = "Keel"`, `version = "1"`, `chainId`, `verifyingContract = PDRGate`.
-* El PDR completo, en JSON con las reglas evaluadas y sus resultados, se guarda fuera de cadena en `evidence/pdr/<intentHash>.json`. En cadena va su hash, dentro del evento del gate.
+* Dominio EIP 712: `name = "Keel"`, `version = "1"`, `chainId`, y como `verifyingContract` el contrato que verifica cada firma (PDRGate para `PolicyDecision`, TradeEscrow para la orden, la atestación y `DocumentDecision`).
+* El PDR completo, en JSON con las reglas evaluadas y sus resultados, se guarda fuera de cadena en `evidence/pdr/<hash>.json`. En cadena va su hash.
+* **Abierto:** qué firmante de política acepta el escrow para `DocumentDecision` (uno registrado en el contrato o uno fijado en cada orden) y si esa decisión es obligatoria para liberar el saldo.
 
 ### 2.4 Eventos y errores tipados (nombres fijos)
 
-* Eventos: `PaymentExecuted`, `PaymentHeld`, `BeneficiaryChangeQueued`, `BeneficiaryChangeVetoed`, `AgentRoleRevoked`, `GatePaused`.
-* Errores: `IntentMismatch`, `CalldataMismatch`, `BadPolicySignature`, `MissingCosignature`, `StalePolicy`, `Expired`, `NonceUsed`, `InvoiceAlreadyPaid`, `GateIsPaused`.
+* PDRGate, eventos: `FundingExecuted`, `OperationHeld`, `AgentRoleRevoked`, `GatePaused`.
+* PDRGate, errores: `IntentMismatch`, `CalldataMismatch`, `BadPolicySignature`, `MissingCosignature`, `StalePolicy`, `Expired`, `NonceUsed`, `GateIsPaused`.
+* TradeEscrow, eventos: `OrderOpened`, `OrderFunded`, `AdvanceReleased`, `ShipmentAccepted`, `BalanceReleased`, `Refunded`, `DisputeRaised`, `DisputeResolved`, `OrderCancelled`.
+* TradeEscrow, errores: `InvalidState`, `OrderExists`, `BadImporterSignature`, `BadExporterSignature`, `BadCarrierSignature`, `BadDocumentDecision`, `ShipmentTooLate`, `BillOfLadingAlreadyUsed`, `DeadlineNotReached`, `NotParty`, `BadResolution`, `TokenNotAllowed`, `AmountMismatch`.
 
 ### 2.5 Estructura del repositorio
 
 ```
-contracts/   Solidity, Foundry, scripts de despliegue          (Área 1)
-schemas/     JSON Schema, tipos TS, structs EIP 712             (Área 2)
-engine/      motor de política, PDR, firmas, verificador        (Área 2)
-ingest/      correo, PDF, extractor, idempotencia               (Área 3)
-app/         web: onboarding, diff legible, cosignatario         (Área 4)
-bot/         bot de Telegram con plantillas                     (Área 4)
-redteam/     escenarios, corpus adversarial, métricas           (Área 5)
-docs/        documento técnico, seguridad, evidencia, deck      (Área 5)
+contracts/   Solidity, Foundry, scripts de despliegue              (Área 1)
+schemas/     JSON Schema, tipos TS, structs EIP 712                 (Área 2)
+engine/      motor de política, PDR, firmas, verificador            (Área 2)
+ingest/      recepción de documentos, parser, extractor             (Área 3)
+app/         perfiles, firma de la orden, diff legible, cosignatario (Área 4)
+bot/         bot de Telegram con plantillas                         (Área 4)
+redteam/     escenarios, corpus adversarial, métricas               (Área 5)
+docs/        objetivo, documento técnico, seguridad, deck           (Área 5)
+evidence/    PDR y evidencia en cadena                              (Área 5)
 ```
 
 ---
@@ -109,172 +180,188 @@ docs/        documento técnico, seguridad, evidencia, deck      (Área 5)
 ## 3. Área 1: Contratos y permisos en cadena
 
 **Perfil sugerido:** quien tenga más experiencia en Solidity y Foundry.
-**Objetivo:** que ni la IA, ni la llave del agente, ni el motor de política comprometido puedan pagar a quien no corresponde. Y que cada nivel de permiso tenga una regla en cadena con su prueba.
+**Objetivo:** que los fondos de una orden solo puedan ir al exportador o volver al importador, según las condiciones firmadas. Y que ni la IA, ni la llave del agente, ni el motor de política comprometido puedan desviarlos.
 
 ### Entregables
 
-* Safe, Roles Modifier v2, Delay Modifier y PDRGate desplegados y verificados en Base Sepolia.
-* Batería de pruebas negativas sobre fork, con fuzz e invariantes.
-* `contracts/deployments/84532.json` con todas las direcciones.
+* TradeEscrow, PDRGate, Safe, Roles Modifier v2 y Delay Modifier desplegados en la red elegida.
+* Batería de pruebas negativas, con fuzz e invariantes.
+* `contracts/deployments/<chainId>.json` con todas las direcciones.
 * Tabla "nivel → dónde se hace cumplir → prueba", que se entrega al Área 5.
 
 ### Tareas
 
-**T1.1 Safe base.**
-Desplegar una Safe en Base Sepolia con el dueño como único firmante (1 de 1) para la demo. Documentar que en producción sería 2 de 3, con recuperación social. El cosignatario **no** se agrega como dueño (D6).
+**T1.0 Red y token (nueva, bloquea el resto).**
+Elegir con el equipo la red cerrada y el token de pago. Confirmar que Safe y los módulos de Zodiac se pueden desplegar ahí y qué herramientas quedan disponibles (SDK, explorador). Si la red no tiene una stablecoin, desplegar un token de prueba y declararlo. Si Safe o Zodiac no se pueden desplegar, avisar el mismo día: cambia el diseño de permisos.
+
+**T1.1 Safe de la empresa.**
+Desplegar una Safe para el importador y otra para el exportador. En la demo pueden ser 1 de 1; documentar que en producción serían 2 de 3 socios. El cosignatario **no** se agrega como dueño (D6).
 
 **T1.2 Rol AGENTE en el Roles Modifier.**
 * Miembro único: la dirección de PDRGate (D4).
-* Destino permitido: solo el contrato USDC de Base Sepolia.
-* Función permitida: solo `transfer(address,uint256)`.
-* Condición sobre el destinatario: igual a alguna dirección de la lista blanca vigente.
-* Condición sobre el monto: dentro de un cupo (allowance) por periodo, por ejemplo mensual, con recarga automática.
+* Destinos permitidos: el contrato TradeEscrow y el token de pago.
+* Funciones permitidas: `fund(orderId)` en el escrow, y en el token solo la aprobación necesaria para ese depósito, con `spender` igual al escrow. Nunca `transfer` ni aprobaciones a otra dirección.
+* Condición sobre el monto: dentro de un cupo por periodo, con recarga automática.
 * Opciones de ejecución: sin `delegatecall` y sin `value`.
-* Armar la configuración con el SDK de Zodiac Roles para no escribir a mano la codificación de condiciones. Guardar la configuración como archivo versionado: su hash es el `policyHash` de la parte en cadena.
+* Armar la configuración con el SDK de Zodiac Roles. Guardarla como archivo versionado: su hash es la parte en cadena del `policyHash`.
+* **Abierto:** aprobación exacta más `fund`, o `fundWithPermit` si el token lo soporta.
 
 **T1.3 Rol COSIGNATARIO en el Roles Modifier.**
 * Miembro: la llave del cosignatario.
-* Funciones permitidas y nada más:
-  * vetar un cambio en cola (invalidar la transacción pendiente en el Delay Modifier);
-  * revocar la membresía de PDRGate en el rol AGENTE (botón de pánico);
-  * pausar PDRGate.
-* Con esto, "el cosignatario no puede iniciar envíos" pasa a ser cierto a nivel de protocolo, no solo de interfaz (crítica 15).
+* Funciones permitidas y nada más: vetar un cambio en cola en el Delay, revocar la membresía de PDRGate en el rol AGENTE (botón de pánico) y pausar PDRGate.
+* Con esto, "el cosignatario no puede iniciar envíos" es cierto a nivel de protocolo, no solo de interfaz (crítica 15).
 
 **T1.4 Delay Modifier para cambios de configuración.**
-* Habilitarlo como módulo de la Safe.
-* Todo cambio de lista blanca, cupos, firmante de política y membresías se encola ahí, con un enfriamiento de 3 minutos en la demo y 48 horas en el documento de producción, más una ventana de expiración.
+* Todo cambio de proveedores conocidos, cupos, firmante de política y membresías se encola ahí, con un enfriamiento de 3 minutos en la demo y 48 horas en el documento de producción.
 * Definir con el Área 4 cómo el dueño propone el cambio desde su billetera.
 * Este es el **nivel 2** en cadena.
 
 **T1.5 ConfigGuard (prioridad media, se recorta si falta tiempo).**
-* Guard de transacciones de la Safe que rechaza llamadas directas del dueño hacia Roles, Delay y PDRGate. Así, esos cambios solo pueden llegar por el camino del Delay.
+* Guard de la Safe que rechaza llamadas directas del dueño hacia Roles, Delay y PDRGate, para que esos cambios solo lleguen por el Delay.
 * Sin este guard, el dueño puede saltarse el retraso, y eso **debe declararse** en el informe de seguridad (D9, crítica 16).
-* Probar a fondo: un guard defectuoso puede bloquear la Safe. Incluir una prueba de que el dueño todavía puede operar por el camino legítimo.
 
 **T1.6 Contrato PDRGate.**
-`execute(PaymentIntent intent, PolicyDecision d, bytes sigPolicy, bytes sigCosigner)` hace, en este orden:
+`execute(FundIntent intent, PolicyDecision d, bytes sigPolicy, bytes sigCosigner)` hace, en este orden:
 1. Rechaza si está pausado (`GateIsPaused`).
 2. Recalcula el hash EIP 712 de la intención y lo compara con `d.intentHash` (`IntentMismatch`).
-3. Construye el calldata **dentro del contrato**, con `abi.encodeCall(IERC20.transfer, (intent.recipient, intent.amountUsdc))`, y compara su hash con `d.calldataHash` (`CalldataMismatch`).
+3. Construye el calldata **dentro del contrato** a partir de la intención y compara su hash con `d.calldataHash` (`CalldataMismatch`).
 4. Verifica que `sigPolicy` venga del firmante de política registrado (`BadPolicySignature`).
 5. Verifica `d.policyHash == currentPolicyHash` (`StalePolicy`).
 6. Verifica expiración y fecha límite (`Expired`).
 7. Verifica y consume el nonce (`NonceUsed`).
-8. Verifica y marca `invoiceKey` como pagada (`InvoiceAlreadyPaid`). La idempotencia queda en cadena, así que ni un motor comprometido puede pagar dos veces la misma factura (crítica 11).
-9. Si `d.tier == 3`, exige una firma válida del cosignatario sobre el mismo digest (`MissingCosignature`). Así se implementa el umbral por monto que la Safe no tiene (crítica 15).
-10. Ejecuta a través del Roles Modifier con el rol AGENTE. Los límites de Roles se siguen aplicando aunque todo lo anterior pase: es la defensa en profundidad.
-11. Emite `PaymentExecuted(intentHash, pdrHash, tier, invoiceKey)`.
+8. Si `d.tier == 3`, exige una firma válida del cosignatario sobre el mismo digest (`MissingCosignature`).
+9. Ejecuta a través del Roles Modifier con el rol AGENTE. Los límites de Roles se siguen aplicando aunque todo lo anterior pase.
+10. Emite `FundingExecuted(intentHash, pdrHash, tier, orderId)`.
 
-`setPolicySigner` y `setPolicyHash` solo pueden llamarse desde la Safe, y solo por el camino del Delay (T1.4).
+La idempotencia del depósito queda en el escrow: una orden solo se deposita una vez (`InvalidState`), así que ni un motor comprometido puede pagarla dos veces (crítica 11). `setPolicySigner` y `setPolicyHash` solo pueden llamarse desde la Safe, por el camino del Delay.
 
-**T1.7 Batería de pruebas negativas sobre fork (crítica 14).**
-Con Foundry sobre un fork de Base Sepolia y la configuración real de Roles. Cada caso debe revertir con el error esperado:
+**T1.7 Batería de pruebas negativas (crítica 14).**
+Con Foundry y la configuración real de Roles. Cada caso debe revertir con el error esperado:
 
 | Grupo | Casos |
 |---|---|
-| Rol mal usado | `delegatecall`; `value` mayor que cero; otro token; `approve`; `transferFrom`; `increaseAllowance`; destinatario fuera de la lista; monto sobre el cupo del periodo |
+| Rol mal usado | `delegatecall`; `value` mayor que cero; otro token; `transfer` directo; aprobación a otra dirección; llamada a otro contrato; monto sobre el cupo del periodo |
 | MultiSend | Llamadas empaquetadas con relleno al final (la falla conocida del desensamblador); llamada anidada al Roles Modifier |
-| Escalada | Agente que intenta cambiar la configuración de Roles; agente que intenta asignarse roles; cosignatario que intenta transferir; cosignatario que intenta cambiar la lista |
-| PDR | Calldata distinto del aprobado; intención alterada en un byte; firma de otro firmante; política vieja; PDR expirado; nonce repetido; factura ya pagada; nivel 3 sin cosignatario |
-| Pausa y pánico | Pago con el gate en pausa; pago después de revocar el rol |
-
-Agregar dos propiedades fuzz:
-* Para cualquier secuencia de llamadas del agente, la salida del periodo es menor o igual al cupo.
-* Ninguna secuencia transfiere a una dirección fuera de la lista.
+| Escalada | Agente que intenta cambiar la configuración de Roles o asignarse roles; cosignatario que intenta transferir |
+| PDR | Calldata distinto del aprobado; intención alterada en un byte; firma de otro firmante; política vieja; PDR expirado; nonce repetido; nivel 3 sin cosignatario |
+| Pausa y pánico | Depósito con el gate en pausa; depósito después de revocar el rol |
+| Escrow, apertura | Firma del importador o del exportador inválida; orden repetida; naviera o árbitro igual a una de las partes; token no permitido; fecha límite pasada |
+| Escrow, fondos | Depósito de quien no es el importador; monto distinto del total; segundo depósito de la misma orden; anticipo dos veces |
+| Escrow, embarque | Atestación firmada por otra llave; atestación de otra orden; fecha *on board* posterior a la límite; BL ya usado; decisión de documentos inválida; embarque con disputa abierta |
+| Escrow, cierre | Reembolso antes de la fecha límite; reembolso tras liquidar; resolución cuya suma no es el saldo; resolución sin firma del árbitro; cualquier llamada sobre un estado final |
 
 **T1.8 Despliegue y verificación.**
-Script de despliegue reproducible, contratos verificados en Basescan y un archivo de direcciones que consumen las demás áreas. Coordinar con el Área 5 la cuenta de faucet y los fondos de prueba.
+Script de despliegue reproducible y un archivo de direcciones que consumen las demás áreas. Coordinar con el Área 5 cómo el jurado puede verificar las transacciones en una red cerrada.
+
+**T1.9 Contrato TradeEscrow (nueva, es la pieza central).**
+Implementar la máquina de estados y la interfaz de la sección 5.14 de [KEEL_SOLUCION_ALCANCE.md](KEEL_SOLUCION_ALCANCE.md): `open`, `fund`, `releaseAdvance`, `submitShipment`, `refundAfterDeadline`, `raiseDispute`, `resolve`, `cancel`.
+* Verificación de firmas EIP 712 de importador, exportador, naviera y árbitro, con soporte de ERC-1271 para que firmen Safes.
+* Depósito exacto, comparando el saldo antes y después.
+* Patrón checks, effects, interactions y guard de reentrancia. Solo tokens permitidos.
+* Plazos en días u horas, con margen de gracia antes del reembolso.
+* Decisiones que hay que cerrar antes de escribir: anticipo en la misma transacción del depósito, ventana de disputa por defecto, resolución por árbitro solo o 2 de 3.
+
+**T1.10 Invariantes del escrow con fuzz (nueva).**
+1. Lo pagado en total nunca supera lo depositado.
+2. Ningún fondo sale hacia una dirección que no sea `importer` o `payoutAddress`.
+3. Un estado final nunca vuelve a mover fondos.
+4. Un mismo BL nunca liquida dos órdenes.
+
+**T1.11 Registro de partes (nueva, se recorta si falta tiempo).**
+`PartyRegistry` administrado por Keel: `open` exige que importador, exportador, naviera y árbitro estén registrados. En la demo, la naviera y el árbitro son llaves de prueba, y se declara.
 
 ### Listo cuando
 
-* Las pruebas de T1.7 pasan con `forge test`, con al menos 25 casos negativos y 2 propiedades fuzz.
-* Existe al menos un revert real en Base Sepolia por cada error tipado del gate.
+* Las pruebas de T1.7 y T1.10 pasan con `forge test`, con al menos 30 casos negativos y las 4 invariantes.
+* Existe al menos un revert real en la red elegida por cada error tipado del escrow y del gate que se use en la demo.
 * El Área 5 tiene la tabla de niveles y dónde se hace cumplir cada uno.
 
 ### Dependencias
 
-* Necesita las estructuras de la sección 2 (Área 2), congeladas el lunes 12.
-* Entrega direcciones a las Áreas 2, 4 y 5 el miércoles 14.
+* Necesita las estructuras de la sección 2 (Área 2), congeladas el miércoles 14.
+* Entrega direcciones a las Áreas 2, 4 y 5 el jueves 15.
 
 ### Si falta tiempo
 
-Se recorta en este orden: ConfigGuard (se declara el riesgo), recuperación social, prueba en FISCO BCOS. **Nunca** se recortan PDRGate, el rol AGENTE ni la batería negativa.
+Se recorta en este orden: ConfigGuard (se declara el riesgo), registro de partes (queda una lista fija en el despliegue), liberación diferida por ventana de disputa, `fundWithPermit`, resolución 2 de 3. **Nunca** se recortan TradeEscrow con sus cuatro invariantes, el reembolso por vencimiento, PDRGate, el rol AGENTE ni la batería negativa.
 
 ---
 
-## 4. Área 2: Motor de política, PDR, tipo de cambio y claves
+## 4. Área 2: Motor de política, PDR y claves
 
 **Perfil sugerido:** backend en TypeScript con interés en criptografía.
-**Objetivo:** convertir una factura validada en una decisión determinista, reproducible y firmada, que el contrato pueda verificar. Además, ser dueño de las interfaces y de la custodia de llaves.
+**Objetivo:** convertir una orden firmada y unos documentos leídos en decisiones deterministas, reproducibles y firmadas, que los contratos puedan verificar. Además, ser dueño de las interfaces y de la custodia de llaves.
 
 ### Entregables
 
-* `schemas/` congelado el lunes 12.
-* `engine/` con función pura de evaluación, emisión de PDR y firma EIP 712.
-* Módulo de tipo de cambio con dos fuentes.
+* `schemas/` congelado el miércoles 14.
+* `engine/` con funciones puras de evaluación, emisión de PDR y firma EIP 712.
 * Verificador reproducible por línea de comandos.
 * Tabla de custodia de llaves y procedimiento de rotación.
 
 ### Tareas
 
-**T2.1 Congelar interfaces (lunes 12).**
-Escribir los esquemas de la sección 2 en JSON Schema, zod y Solidity, con pruebas de que las tres versiones calculan el mismo hash para el mismo dato. Si TypeScript y Solidity no coinciden byte a byte, el gate rechaza todo.
+**T2.1 Congelar interfaces (miércoles 14).**
+Escribir los esquemas de la sección 2 en JSON Schema, zod y Solidity, con pruebas de que las tres versiones calculan el mismo hash para el mismo dato. Si TypeScript y Solidity no coinciden byte a byte, los contratos rechazan todo.
 
 **T2.2 Motor determinista.**
-`evaluate(extraction, context) → { tier, rules[], intent }` como función pura: sin red, sin LLM y sin reloj implícito (la hora entra como parámetro). Cada regla devuelve el nivel mínimo que fuerza y el nivel final es el máximo. Reglas iniciales:
+Funciones puras: sin red, sin LLM y sin reloj implícito (la hora entra como parámetro). Cada regla devuelve el nivel mínimo que fuerza y el nivel final es el máximo. Cada regla tiene su prueba unitaria. Las reglas se versionan, y el hash del archivo de reglas más el hash de la configuración de Roles forman el `policyHash`.
 
-| Regla | Pasa (nivel 1) | Escala | Bloquea (nivel 4) |
+`evaluateFunding(order, context) → { tier, rules[], intent }`, para el depósito:
+
+| Regla | Pasa (nivel 1) | Escala | Bloquea |
 |---|---|---|---|
-| Alias registrado | `alias_id` existe y está verificado | | alias desconocido |
-| Emisor esperado | `issuer_tax_id` coincide con el registrado para el alias | | RUT distinto |
-| Monto en rango | dentro de ±25% del promedio histórico del alias | fuera de rango: nivel 3 | |
-| Cupo del periodo | cabe en el cupo restante | no cabe: nivel 3 | |
-| Tipo de cambio | fuentes dentro de la tolerancia | divergencia: retener y avisar | |
-| Idempotencia | `invoiceKey` nueva | | ya pagada |
-| Cambio de cuenta | `mentions_account_change = false` | `true`: se abre una solicitud de cambio (nivel 2) y **no** se paga | |
-| Texto oculto | `false` | `true`: nivel 3 y alerta | |
-| Vencimiento | hay tiempo | vence pronto y está retenido: aviso urgente (D8) | |
+| Orden firmada | Firmas de ambas partes válidas y orden abierta en el escrow | | falta una firma |
+| Proveedor conocido | Exportador y cuenta de cobro ya verificados | proveedor nuevo: nivel 2 | parte no registrada |
+| Cupo del periodo | El total cabe en el cupo restante | no cabe: nivel 3 | |
+| Monto en rango | Dentro del rango habitual con ese proveedor | fuera de rango: nivel 3 | |
+| Plazo | La fecha límite de embarque es futura y razonable | muy próxima: aviso | ya pasó |
 
-Cada regla debe tener su prueba unitaria. Las reglas se versionan, y el hash del archivo de reglas más el hash de la configuración de Roles forman el `policyHash`.
+`evaluateDocuments(order, attestation, extractions, context) → { conforms, rules[], decision }`, para el gatillo 2:
 
-**T2.3 Tipo de cambio (crítica 12).**
-* La factura viene en pesos y el pago se hace en USDC.
-* Usar dos fuentes: el dólar observado del Banco Central (por ejemplo, vía mindicador.cl) y la cotización de un exchange local de referencia (Buda u Orionx).
-* Si divergen más de un 1,5%, la factura se retiene y se avisa.
-* El monto en USDC se calcula con la tasa menos favorable más un margen fijo declarado.
-* La tasa, las dos fuentes y la hora de consulta entran al `inputsHash` del PDR.
-* En la demo en testnet las fuentes pueden fijarse con valores grabados, pero el código y la regla deben ser los reales.
-* El cupo en USDC del Roles Modifier acota el peor caso aunque alguien manipule la fuente. Esto se documenta como control.
+| Regla | Conforme | No conforme |
+|---|---|---|
+| Número de documento | El hash del número extraído es el `blNumberHash` de la atestación | distinto: retener y avisar |
+| Fecha *on board* | Igual a la de la atestación y no posterior a la fecha límite | distinta o tardía |
+| Monto de la factura | Igual al total de la orden, en su moneda | distinto |
+| Partes | El importador de la factura es el de la orden | distinto |
+| Incoterm y mercancía | Incoterm y código arancelario iguales a los de la orden | distintos |
+| Cambio de cuenta | `mentions_account_change = false` | `true`: se retiene, se avisa y **nunca** cambia la cuenta de cobro |
+| Texto oculto | `false` | `true`: retener y alerta |
+
+**T2.3 Tipo de cambio.**
+**Retirada.** El monto se pacta en la orden directamente en el token de pago, así que ni el motor ni el contrato necesitan tipo de cambio. La conversión ocurre fuera, al entrar y al salir.
 
 **T2.4 Emisión y firma del PDR.**
-* Construir el calldata exacto, calcular `calldataHash`, armar `PolicyDecision` y firmarla con la llave de política (EIP 712).
-* Para nivel 3, generar el digest que debe firmar el cosignatario y entregarlo al Área 4.
-* Guardar el JSON completo del PDR en `evidence/pdr/`.
+* Depósito: construir el calldata exacto, calcular `calldataHash`, armar `PolicyDecision` y firmarla con la llave de política. Para nivel 3, generar el digest que debe firmar el cosignatario y entregarlo al Área 4.
+* Gatillo 2: armar y firmar `DocumentDecision`.
+* Guardar el JSON completo de cada PDR en `evidence/pdr/`.
 
 **T2.5 Simulación previa (crítica 18).**
-`eth_call` de la llamada exacta al gate antes de enviarla. Si revierte, el pago queda retenido con su motivo y no se gasta gas. Anvil queda solo para las pruebas.
+`eth_call` de la llamada exacta antes de enviarla. Si revierte, la operación queda retenida con su motivo y no se gasta gas.
 
-**T2.6 Estados del pago y aviso al fallar cerrado (crítica 19).**
-* Estados: `pagado`, `retenido`, `en_aprobacion`, `cambio_en_cola`, `bloqueado`.
-* Un programador revisa cada día los pagos retenidos y avisa (vía el bot del Área 4) a 5, 3 y 1 día del vencimiento, con el motivo y las instrucciones de pago manual.
+**T2.6 Estados de la orden y aviso al fallar cerrado (crítica 19).**
+* Estados fuera de cadena que acompañan a los del escrow: `retenida`, `en_aprobacion`, `cambio_en_cola`, `bloqueada`.
+* Un programador revisa cada día las órdenes abiertas y avisa (vía el bot del Área 4) cuando se acerca la fecha límite de embarque, con el motivo y qué puede hacer la persona.
 
 **T2.7 Custodia y rotación de llaves (crítica 13).**
-Escribir y aplicar esta tabla:
 
 | Llave | Qué puede hacer | Si la roban | Mitigación | Rotación |
 |---|---|---|---|---|
-| Relayer del agente | Pagar gas y llamar al gate | Nada sin un PDR válido | Saldo mínimo de ETH | Libre, sin Delay |
-| Firmante de política | Firmar PDR | Puede aprobar pagos dentro de Roles: lista blanca y cupo | Proceso separado, monitoreo, cupo de Roles | `setPolicySigner` vía Delay |
-| Cosignatario | Vetar, pausar, revocar | Puede detener pagos, no robar | Rol mínimo | El dueño la reemplaza vía Delay |
-| Dueño | Configurar vía Delay | Cambios visibles y vetables durante el enfriamiento | Delay y ConfigGuard | Recuperación de la Safe |
+| Relayer del agente | Pagar gas y llamar a los contratos | Nada sin un PDR o una firma válida | Saldo mínimo | Libre, sin Delay |
+| Firmante de política | Firmar PDR | Puede depositar órdenes firmadas dentro del cupo y dar por conformes documentos que no lo son | Proceso separado, monitoreo, cupo de Roles, firma de la naviera | `setPolicySigner` vía Delay |
+| Cosignatario | Vetar, pausar, revocar | Puede detener operaciones, no robar | Rol mínimo | El dueño la reemplaza vía Delay |
+| Dueño (cada empresa) | Firmar órdenes, configurar vía Delay | Puede firmar órdenes; los cambios de configuración son visibles y vetables | Umbral de la Safe, Delay y ConfigGuard | Recuperación de la Safe |
+| Naviera (prueba) | Firmar atestaciones de embarque | Atestaciones falsas | Ventana de disputa; en producción, BL electrónico | Nueva orden con otra naviera |
+| Árbitro (prueba) | Repartir entre las partes en una disputa | Reparto injusto, nunca hacia sí mismo | Opción 2 de 3 | Nueva orden con otro árbitro |
 | Token del bot | Enviar mensajes | Mensajes falsos | Plantillas, lista de chats; el bot no firma nada | Regenerar en BotFather |
-| API del LLM | Extraer facturas | Costo y abuso, no fondos | Variables de entorno, límite de gasto | Regenerar |
+| API del LLM | Extraer documentos | Costo y abuso, no fondos | Variables de entorno, límite de gasto | Regenerar |
 
 Para la demo, las llaves viven en archivos `.env` fuera del repositorio. En el documento se declara KMS o HSM como camino a producción.
 
 **T2.8 Monitor de uso fuera del sistema (crítica 13).**
-* Un vigía escucha los eventos del Roles Modifier y del gate.
-* Si aparece una ejecución con el rol AGENTE que no corresponde a ningún PDR emitido por el motor, llama automáticamente al botón de pánico: revoca el rol (T1.3) usando la llave del cosignatario automático, o avisa al cosignatario humano.
+* Un vigía escucha los eventos del Roles Modifier, del gate y del escrow.
+* Si aparece una ejecución con el rol AGENTE que no corresponde a ningún PDR emitido por el motor, llama al botón de pánico (T1.3) o avisa al cosignatario humano.
 * Es el cierre del acto 4.
 
 **T2.9 Verificador reproducible.**
@@ -284,173 +371,177 @@ Para la demo, las llaves viven en archivos `.env` fuera del repositorio. En el d
 3. Recalcula la decisión con las mismas entradas y la misma versión de reglas.
 4. Compara todos los hashes y muestra "coincide" o la diferencia exacta.
 
-Es la herramienta que se le muestra al jurado para pasar de "tenemos logs" a "nuestras decisiones son verificables".
+**T2.10 Vigilancia de plazos (nueva).**
+Para cada orden en curso, el agente ejecuta `refundAfterDeadline` cuando pasó la fecha límite más el margen, y presenta la atestación con `submitShipment` cuando está disponible. Ambas llamadas las puede hacer cualquiera, así que no dan autoridad nueva al relayer.
 
 ### Listo cuando
 
 * Las interfaces están congeladas y probadas en TS y Solidity.
 * El motor tiene una prueba unitaria por regla y pasa el corpus del Área 3.
-* El verificador reproduce al menos 5 decisiones reales de testnet.
+* El verificador reproduce al menos 5 decisiones reales de la red de prueba.
 * La tabla de llaves está en el informe de seguridad.
 
 ### Dependencias
 
-* Recibe direcciones del Área 1 (miércoles 14) y extracciones del Área 3.
+* Recibe direcciones del Área 1 (jueves 15) y extracciones del Área 3.
 * Entrega PDR firmados al Área 1 para pruebas y avisos al Área 4.
 
 ### Si falta tiempo
 
-Se recorta el monitor automático (queda solo como aviso humano) y una de las dos fuentes de tipo de cambio (se declara). **Nunca** se recortan la firma EIP 712, el verificador ni la idempotencia.
+Se recorta el monitor automático (queda solo como aviso humano) y la regla de monto en rango. **Nunca** se recortan la firma EIP 712, el verificador ni la comparación de documentos contra la orden.
 
 ---
 
-## 5. Área 3: Ingesta de facturas y extracción en cuarentena
+## 5. Área 3: Ingesta de documentos y extracción en cuarentena
 
-**Perfil sugerido:** backend con experiencia en LLM, parsing de PDF y correo.
-**Objetivo:** que nada de lo que llega en un correo o en un PDF pueda convertirse en una dirección de pago, y que las facturas legítimas se extraigan con la exactitud suficiente para pagar solas.
+**Perfil sugerido:** backend con experiencia en LLM y parsing de PDF.
+**Objetivo:** que nada de lo que llega en un documento pueda convertirse en una cuenta de cobro, y que los BL y facturas legítimos se lean con la exactitud suficiente para confirmar el embarque sin intervención.
 
 ### Entregables
 
-* `ingest/` con canal de correo autenticado, parser determinista, extractor en cuarentena y comparación entre ambos.
-* Detección de cambio de beneficiario que abre solicitudes y nunca pagos.
-* Corpus de facturas legítimas y adversariales con etiquetas correctas.
+* `ingest/` con canal de entrada autenticado, parser determinista, extractor en cuarentena y comparación entre ambos.
+* Detección de cambio de cuenta que abre una alerta y nunca un pago.
+* Corpus de documentos legítimos y adversariales con etiquetas correctas.
 
 ### Tareas
 
 **T3.1 Canal de entrada autenticado (crítica 10).**
-* Usar una casilla dedicada, por ejemplo con reenvío de correo a un webhook.
-* Para cada correo, validar SPF, DKIM y DMARC, y comparar el dominio alineado con el dominio registrado para ese alias en el onboarding.
-* Si falla, el correo queda en cuarentena y no se procesa. Se registra en la bitácora con el motivo.
+* Los documentos de una orden los sube una de sus partes desde la app, autenticada con su billetera. Se registra quién subió cada archivo y su hash.
+* Si se acepta correo como canal secundario, se validan SPF, DKIM y DMARC contra el dominio registrado de la parte. Si falla, el correo queda en cuarentena y se registra en la bitácora.
+* Un documento que llega por correo nunca vale más que una lectura: no cambia nada de la orden.
 
 **T3.2 Protección contra inundación (crítica 10).**
-* Máximo una solicitud de cambio de beneficiario pendiente por alias.
-* Límite de correos por remitente y por día.
-* Duplicados descartados automáticamente.
-* Enfriamiento de 7 días tras un cambio rechazado o vetado.
-* Las solicitudes se agrupan en un resumen diario en vez de notificarse una por una.
-* Objetivo: que nadie firme por cansancio.
+* Límite de documentos por orden y por día.
+* Duplicados descartados por hash.
+* Las alertas se agrupan en un resumen en vez de notificarse una por una. Objetivo: que nadie firme por cansancio.
 
 **T3.3 Parser determinista.**
-* Extraer el texto del PDF y aplicar expresiones regulares para RUT, folio, periodo, monto y vencimiento.
+* Extraer el texto del PDF y aplicar expresiones regulares para número de documento, fecha *on board*, puertos, número de factura, monto, moneda e incoterm.
+* Como los BL no tienen formato estándar, el parser cubre los formatos del corpus (por ejemplo, dos navieras y una guía aérea) y se declara ese límite.
 * Detectar texto oculto: color igual al fondo, tamaño menor a 4 puntos, fuera del área visible, capas superpuestas.
-* Normalizar homoglifos (caracteres de otros alfabetos que se ven iguales) antes de comparar.
+* Normalizar homoglifos antes de comparar.
 
 **T3.4 Extractor LLM en cuarentena.**
-* Sin herramientas, temperatura 0 y salida estructurada con el esquema estricto de la sección 2.1.
-* El modelo elige `alias_id` de un enum y nunca produce direcciones.
-* Si el documento menciona una cuenta o billetera nueva, solo marca `mentions_account_change = true`. Las direcciones encontradas las extrae el parser determinista y van **exclusivamente** al flujo de cambio de beneficiario (T3.6).
-* Todo lo que no calce con el esquema se descarta y la factura queda retenida.
+* Sin herramientas, temperatura 0 y salida estructurada con los esquemas estrictos de la sección 2.1.
+* Nunca produce direcciones, cuentas ni nombres.
+* Si el documento menciona una cuenta o un beneficiario distinto, solo marca `mentions_account_change = true`.
+* Todo lo que no calce con el esquema se descarta y la operación queda retenida.
 
 **T3.5 Concordancia de dos fuentes.**
-* El extractor y el parser deben coincidir en RUT, folio, periodo y monto.
-* Si hay diferencia, la factura queda en nivel 3, con aviso que muestra los dos valores.
-* Así se cubre el límite que reconoce el propio documento: un LLM manipulado puede devolver un valor falso dentro de un esquema válido.
+* El extractor y el parser deben coincidir en número de documento, fecha *on board*, monto y moneda.
+* Si hay diferencia, la operación queda retenida, con aviso que muestra los dos valores.
+* Así se cubre el límite reconocido: un LLM manipulado puede devolver un valor falso dentro de un esquema válido.
 
-**T3.6 Detección de cambio de beneficiario.**
-* Genera una solicitud de cambio, no un pago.
-* La solicitud incluye: dirección anterior y nueva, fuente, resultado de SPF/DKIM y hash del documento.
-* La pasa al Área 4 (diff legible) y, si el dueño la confirma, al Delay del Área 1.
+**T3.6 Detección de cambio de cuenta.**
+* Genera una alerta, no un pago ni un cambio.
+* La alerta incluye: fuente, canal, hash del documento y el recordatorio de que la cuenta de cobro solo cambia con una orden nueva firmada por ambas partes (D12).
+* Se pasa al Área 4 para mostrarla.
 
-**T3.7 Clave de idempotencia (crítica 11).**
-* `invoiceKey = keccak256(issuer_tax_id, invoice_number, period)`, calculada con los valores normalizados.
-* Reemplaza al hash del PDF, que se evade cambiando un píxel.
-* Se deduplica al ingresar y además se hace cumplir en cadena (T1.6, paso 8).
+**T3.7 Claves de documento (crítica 11).**
+* `blNumberHash = keccak256(número de documento normalizado)`. Debe calcularse igual que en la atestación de la naviera, o el motor nunca dará conformidad.
+* `docsHash = keccak256` del paquete de archivos, en un orden definido.
+* La unicidad se hace cumplir en cadena: un BL no liquida dos órdenes (T1.9).
 
-**T3.8 Corpus de facturas.**
-* **Legítimas:** al menos 12, anonimizadas: luz, agua, internet, arriendo y gastos comunes, de 3 periodos distintos.
-* **Adversariales:** al menos 25 variantes: cuenta cambiada con el mismo formato, texto blanco con instrucciones, letra diminuta, homoglifos en el RUT, monto alterado, folio repetido con otro píxel, remitente falso que falla DKIM, correo legítimo reenviado con un adjunto cambiado, inyección en el campo del emisor.
+**T3.8 Corpus de documentos.**
+* **Legítimos:** al menos 12 conjuntos (BL o guía aérea más factura), anonimizados, coherentes con una orden de prueba cada uno.
+* **Adversariales:** al menos 25 variantes: factura con cuenta de cobro distinta, texto blanco con instrucciones, letra diminuta, homoglifos en el número de BL, fecha *on board* alterada, monto alterado, BL de otra orden, BL repetido con otro píxel, firma escaneada pegada, inyección en el campo del consignatario.
 * Cada caso lleva su resultado esperado. El corpus lo usa el Área 5 para medir.
 
 ### Listo cuando
 
-* Las 12 facturas legítimas se extraen bien de punta a punta.
-* Ninguna variante adversarial produce un pago.
+* Los 12 conjuntos legítimos se leen bien de punta a punta y el motor los da por conformes.
+* Ninguna variante adversarial produce una liberación de fondos ni un cambio de cuenta.
 * Ningún dato del documento llega a un mensaje de Telegram ni a un PDR fuera de los campos tipados.
 
 ### Dependencias
 
-* Recibe el esquema del Área 2 el lunes 12 y la tabla de alias con dominios del Área 4.
+* Recibe los esquemas del Área 2 el miércoles 14 y las órdenes de prueba del Área 4.
 * Entrega extracciones al Área 2 y el corpus al Área 5 el viernes 16.
 
 ### Si falta tiempo
 
-Se recortan el resumen diario (queda solo el límite de solicitudes pendientes) y la detección de capas superpuestas. **Nunca** se recortan el esquema sin texto libre, la concordancia de dos fuentes ni la validación SPF/DKIM.
+Se recortan el canal de correo (queda solo la carga desde la app), la guía aérea (queda solo el BL marítimo) y la detección de capas superpuestas. **Nunca** se recortan el esquema sin texto libre ni la concordancia de dos fuentes.
 
 ---
 
 ## 6. Área 4: Producto, onboarding y canal humano
 
 **Perfil sugerido:** frontend o full stack con criterio de producto y UX.
-**Objetivo:** que la persona entienda lo que firma sin leer hexadecimal, que el primer registro de un beneficiario no sea confianza ciega y que el cosignatario pueda frenar sin poder robar.
+**Objetivo:** que importador y exportador entiendan lo que firman sin leer hexadecimal, que el alta de un proveedor no sea confianza ciega y que el cosignatario pueda frenar sin poder robar.
 
 ### Entregables
 
-* App web: onboarding, libreta de beneficiarios, diff legible de cambios, vista del cosignatario, bitácora y panel de niveles.
-* Bot de Telegram con mensajes de plantilla y enlaces de firma.
-* Firma del dueño desde su propia billetera, sin llaves en el servidor.
+* App: perfiles de importador y exportador, creación y firma de la orden, diff legible, estado del escrow, disputa, vista del cosignatario, bitácora y panel de niveles.
+* Bot de Telegram con mensajes de plantilla y enlaces a la app.
+* Firma de cada parte desde su propia billetera, sin llaves en el servidor.
 
 ### Tareas
 
-**T4.1 Onboarding con verificación fuera de banda (crítica 9).**
-1. El usuario registra un beneficiario: alias, nombre, RUT, dominio de correo esperado y dirección USDC.
-2. Keel envía una **transferencia de prueba** de un monto aleatorio pequeño, por ejemplo 0,37 USDC.
-3. El usuario le pide al beneficiario, por teléfono o en persona, que le confirme el monto exacto recibido, y lo ingresa en la app.
-4. Solo si coincide, la dirección se marca como verificada y se encola su alta en la lista blanca a través del Delay.
+**T4.1 Alta de proveedor con verificación fuera de banda (crítica 9).**
+1. El importador registra un proveedor: nombre, identificador y cuenta de cobro.
+2. Keel envía una **transferencia de prueba** de un monto aleatorio pequeño.
+3. El importador le pide al proveedor, por un canal distinto, que le confirme el monto exacto recibido, y lo ingresa en la app.
+4. Solo si coincide, el proveedor queda como conocido. El alta pasa por el Delay.
 
-El resultado de la verificación (monto, fecha y canal) se guarda como hash en la bitácora. En el deck esto se compara con los microdepósitos que usan los bancos.
+Un proveedor no conocido no impide firmar una orden, pero su primer depósito es de nivel 2.
 
-**T4.2 Diff legible para cambios de beneficiario (crítica 17).**
+**T4.2 Diff legible de la orden antes de firmar (crítica 17).**
 Pantalla con:
-* alias y nombre;
-* **cuenta anterior** en grupos cortos con identicon, fecha de verificación y pagos realizados;
-* **cuenta nueva** con identicon, "vista por primera vez hoy", fuente (correo de X) y resultado de SPF/DKIM;
-* qué cambia en el contrato y cuándo termina el enfriamiento.
+* partes, con nombre e identificador tomados del registro;
+* **cuenta de cobro** en grupos cortos con identicon, y si es la misma de órdenes anteriores con ese proveedor o "vista por primera vez hoy";
+* monto total, anticipo y saldo, fecha límite de embarque, naviera, árbitro e incoterm;
+* qué puede y qué no puede hacer el contrato con esos fondos.
 
-Antes de firmar, exige el paso de verificación por otro canal (T4.1). El botón por defecto es "Rechazar", no "Aprobar".
+El botón por defecto es "Rechazar", no "Firmar".
 
 **T4.3 Bot de Telegram seguro (crítica 8).**
-* Solo envía mensajes armados con plantillas y campos tipados: enums, montos y fechas. Nunca reenvía texto del correo o del PDF.
+* Solo envía mensajes armados con plantillas y campos tipados: enums, montos y fechas. Nunca reenvía texto de un documento o de un correo.
 * Responde solo a una lista de chats registrados.
-* No firma nada: los botones abren la app web, donde firma la billetera del dueño.
-* El token se guarda como se define en T2.7.
+* No firma nada: los botones abren la app.
 
-**T4.4 Firma del dueño sin llave en el servidor.**
-* El dueño firma desde su billetera en el navegador (WalletConnect o una billetera de navegador) y propone transacciones al Delay con el SDK de Safe.
-* En la demo puede ser una billetera de prueba en el navegador, pero **nunca** una llave en el servidor.
-* Esto separa a Keel del competidor, que reconoce tener la llave del dueño en el servidor.
+**T4.4 Firma sin llave en el servidor.**
+* Importador y exportador firman la orden desde su billetera (WalletConnect o una billetera de navegador), y los dueños proponen cambios al Delay con el SDK de Safe.
+* En la demo pueden ser billeteras de prueba, pero **nunca** una llave en el servidor.
 
 **T4.5 Vista del cosignatario.**
-* Lista de cambios en cola, con el diff legible y su cuenta regresiva.
-* Botón "Vetar" y botón de pánico "Revocar al agente": cada uno es una sola transacción con el rol COSIGNATARIO (T1.3).
-* Solicitudes de nivel 3 para cofirmar.
+* Lista de cambios en cola, con su cuenta regresiva.
+* Botón "Vetar" y botón de pánico "Revocar al agente".
+* Depósitos de nivel 3 para cofirmar.
 * No hay ningún botón para iniciar pagos, porque el rol no lo permite.
 
-**T4.6 Avisos de pagos retenidos (crítica 19).**
-Diseñar los mensajes de T2.6: qué pasó, por qué, cuánto falta para el vencimiento y cómo pagar manualmente si es urgente. Probarlos con 2 personas ajenas al equipo.
+**T4.6 Avisos de operaciones retenidas y de plazos (crítica 19).**
+Diseñar los mensajes de T2.6: qué pasó, por qué, cuánto falta para la fecha límite y qué puede hacer la persona. Incluye los avisos de depósito, anticipo, embarque, saldo, reembolso y alerta de cambio de cuenta.
 
 **T4.7 Bitácora y panel de niveles.**
-* Una línea por intento: estado (pagado, retenido, en cola, vetado, revertido en cadena), regla que decidió, nivel, enlace al PDR y enlace a Basescan.
-* Panel con los niveles 0 a 4 y el contador "facturas pagadas, ataques bloqueados, fondos perdidos: 0".
-* Se usa en la demo y en las capturas.
+* Una línea por evento: estado, regla que decidió, nivel, enlace al PDR y a la transacción.
+* Panel con los niveles 0 a 4 y el contador "órdenes liquidadas, ataques bloqueados, fondos perdidos: 0".
 
 **T4.8 Textos en inglés y diseño de la demo.**
-* Todos los textos de la interfaz en inglés, claros, sin jerga cripto: montos en pesos con su equivalente en USDC.
+* Todos los textos de la interfaz en inglés, claros, sin jerga cripto.
 * Coordinar con el Área 5 que cada acto de la demo se vea en una sola pantalla.
+
+**T4.9 Perfiles y flujo de la orden (nueva).**
+* Perfil de importador: crear una orden a partir de la proforma, firmarla, ver el depósito y el estado.
+* Perfil de exportador: revisar y firmar la orden, ver que los fondos están depositados, subir el BL y la factura, ver el cobro.
+* Vista de la orden con su estado en el escrow y la línea de tiempo: firmada, depositada, anticipo, embarcada, liquidada o reembolsada.
+
+**T4.10 Disputa y cancelación (nueva, se recorta si falta tiempo).**
+Botones para abrir una disputa y para cancelar de mutuo acuerdo, y una vista mínima para que el árbitro firme el reparto.
 
 ### Listo cuando
 
 * Los cuatro actos de la demo se recorren desde la interfaz sin tocar la consola.
-* Ninguna pantalla muestra una dirección completa sin identicon y alias.
-* El bot pasa la prueba de inyección del Área 5: un emisor con instrucciones no aparece en ningún mensaje.
+* Ninguna pantalla muestra una dirección completa sin identicon y nombre.
+* El bot pasa la prueba de inyección del Área 5: un documento con instrucciones no aparece en ningún mensaje.
 
 ### Dependencias
 
-* Recibe direcciones y ABIs del Área 1, estados del Área 2 y solicitudes de cambio del Área 3.
+* Recibe direcciones y ABIs del Área 1, estados del Área 2 y alertas del Área 3.
 * Entrega capturas y la grabación al Área 5.
 
 ### Si falta tiempo
 
-Se recortan la prueba con personas externas y la vista móvil. **Nunca** se recortan el diff legible, la verificación fuera de banda ni la firma sin llave en el servidor.
+Se recortan la vista del árbitro (la disputa se muestra por script), la vista móvil y el alta con transferencia de prueba (queda una lista de proveedores precargada, y se declara). **Nunca** se recortan el diff legible de la orden, los dos perfiles ni la firma sin llave en el servidor.
 
 ---
 
@@ -469,77 +560,85 @@ Se recortan la prueba con personas externas y la vista móvil. **Nunca** se reco
 
 ### Tareas
 
-**T5.1 Coordinación (desde el lunes 12).**
+**T5.1 Coordinación.**
 * Inscribir al equipo y confirmar que se cumple el requisito de al menos 60% de integrantes no chinos.
-* Enviar el correo a la organización (wangyr@pbcsf.tsinghua.edu.cn) con dos preguntas: si testnet cuenta como transacciones reales y si el cierre es el 20 de octubre o el 2 de noviembre.
+* Enviar el correo a la organización (wangyr@pbcsf.tsinghua.edu.cn) con dos preguntas: si las transacciones en una red cerrada o de prueba cuentan como transacciones reales y cómo debe poder verificarlas el jurado, y si el cierre es el 20 de octubre o el 2 de noviembre.
 * Reunión diaria de 15 minutos a la misma hora.
-* Tablero con las tareas de este documento.
+* Actualizar el tablero con las tareas nuevas y retiradas de este documento.
 * Puntos de integración de la sección 9.
 
 **T5.2 Verificación de afirmaciones (crítica 16 y D9).**
-Revisar cada cifra y afirmación del documento técnico antes de que entre al deck, y marcar con fuente o eliminar:
+Revisar cada cifra y afirmación antes de que entre al deck, y marcar con fuente o eliminar:
 * incidente DRB y sus cifras;
-* Neat Pagos;
-* crecimiento de Cobre;
-* "ningún competidor ataca el fraude de facturas". Reformular: el repositorio Leash ya trata facturas con cambio de datos.
-* "imposible para cualquiera".
-* "ninguno conocido".
+* costo y demora de las transferencias internacionales (hoy la única fuente es la entrevista);
+* "con China casi no se usa carta de crédito" (ídem);
+* regulación de cripto en China continental y de stablecoins en Hong Kong;
+* qué plataformas de comercio exterior sobre blockchain y de BL electrónico existen, antes de decir que algo no existe;
+* "imposible para cualquiera" y "ninguno conocido".
+
+Confirmar además si se puede citar al importador entrevistado.
 
 **T5.3 Informe de autoevaluación de seguridad.**
-* Tabla de niveles: nivel, qué cubre, dónde se hace cumplir (contrato, gate, motor o interfaz), prueba que lo demuestra y hash de evidencia. La construye con el Área 1.
-* El nivel 4 se redacta con precisión: imposible para el agente y el cosignatario; el dueño puede cambiar reglas solo vía Delay, con aviso y veto, y si no está el ConfigGuard, se declara que puede saltárselo.
+* Tabla de niveles: nivel, qué cubre, dónde se hace cumplir (escrow, gate, Roles, motor o interfaz), prueba que lo demuestra y hash de evidencia. La construye con el Área 1.
+* El nivel 4 se redacta con precisión: prohibido para el agente y el cosignatario; el dueño puede cambiar reglas solo vía Delay, y si no está el ConfigGuard, se declara que puede saltárselo.
 * Lista de riesgos conocidos, sin "ninguno conocido":
-  * configuración de Roles no auditada por terceros;
+  * contrato de escrow propio, sin auditoría de terceros;
+  * configuración de Roles no auditada;
   * firmante de política en un servidor;
-  * fuentes del tipo de cambio;
-  * puente fiat centralizado;
-  * riesgo de emisor y congelamiento de USDC;
+  * naviera y árbitro representados por llaves de prueba;
+  * registro de partes administrado por Keel;
+  * colusión de exportador y naviera;
+  * el anticipo solo se recupera por disputa;
+  * riesgo de emisor del token de pago;
+  * verificación pública limitada en una red cerrada;
   * Telegram como canal;
   * la bitácora prueba lo registrado, no que nada se haya escapado.
 * Tabla de llaves de T2.7.
 
 **T5.4 Batería de red team (40 escenarios mínimo).**
-Categorías, con casos de las críticas incluidos:
 
 | Categoría | Ejemplos |
 |---|---|
-| Factura | cuenta cambiada; texto oculto; homoglifos; monto alterado; folio repetido con otro píxel |
-| Correo | remitente falso sin DKIM; inundación de solicitudes; reenvío con adjunto cambiado |
-| Interfaz | inyección en campo de emisor dirigida a Telegram; diff con direcciones parecidas |
-| Tipo de cambio | fuente manipulada; divergencia entre fuentes |
+| Cuenta de cobro | correo de cambio de cuenta; factura con otra cuenta; orden nueva con una dirección parecida |
+| Documentos | BL fabricado; firma escaneada pegada; fecha *on board* alterada; monto alterado; texto oculto; homoglifos |
+| Embarque | atestación firmada por otra llave; atestación de otra orden; mismo BL en dos órdenes; embarque tardío |
+| Interfaz | inyección en un campo dirigida a Telegram; diff con direcciones parecidas |
 | Llaves | relayer robado; firmante de política robado; uso del rol fuera del sistema |
-| Contrato | todos los casos de T1.7 ejecutados en testnet |
-| Onboarding | alta con dirección falsa; verificación con monto equivocado |
+| Escrow | retiro del importador; anticipo doble; reembolso anticipado; llamadas sobre estados finales; árbitro que intenta cobrar |
+| Contrato | todos los casos de T1.7 ejecutados en la red de prueba |
+| Alta de proveedor | alta con dirección falsa; verificación con monto equivocado |
 
 Métricas:
 * tasa de bloqueo de ataques;
-* falsos positivos sobre las facturas legítimas;
-* porcentaje de facturas pagadas sin intervención humana;
+* falsos positivos sobre los documentos legítimos;
+* porcentaje de órdenes completadas sin intervención humana más allá de las firmas;
 * latencia de decisión;
-* **capa que detuvo cada ataque**: correo, extractor, motor, gate, Roles o humano.
-
-La última métrica es la que mejor muestra la defensa en profundidad.
+* **capa que detuvo cada ataque**: canal, extractor, motor, gate, Roles, escrow o humano.
 
 **T5.5 Script de evidencia en cadena.**
 Un comando que, sobre el despliegue final, genera y documenta con su hash:
-1. Pago de nivel 1 exitoso.
-2. Alta de beneficiario en cola y ejecutada tras el enfriamiento.
-3. Cambio de beneficiario vetado por el cosignatario.
-4. Pago de nivel 3 con cofirma.
-5. Revert por destinatario fuera de la lista (Roles).
-6. Revert por falta de PDR válido (gate).
-7. Revert por calldata distinto del aprobado.
-8. Revert por factura ya pagada.
-9. Revert por `delegatecall`.
-10. Revocación del rol por el botón de pánico.
-11. Intento de pago posterior que revierte.
+1. Orden abierta con ambas firmas.
+2. Depósito de nivel 1 por el gate.
+3. Anticipo liberado.
+4. Embarque aceptado y saldo liberado.
+5. Reembolso por vencimiento en otra orden.
+6. Depósito de nivel 3 con cofirma.
+7. Revert por atestación no firmada por la naviera.
+8. Revert por fecha *on board* tardía.
+9. Revert por BL ya usado.
+10. Revert por intento de retiro o de llamada fuera de estado.
+11. Revert del Roles por destino no permitido (el robo directo).
+12. Revert por falta de PDR válido (gate).
+13. Revocación del rol por el botón de pánico y depósito posterior que revierte.
+14. Disputa resuelta por el árbitro (si T4.10 y la disputa no se recortan).
 
 **T5.6 Documento técnico y README.**
-* Documento técnico: arquitectura con diagrama, algoritmo central (motor más PDR más gate), diseño de seguridad y comparación honesta con el estado del arte (Leash, Coinbase, Cobo, Safe con Roles, PACE).
+* Documento técnico: arquitectura con diagrama, algoritmo central (escrow más motor más PDR más gate), diseño de seguridad y comparación honesta con el estado del arte.
 * README: qué es, cómo desplegar, cómo correr las pruebas y la batería de red team, y enlaces a la evidencia.
+* Mantener [flujo_clave.md](flujo_clave.md) al día cuando el equipo cierre una decisión abierta.
 
 **T5.7 Deck y video.**
-* Deck de 10 minutos con este orden: incidente DRB, problema, idea central, arquitectura, cuatro actos, métricas, seguridad, alineación con WeBank, límites honestos.
+* Deck de 10 minutos con este orden: incidente DRB, problema del comercio exterior, idea central, arquitectura, cuatro actos, métricas, seguridad, alineación con WeBank, límites honestos.
 * Video de 5 minutos con los cuatro actos grabados desde la app del Área 4, con narración en inglés.
 * Ensayo general el domingo 18.
 
@@ -559,16 +658,16 @@ Se recortan la comparación extensa con el estado del arte (queda una tabla) y l
 
 ---
 
-## 8. Calendario (hora de Chile)
+## 8. Calendario (hora de Chile, propuesta desde el martes 13)
 
 | Día | Hito | Áreas clave |
 |---|---|---|
-| Lun 12 | Inicio. Interfaces congeladas a las 20:00. Repositorio con estructura. Correo a la organización. | 2, 5 |
-| Mar 13 | Rol AGENTE y PDRGate en pruebas locales. Motor con las primeras reglas. Parser y extractor sobre 3 facturas. Esqueleto de la app. | 1, 2, 3, 4 |
-| Mié 14 | **Despliegue v1 en Base Sepolia y primer revert real.** Firma EIP 712 compatible entre TS y Solidity. | 1, 2 |
-| Jue 15 | Delay y rol COSIGNATARIO. Concordancia de dos fuentes. Onboarding con transferencia de prueba. | 1, 3, 4 |
-| Vie 16 | **Integración de punta a punta: acto 1 en testnet.** Corpus completo entregado. Primera corrida de red team. | Todas |
-| Sáb 17 | Actos 2, 3 y 4 funcionando. Monitor y botón de pánico. Diff legible. Borradores de documentos. | Todas |
+| Lun 12 | Inicio. Interfaces del pago de cuentas congeladas. Repositorio con estructura. | 2, 5 |
+| Mar 13 | **Cambio de rumbo.** Objetivo y flujo publicados en `flujo_clave.md`. Borrador de las interfaces nuevas. Tablero actualizado. | Todas |
+| Mié 14 | **Interfaces nuevas congeladas a las 20:00. Red y token decididos.** TradeEscrow en pruebas locales. Motor con las primeras reglas. Parser y extractor sobre 3 conjuntos de documentos. | 1, 2, 3 |
+| Jue 15 | **Despliegue v1 y primer revert real.** Firma EIP 712 compatible entre TS y Solidity. Rol AGENTE y PDRGate. Perfiles y firma de la orden en la app. | 1, 2, 4 |
+| Vie 16 | **Integración de punta a punta: acto 1 en la red de prueba.** Corpus completo entregado. Primera corrida de red team. | Todas |
+| Sáb 17 | Actos 2, 3 y 4 funcionando. Delay, cosignatario y botón de pánico. Disputa. Borradores de documentos. | Todas |
 | Dom 18 | **Congelamiento de funciones a las 20:00.** Despliegue final. Script de evidencia. Ensayo general. | Todas |
 | Lun 19 | Documentos, deck y video finales. **Entrega a las 22:00.** | 5 con apoyo de todos |
 | Mar 20 | Margen. Cierre oficial a las 12:59. | 5 |
@@ -577,9 +676,9 @@ Se recortan la comparación extensa con el estado del arte (queda una tabla) y l
 
 ## 9. Puntos de integración
 
-1. **Lunes 12, 20:00:** congelamiento de interfaces (Área 2 con todas).
-2. **Miércoles 14:** direcciones y ABIs publicados (Área 1 hacia 2, 4 y 5).
-3. **Viernes 16:** un pago real de punta a punta: correo, extracción, motor, PDR, gate, Roles y USDC, visible en la bitácora.
+1. **Miércoles 14, 20:00:** congelamiento de las interfaces nuevas y decisión de red y token (Área 2 y Área 1 con todas).
+2. **Jueves 15:** direcciones y ABIs publicados (Área 1 hacia 2, 4 y 5).
+3. **Viernes 16:** una orden real de punta a punta: firma, depósito por el gate, anticipo, atestación, lectura de documentos, PDR y saldo, visible en la bitácora.
 4. **Domingo 18:** despliegue final. Después de esto no se cambian contratos, solo documentos.
 
 Regla de trabajo: cada área trabaja en su carpeta y en sus propias ramas. Los cambios a `schemas/` los aprueba el Área 2, y los cambios a contratos ya desplegados, el Área 1.
@@ -590,33 +689,36 @@ Regla de trabajo: cada área trabaja en su carpeta y en sus propias ramas. Los c
 
 Si el viernes 16 el acto 1 no funciona de punta a punta, el Área 5 activa el recorte en este orden:
 
-1. Exploración en FISCO BCOS.
-2. Transacciones en Base mainnet.
-3. ConfigGuard (se declara el riesgo).
-4. Monitor automático (queda el aviso humano).
-5. Segunda fuente de tipo de cambio (se declara).
-6. Resumen diario de solicitudes.
+1. Disputa con vista del árbitro (queda por script, o como diseño).
+2. Liberación diferida por ventana de disputa.
+3. Registro de partes en cadena (queda una lista fija).
+4. ConfigGuard (se declara el riesgo).
+5. Monitor automático (queda el aviso humano).
+6. Guía aérea y canal de correo (quedan el BL marítimo y la carga desde la app).
+7. Alta de proveedor con transferencia de prueba (queda una lista precargada).
 
-**Nunca caen:** PDRGate, rol AGENTE, Delay para cambios, cosignatario con veto, extracción sin texto libre, cuatro actos de la demo, script de evidencia, informe de seguridad.
+**Nunca caen:** TradeEscrow con sus cuatro invariantes, firma de la orden por ambas partes, atestación de embarque firmada, reembolso por vencimiento, PDRGate, rol AGENTE, extracción sin texto libre, cuatro actos de la demo, script de evidencia, informe de seguridad.
 
 ---
 
 ## 11. Mapa de críticas
 
+Las críticas se recibieron sobre la propuesta de pago de cuentas. Así se trasladan al flujo de comercio exterior:
+
 | # | Crítica | Área | Tarea |
 |---|---|---|---|
 | 8 | Texto libre en el esquema; eliminar el LLM operativo | 2, 3, 4 | D2, D3, T3.4, T4.3 |
 | 9 | Onboarding con confianza ciega | 4 | T4.1 |
-| 10 | Correo sin validar y solicitudes en masa | 3 | T3.1, T3.2 |
-| 11 | Idempotencia evadible cambiando un píxel | 3, 1 | T3.7, T1.6 paso 8 |
-| 12 | Tipo de cambio como superficie de ataque | 2 | T2.3 |
+| 10 | Canal de entrada sin validar y solicitudes en masa | 3 | T3.1, T3.2 |
+| 11 | Idempotencia evadible cambiando un píxel | 3, 1 | T3.7, T1.6, T1.9 |
+| 12 | Tipo de cambio como superficie de ataque | 2 | Ya no aplica: el monto se pacta en el token (T2.3 retirada) |
 | 13 | Custodia de llaves y botón de pánico | 2, 1 | T2.7, T2.8, T1.3 |
-| 14 | Módulos auditados no implican configuración auditada | 1 | T1.7 |
-| 15 | Niveles 0 y 3 sin implementar; umbral global de la Safe; cosignatario que puede proponer | 1 | T1.3, T1.6 paso 9, D6 |
+| 14 | Módulos auditados no implican configuración auditada | 1 | T1.7, T1.10 |
+| 15 | Niveles 0 y 3 sin implementar; umbral global de la Safe; cosignatario que puede proponer | 1 | T1.3, T1.6 paso 8, D6 |
 | 16 | Sobreafirmaciones | 5, 1 | D9, T5.2, T5.3, T1.5 |
 | 17 | El humano firma direcciones hexadecimales | 4 | T4.2 |
 | 18 | La simulación aporta poco para un transfer | 2 | D7, T2.5 |
 | 19 | Fallar cerrado tiene costo real | 2, 4 | D8, T2.6, T4.6 |
 | 1 a 7 | No incluidas en la captura | Por asignar | Por asignar |
 
-**Nota sobre el nivel 0:** las lecturas (consultar saldos, ver facturas, ver la bitácora) no firman nada. Se implementan como ausencia de capacidad: el lector no tiene llaves y el chat, si existe, no tiene herramientas que muevan fondos. En el informe se declara así, con la prueba de que el componente de lectura no tiene permisos en Roles.
+**Nota sobre el nivel 0:** las lecturas (ver órdenes, documentos y bitácora) no firman nada. Se implementan como ausencia de capacidad: el lector no tiene llaves y el chat, si existe, no tiene herramientas que muevan fondos. En el informe se declara así, con la prueba de que el componente de lectura no tiene permisos en Roles.

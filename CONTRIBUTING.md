@@ -14,20 +14,24 @@
 |---|---|---|---|
 | 1 | Contracts and on-chain permissions | `contracts/` | @Mrnooqmal |
 | 2 | Policy engine, PDR, exchange rate and keys | `schemas/`, `engine/` | @darlopezp |
-| 3 | Invoice ingestion and quarantined extraction | `ingest/` | @dvni7 |
+| 3 | Trade document ingestion and quarantined extraction | `ingest/` | @dvni7 |
 | 4 | Product, onboarding and human channel | `app/`, `bot/` | @2Chrisss |
 | 5 | Red team, evidence, documentation and coordination | `redteam/`, `docs/`, `evidence/` | @Benjasncz2 |
 
 ## Integration points (Chile time)
 
-1. Monday Oct 12, 20:00: shared interfaces frozen. After this, a change to `schemas/` must be announced to all five areas.
-2. Wednesday Oct 14: addresses and ABIs published in `contracts/deployments/84532.json`.
-3. Friday Oct 16: one real end to end payment on testnet, visible in the activity log.
+The project changed direction on October 13 (from utility bill payments to trade escrow), so the first three points were replanned. They are a proposal until Area 5 confirms them.
+
+1. Wednesday Oct 14, 20:00: shared interfaces of the escrow flow frozen (purchase order, shipment attestation, document extraction, PDR). The network and the payment token are decided the same day. After this, a change to `schemas/` must be announced to all five areas.
+2. Thursday Oct 15: addresses and ABIs published in `contracts/deployments/<chainId>.json`.
+3. Friday Oct 16: one real end to end order on the test network (signature, deposit, advance, shipment, balance), visible in the activity log.
 4. Sunday Oct 18, 20:00: feature freeze and final deployment. After this, only documents change.
 5. Monday Oct 19, 22:00: submission.
 
 ## Rules that apply everywhere
 
+* [docs/flujo_clave.md](docs/flujo_clave.md) defines the goal of the project and the flow it implements. Check it before designing or creating any component. If an idea contradicts it, raise it with the team and update that document first.
+* The payout address never comes from a document. It comes from the purchase order signed by both parties.
 * The project is called Keel in code, documents and deck.
 * There is no operational LLM. The only LLM is the quarantined extractor, and its output schema has no free text.
 * Keys never enter the repository. Use `.env` (see `.env.example`). The owner key never lives on a server.

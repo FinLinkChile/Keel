@@ -1,8 +1,18 @@
 # ingest (Area 3)
 
-Authenticated email channel, deterministic PDF parser, quarantined LLM extractor and the comparison between both.
+Authenticated intake of trade documents, deterministic PDF parser, quarantined LLM extractor and the comparison between both.
 
-`src/index.ts` declares `parseInvoice`, `extractInvoice` and `invoiceKey`. Both readers return the `InvoiceExtraction` schema from `@keel/schemas`, which has no free text. Addresses found in a document never reach a payment: they go only to the beneficiary change flow.
+The documents are the bill of lading (or air waybill) and the commercial invoice of a purchase order. Both readers return schemas from `@keel/schemas` that have no free text. Nothing found in a document can become a payout address: a document that mentions a different account only raises an alert, and the payout address changes only with a new order signed by both parties.
+
+The extractor reads data. It does not validate signatures: the proof of shipment is the attestation signed by the carrier, not a scanned signature in a PDF.
+
+Bills of lading have no standard format across carriers. The parser covers the formats in the corpus, and that limit is declared.
+
+## Current state
+
+Everything implemented here was built for the previous scope (utility bill payments): invoices arriving by email, read into the `InvoiceExtraction` schema, with beneficiary aliases and an `invoiceKey`. The sections below describe that code as it is today.
+
+Most of it carries over to trade documents: the quarantined extractor and its provider adapters, the privacy layer, hidden text detection, the two source agreement, flood protection and the admin API. What has to change once Area 2 freezes the new extraction schemas: the fields the parser and the extractor read (transport document and commercial invoice instead of a utility bill), the keys (`blNumberHash` and `docsHash` instead of `invoiceKey`), the intake channel (upload by a party of the order, with email as a secondary channel) and the account change flow (an alert only, because the payout address changes only with a new signed order).
 
 ```sh
 npm run serve -w ingest       # inbound webhook, needs INGEST_* and LLM_* in .env
@@ -67,7 +77,7 @@ An admin can switch the LLM and the DMARC policy at runtime. Requests carry `Aut
 * Every effective change is logged as `{"type": "settings_changed", "actor", "at", "changes": {field: {from, to}}}`. Relaxing `requireDmarc` lowers the bar for who can send invoices, and switching providers changes where redacted invoice text is sent; the screen should say so before confirming.
 * `requireDmarc` defaults to `true`. The log receives only the message hash, the status, the reason and the SPF/DKIM/DMARC keywords. The server refuses to start without a token of at least 32 characters and listens on 127.0.0.1 unless `INGEST_HOST` says otherwise.
 
-The invoice corpus lives in `redteam/corpus/` so Area 5 can measure against it.
+The document corpus lives in `redteam/corpus/` so Area 5 can measure against it.
 
 ## Choosing the LLM
 
@@ -105,13 +115,15 @@ npm run extract -w ingest -- invoice.pdf   # calls the real API, prints LLM vs p
 
 ## Tasks
 
+Tasks are described in [docs/keel_division_trabajo.md](../docs/keel_division_trabajo.md). Tasks that keep their number changed scope with the change of direction of October 13.
+
 | Task | Issue |
 |---|---|
-| T3.1 Authenticated inbound channel | #18 |
+| T3.1 Authenticated inbound channel (upload by a party of the order) | #18 |
 | T3.2 Flood protection | #19 |
-| T3.3 Deterministic parser | #20 |
+| T3.3 Deterministic parser for transport documents and invoices | #20 |
 | T3.4 Quarantined LLM extractor | #21 |
 | T3.5 Two source agreement | #22 |
-| T3.6 Beneficiary change detection | #23 |
-| T3.7 Idempotency key | #24 |
-| T3.8 Invoice corpus | #25 |
+| T3.6 Account change detection (alert only) | #23 |
+| T3.7 Document keys (`blNumberHash`, `docsHash`) | #24 |
+| T3.8 Document corpus | #25 |
