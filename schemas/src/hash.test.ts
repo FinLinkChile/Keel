@@ -21,6 +21,7 @@ import {
   domainSeparator,
   requiredDocsHash,
   structHash,
+  termsHash,
   typedDataDigest,
 } from "./hash";
 import {
@@ -239,5 +240,26 @@ describe("field hashes", () => {
     expect(() => bytes32Text("cif")).toThrow();
     expect(() => bytes32Text("")).toThrow();
     expect(() => bytes32Text("A".repeat(32))).toThrow();
+  });
+});
+
+describe("termsHash (proposal)", () => {
+  const terms = {
+    orderNumber: "PO20260042",
+    currency: "USD" as const,
+    invoiceAmountMinor: 1_000_000n,
+    hsCodes: ["130231", "130239"],
+    documentHash: word("order.pdf"),
+  };
+
+  it("ignores the order of the HS codes and changes with any term", () => {
+    expect(termsHash({ ...terms, hsCodes: ["130239", "130231"] })).toBe(termsHash(terms));
+    expect(termsHash({ ...terms, invoiceAmountMinor: 1_000_001n })).not.toBe(termsHash(terms));
+    expect(termsHash({ ...terms, currency: "CNY" })).not.toBe(termsHash(terms));
+  });
+
+  it("rejects malformed terms instead of hashing them", () => {
+    expect(() => termsHash({ ...terms, orderNumber: "po-42" })).toThrow();
+    expect(() => termsHash({ ...terms, hsCodes: [] })).toThrow();
   });
 });

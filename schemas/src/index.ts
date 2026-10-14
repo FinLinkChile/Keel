@@ -108,6 +108,34 @@ export interface PurchaseOrder {
   nonce: bigint;
 }
 
+// Decided by Area 2 (Oct 14): the terms behind `termsHash`. `termsHash` is the EIP-712 hash of
+// these terms (see `termsHash` in ./hash.ts), so both parties sign them through the
+// order. They are what the engine compares the commercial invoice against at trigger 2.
+export const OrderTerms = z
+  .object({
+    // Same format as `order_number` in the invoice extraction
+    orderNumber: z.string().regex(/^[A-Z0-9]{1,20}$/),
+    currency: z.enum(CURRENCIES),
+    // Amount of the commercial invoice, in the minor unit of `currency`
+    invoiceAmountMinor: z.bigint().positive(),
+    // Harmonized System codes of the goods
+    hsCodes: z.array(z.string().regex(/^[0-9]{6,10}$/)).min(1),
+    // keccak256 of the full order document, with the proforma
+    documentHash: z.string().regex(/^0x[0-9a-f]{64}$/),
+  })
+  .strict();
+export type OrderTerms = z.infer<typeof OrderTerms>;
+
+export const TERMS_EIP712_TYPES = {
+  OrderTerms: [
+    { name: "orderNumber", type: "string" },
+    { name: "currency", type: "string" },
+    { name: "invoiceAmountMinor", type: "uint256" },
+    { name: "hsCodes", type: "string[]" },
+    { name: "documentHash", type: "bytes32" },
+  ],
+} as const;
+
 // Signed by the carrier fixed in the order.
 export interface ShipmentAttestation {
   orderId: Hex;

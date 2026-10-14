@@ -7,7 +7,10 @@ import {
   type Eip712Type,
   type Hex,
   type KeelDomain,
+  OrderTerms as OrderTermsSchema,
+  type OrderTerms,
   PERSONAL_EIP712_TYPES,
+  TERMS_EIP712_TYPES,
   type PaymentIntent,
   type RequiredDocType,
 } from "./index";
@@ -60,6 +63,14 @@ export function blNumberHash(documentNumber: string): Hex {
 export function requiredDocsHash(docs: readonly RequiredDocType[]): Hex {
   if (docs.length === 0) throw new Error("an order requires at least one document");
   return keccak256(toBytes([...new Set(docs)].sort().join(",")));
+}
+
+// `termsHash` of the order, the EIP-712 hash of its terms. The HS codes are
+// sorted first, so their order does not change the hash.
+export function termsHash(terms: OrderTerms): Hex {
+  const parsed = OrderTermsSchema.parse(terms);
+  const data = { ...parsed, hsCodes: [...new Set(parsed.hsCodes)].sort() };
+  return hashStruct({ types: TERMS_EIP712_TYPES, primaryType: "OrderTerms", data } as never);
 }
 
 // Hash of a document package: keccak256 of the concatenated keccak256 of each file,
