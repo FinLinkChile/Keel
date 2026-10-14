@@ -87,13 +87,17 @@ export interface SignedDocumentDecision {
   domain: KeelDomain;
 }
 
-// Trigger 2: the policy signer signs the DocumentDecision. Its verifying contract is
-// TradeEscrow; which policy signer the escrow accepts is open decision 3.
+// Trigger 2: the document verifier fixed in the order signs the DocumentDecision for
+// TradeEscrow. Any other key would be rejected by the escrow, so it fails here first.
 export async function signDocumentDecision(
   decision: DocumentDecision,
   domain: KeelDomain,
   signer: PolicySigner,
+  documentVerifier: Hex,
 ): Promise<SignedDocumentDecision> {
+  if (signer.address.toLowerCase() !== documentVerifier.toLowerCase()) {
+    throw new Error("the signer is not the document verifier of this order");
+  }
   const signature = await signer.signTypedData({
     domain,
     types: { DocumentDecision: EIP712_TYPES.DocumentDecision },

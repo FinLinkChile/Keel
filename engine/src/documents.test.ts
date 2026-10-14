@@ -32,6 +32,7 @@ const order: PurchaseOrder = {
   disputeWindow: BigInt(7 * DAY),
   carrier: address(0xd5),
   arbiter: address(0xe6),
+  documentVerifier: address(0xe7),
   incoterm: bytes32Text("CIF"),
   termsHash: termsHash(terms),
   requiredDocsHash: requiredDocsHash(["BILL_OF_LADING", "COMMERCIAL_INVOICE"]),
@@ -159,11 +160,12 @@ describe("evaluateDocuments (trigger 2)", () => {
     expect(documentInputsHash(invoice({ invoice_number: "INV20261002" }), context)).not.toBe(documentInputsHash(extractions, context));
   });
 
-  it("the policy key signs the DocumentDecision for the escrow", async () => {
+  it("only the document verifier of the order signs the DocumentDecision", async () => {
     const decision = evaluateDocuments(order, attestation, extractions, context).decision!;
     const signer = loadPolicySigner({ POLICY_SIGNER_PRIVATE_KEY: word("policy") });
     const domain = keelDomain(1, address(0xe5c));
-    const signed = await signDocumentDecision(decision, domain, signer);
+    await expect(signDocumentDecision(decision, domain, signer, order.documentVerifier)).rejects.toThrow("not the document verifier");
+    const signed = await signDocumentDecision(decision, domain, signer, signer.address);
     const recovered = await recoverTypedDataAddress({
       domain,
       types: { DocumentDecision: EIP712_TYPES.DocumentDecision },
