@@ -1,5 +1,9 @@
 # Historial de la documentación
 
+## 2026-10-14
+
+* **Actualización**: [README](README.md) y la skill `keel-docs` indican ahora cuándo se actualiza la documentación, qué casos se editan directamente y cuáles se avisan primero.
+
 ## 2026-10-13
 
 * **Reestructuración**: la documentación pasó de cinco documentos largos a un bundle [OKF v0.2](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) de conceptos cortos, uno por archivo, organizados por carpetas. Las convenciones están en [README](README.md).

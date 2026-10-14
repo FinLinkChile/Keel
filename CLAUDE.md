@@ -8,6 +8,8 @@ Contexto: importación de productos desde China por empresas chilenas, con el co
 
 `docs/` es un bundle OKF: conceptos cortos, uno por archivo, con frontmatter y un `index.md` por carpeta. Antes de abrir, buscar o editar cualquier archivo de `docs/`, invocar la skill `keel-docs`: trae el mapa de qué concepto responde cada necesidad y las reglas para actualizar. Leer solo los conceptos que la tarea necesita, nunca la carpeta completa.
 
+Al terminar una tarea que cambie contratos, esquemas, reglas del motor, alcance o plan, revisar la sección "Cuándo actualizar la documentación" de la skill: si el cambio refleja algo que el equipo ya decidió, actualizar el concepto en el mismo cambio; si el código contradice un concepto o hay una decisión de por medio, avisar antes de editar.
+
 ## Regla general: alinearse con el flujo clave
 
 `docs/flujo/` define el objetivo del proyecto y el flujo que se implementa. Es la referencia del equipo: si otro concepto de `docs/` no coincide, vale `docs/flujo/`.

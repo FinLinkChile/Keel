@@ -55,6 +55,33 @@ Se resuelven sin buscar: `D1` a `D14` en `decisiones/transversales.md`; decisió
 
 Leer `docs/flujo/checklist-componente.md` y responder sus ocho preguntas abriendo solo los conceptos que cada una necesite. En la propuesta, decir a qué paso del flujo sirve. Si la idea contradice `flujo/`, queda fuera del alcance o toca una decisión abierta, avisarlo antes de escribir código.
 
+## Cuándo actualizar la documentación
+
+Al terminar una tarea, revisar si ocurrió alguno de estos casos. Si ninguno aplica, no tocar `docs/`.
+
+Se actualiza directamente, en el mismo cambio, cuando solo se refleja un hecho que el equipo ya decidió:
+
+| Qué pasó | Qué se actualiza |
+| --- | --- |
+| El equipo cambió el objetivo o el flujo | `docs/flujo/` primero, después el código |
+| El equipo cerró una decisión abierta | El concepto afectado, luego `decisiones/abiertas.md`, después el código |
+| El equipo confirmó o descartó algo marcado **[PROPUESTA]** o `status: draft` | Quitar la marca o el `status`, o retirar el contenido descartado |
+| Cambió una interfaz compartida en `schemas/` o `contracts/src/` con aprobación del área dueña | El concepto de `docs/interfaces/` o `docs/flujo/datos-firmados-e-interfaz.md` |
+| Se completó algo marcado **[EN CURSO]** o **[DISEÑO]** | Cambiar la marca a **[HECHO]** |
+| Cambió una tarea, el calendario, un recorte o un entregable por decisión del equipo | El concepto de `docs/trabajo/` o `docs/entrega/` |
+| Se agregó, renombró o eliminó un concepto | El `index.md` de la carpeta y los enlaces que apuntaban a él |
+
+Se avisa a la persona antes de editar, porque implica una decisión que no es del agente:
+
+- El código que se va a escribir, o que ya existe, contradice un concepto. No se ajusta la documentación para que coincida con el código sin preguntar.
+- Dos conceptos se contradicen. Vale `docs/flujo/`, pero se informa cuál es la diferencia.
+- Aparece una amenaza nueva, se debilita una defensa o cambia un riesgo residual (`docs/flujo/amenazas.md`).
+- Algo nuevo queda dentro o fuera del alcance (`docs/flujo/alcance.md`).
+- Surge una pregunta que nadie ha decidido: se propone agregarla a `decisiones/abiertas.md`, no se responde.
+- Un concepto pasó su `stale_after`, o un dato marcado "por verificar" se va a usar como hecho.
+
+No se actualiza la documentación para registrar trabajo hecho, estados de avance ni detalles de implementación que el código ya muestra.
+
 ## Cómo actualizar la documentación
 
 Leer primero `docs/README.md` (convenciones). En resumen:

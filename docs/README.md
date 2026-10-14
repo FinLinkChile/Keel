@@ -1,10 +1,10 @@
 ---
 type: Guía
 title: "Conventions of the Keel documentation"
-description: "How the docs are stored and referenced: one concept per file, frontmatter, folders, links, identifiers, precedence and how to change them."
+description: "How the docs are stored and referenced: one concept per file, frontmatter, folders, links, identifiers, precedence, and when and how to change them."
 tags: [okf, conventions, docs]
 modo: ambos
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T04:10:00Z }
 ---
 
 # docs (Area 5)
@@ -72,6 +72,20 @@ verified: { by: human:<github-user>, at: 2026-10-15T12:00:00Z }
 # Precedence
 
 `flujo/` defines the goal of the project and the flow it implements. If another concept contradicts it, `flujo/` is right and the other concept is fixed. If the team changes the goal or the flow, `flujo/` is updated first and the code after.
+
+# When to change the documentation
+
+Update a concept in the same pull request as the change that makes it outdated:
+
+* The team changed the goal or the flow, or closed an open decision. The documentation changes first, the code after.
+* The team confirmed or dropped something marked **[PROPUESTA]** or `status: draft`.
+* A shared interface in `schemas/` or `contracts/src/` changed with the approval of the owning area.
+* Something marked **[EN CURSO]** or **[DISEÑO]** is done.
+* A task, the calendar, a cut rule or a deliverable changed.
+
+Raise it with the team before editing when a decision is involved: the code contradicts a concept, two concepts contradict each other, a new threat or residual risk appears, something moves in or out of scope, or a question nobody has decided comes up (add it to [decisiones/abiertas.md](decisiones/abiertas.md), do not answer it). Never edit a concept just to make it match the code.
+
+The documentation does not record progress or implementation details that the code already shows.
 
 # Changing the documentation
 
