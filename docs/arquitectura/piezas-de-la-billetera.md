@@ -18,7 +18,7 @@ Vienen de Keel Personal y las comparten los dos modos:
 | Safe | La cuenta de la empresa. Los dueños son personas, nunca el agente |
 | Zodiac Roles Modifier v2 | Limita al agente: a qué contrato puede llamar, qué función y con qué cupo |
 | Zodiac Delay Modifier | Los cambios de configuración esperan N horas, con aviso y ventana de veto |
-| Gate (PDRGate en Personal, gate de Trade en Trade) | Único miembro del rol del agente (D4). Sin un PDR válido no se mueve nada. Hay un gate por modo, con la verificación del PDR compartida |
+| Gate (PDRGate en Personal, gate de Trade en Trade) | Único miembro del rol del agente (D4). Sin un PDR válido no se mueve nada. Hay un gate por modo; su estructura interna la define el Área 1 |
 | PDR (Registro de Decisión de Política) | Decisión firmada con EIP-712 que ata la intención, la política y el calldata exacto |
 | Motor de política | Función determinista, sin LLM ni red. Decide el nivel y firma el PDR |
 | Extractor en cuarentena | El único LLM. Lee documentos no confiables y devuelve un esquema sin texto libre (D2, D3) |

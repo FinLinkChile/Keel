@@ -16,7 +16,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
 | Agencia excesiva (OWASP LLM06) | El agente intenta una acción fuera de su tarea | Rol Zodiac limitado al escrow, con cupo | Acciones dentro del rol siguen siendo posibles |
 | Mismo BL para dos órdenes | Cobrar dos veces con un embarque | Registro de `blNumberHash` usados | Depende de normalizar bien el número |
 | Llave del agente o del relayer robada | Intento de mover fondos | Sin PDR válido no pasa por el gate de Trade; el rol solo permite llamar al escrow, con cupo | Ninguna autoridad propia; puede gastar gas |
-| Llave de política robada | PDR falsos | El Roles limita destino y cupo; el escrow solo paga a las partes de la orden | Puede depositar órdenes firmadas dentro del cupo y aprobar documentos no conformes |
+| Llave de política robada | PDR falsos | El Roles limita destino y cupo; el escrow solo paga a las partes de la orden | Puede depositar órdenes firmadas dentro del cupo y aprobar documentos no conformes. Mientras el gate de Trade no verifique en la cadena el registro de proveedores (T1.11), eso incluye una orden firmada por ambas partes con una dirección de cobro nueva |
 | Importador retira tras ver el embarque | Deja al exportador sin cobrar | El contrato no tiene función de retiro unilateral | Disputa de mala fe, que resuelve el árbitro |
 | Exportador nunca embarca | Se queda con el anticipo | Reembolso del saldo por vencimiento | El anticipo solo se recupera por disputa |
 | Colusión de exportador y naviera | Atestación de un embarque que no ocurrió | Ventana de disputa, árbitro, reputación e identidad verificada | Riesgo residual declarado |
