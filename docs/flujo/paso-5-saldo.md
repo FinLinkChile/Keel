@@ -33,7 +33,7 @@ El número de orden, el monto y la moneda de la factura y los códigos arancelar
 
 # Decisión del motor: obligatoria, con dos salidas
 
-Decidido por el Área 2 (Darienn) el 14 de octubre (decisión 3). El saldo se libera solo con un `DocumentDecision` válido o con la aprobación manual del importador. Así, liberar el saldo exige siempre dos firmas independientes: la de la naviera y la del verificador de documentos (o la del propio importador, que es quien paga).
+Decidido por las Áreas 1 y 2 el 14 de octubre (decisión 3), a propuesta del Área 2. El saldo se libera solo con un `DocumentDecision` válido o con la aprobación manual del importador. Así, liberar el saldo exige siempre dos firmas independientes: la de la naviera y la del verificador de documentos (o la del propio importador, que es quien paga).
 
 * **Quién firma:** el `documentVerifier` que fija cada orden, firmado por ambas partes. No puede ser el importador, el exportador ni la naviera. Así el comprador no controla por sí solo el pago al vendedor, igual que en una carta de crédito revisa un tercero. En el prototipo es la llave de política del motor de Keel; en producción, quien las partes acuerden. El escrow no tiene un firmante global ni un administrador que lo cambie.
 * **Dos pasos:** primero se registra la atestación de la naviera y la orden pasa a Embarcado; después se libera el saldo con el `DocumentDecision` o con la `BalanceApproval`. Los nombres de las funciones los define el Área 1 (ver [datos firmados e interfaz](datos-firmados-e-interfaz.md)).
