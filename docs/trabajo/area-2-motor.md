@@ -1,11 +1,11 @@
 ---
 type: Área de trabajo
 title: "Área 2: motor de política, PDR, tipo de cambio y claves"
-description: "Objetivo, entregables y tareas T2.1 a T2.10: interfaces, reglas del motor, tipo de cambio, firma del PDR, simulación, custodia de llaves, monitor, verificador y plazos."
+description: "Objetivo, entregables y tareas T2.1 a T2.11: interfaces, reglas del motor, tipo de cambio, firma del PDR, simulación, custodia de llaves, monitor, verificador, plazos y servicio del agente."
 tags: [area-2, motor, pdr, llaves, t2]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T16:00:00Z }
 ---
 
 **Perfil sugerido:** backend en TypeScript con interés en criptografía.
@@ -122,12 +122,21 @@ Es la herramienta que se le muestra al jurado para pasar de "tenemos logs" a "nu
 **T2.10 Vigilancia de plazos (agregada por Trade).**
 Para cada orden en curso, el agente ejecuta `refundAfterDeadline` cuando pasó la fecha límite más el margen, y presenta la atestación con `submitShipment` cuando está disponible. Ambas llamadas las puede hacer cualquiera, así que no dan autoridad nueva al relayer.
 
+**T2.11 Servicio del agente (agregada por Trade). [PROPUESTA]**
+El proceso que une la ingesta, el motor, el PDR y el relayer. Sin él no hay orden de punta a punta (punto de integración del viernes 16, acto 1 de la demo). Vive en `engine/`, separado de las funciones puras: el motor sigue sin red y el servicio es el único que lee la cadena y envía transacciones.
+* **Depósito (paso 2):** detecta una orden abierta en el escrow, lee el estado de la orden, el cupo del rol en Roles y el nonce, arma el `FundingContext`, llama a `evaluateFunding`, firma el PDR (T2.4), simula la llamada (T2.5) y la envía con el relayer al gate de Trade. Nivel 3: entrega la solicitud de cofirma al Área 4. Nivel 2 o 4: retiene y avisa (T2.6).
+* **Gatillo 2 (paso 5):** recibe las extracciones y el hash de cada archivo del Área 3, lee la atestación registrada (`ShipmentAccepted`) y los `OrderTerms` de la orden, llama a `issueDocumentPdr`, guarda la evidencia y envía `releaseBalance`. Si los documentos no son conformes, retiene y avisa; la salida manual es la `BalanceApproval` del importador.
+* **Plazos:** corre la vigilancia de T2.10.
+* **Llaves:** el relayer solo paga gas y envía; el firmante de política firma en un proceso separado ([custodia de llaves](../arquitectura/custodia-de-llaves.md)). El servicio no gana autoridad nueva: sin un PDR o una firma válida, el gate y el escrow revierten.
+* De dónde salen la orden, los términos, los proveedores conocidos y el historial de montos es la [decisión abierta 15](../decisiones/abiertas.md). Mientras no se cierre, el servicio los lee de archivos locales de la demo.
+
 # Listo cuando
 
 * Las interfaces están congeladas y probadas en TS y Solidity.
 * El motor tiene una prueba unitaria por regla y pasa los corpus del Área 3.
 * El verificador reproduce al menos 5 decisiones reales de la red de prueba.
 * La tabla de llaves está en el informe de seguridad.
+* El servicio del agente lleva una orden de la red de prueba desde el depósito hasta el saldo sin intervención manual.
 
 # Dependencias
 

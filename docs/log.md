@@ -1,5 +1,10 @@
 # Historial de la documentación
 
+## 2026-10-15
+
+* **Nueva tarea [PROPUESTA]: T2.11 servicio del agente** ([Área 2](trabajo/area-2-motor.md)). Ninguna tarea construía el proceso que une ingesta, motor, PDR y relayer, y sin él no hay orden de punta a punta. Lo propuso Darienn (Área 2) al revisar los pendientes del área.
+* **Nueva decisión abierta 15**: dónde viven la orden, los términos, los proveedores conocidos y el historial, y quién los entrega al agente (Áreas 2, 3 y 4). Supuesto mientras tanto: archivos locales de la demo ([decisiones abiertas](decisiones/abiertas.md)).
+
 ## 2026-10-14
 
 * **Aprobación del Área 1 al PR #46**: la decisión 3 queda registrada como de las Áreas 1 y 2. `ESCROW_STATES` empieza con `NONE`, porque TradeEscrow usa 0 para "no hay orden". La tabla de llaves declara que en el prototipo una sola llave aprueba depósitos y da por conformes documentos. El Área 1 ajusta en su PR de TradeEscrow los detalles de la liberación (`releaseBalance` tras la ventana de disputa, `approveBalance` del importador, disputa sin límite de tiempo en Embarcado) ([paso 5](flujo/paso-5-saldo.md)).
