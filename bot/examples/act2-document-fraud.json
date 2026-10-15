@@ -1,0 +1,33 @@
+[
+  {
+    "id": "act2-account-change-attempt",
+    "kind": "account_change_attempt",
+    "mode": "trade",
+    "occurredAt": 1792569600,
+    "orderRef": "po-0142",
+    "orderLabel": "PO-0142",
+    "parties": { "importer": "acme-imports", "exporter": "lingnan" }
+  },
+  {
+    "id": "act2-held-account-mention",
+    "kind": "operation_held",
+    "mode": "trade",
+    "occurredAt": 1792569660,
+    "orderRef": "po-0142",
+    "orderLabel": "PO-0142",
+    "parties": { "importer": "acme-imports", "exporter": "lingnan" },
+    "reason": "account_change_mention",
+    "deadline": 1795132800
+  },
+  {
+    "id": "act2-held-fabricated-bl",
+    "kind": "operation_held",
+    "mode": "trade",
+    "occurredAt": 1792573200,
+    "orderRef": "po-0142",
+    "orderLabel": "PO-0142",
+    "parties": { "importer": "acme-imports", "exporter": "lingnan" },
+    "reason": "documents_mismatch",
+    "deadline": 1795132800
+  }
+]

@@ -176,7 +176,9 @@ export const operationHeld: Render<"operation_held"> = (n, r, ctx) => {
   if (r.side === "exporter") {
     return {
       text: lines(
-        `Your documents for ${n.orderLabel} are under review. The balance is not paid yet.`,
+        ctx.repeatDocumentHold
+          ? `Another document for ${n.orderLabel} is under review. The balance is still not paid.`
+          : `Your documents for ${n.orderLabel} are under review. The balance is not paid yet.`,
         until && `Accepted proof of shipment is needed by ${until}.`,
         `If anything else is needed, ${imp} will contact you.`,
       ),

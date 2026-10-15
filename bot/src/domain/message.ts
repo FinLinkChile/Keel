@@ -11,4 +11,7 @@ export interface RenderContext {
   now: number;
   // Name from the recipient directory. Every account of a notice is checked before rendering.
   name: (accountId: string) => string;
+  // True when this side of this order already got a hold for its documents. The exporter's
+  // generic version then says "another document" instead of repeating itself.
+  repeatDocumentHold?: boolean;
 }

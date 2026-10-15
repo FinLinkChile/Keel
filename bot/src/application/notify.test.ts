@@ -87,6 +87,32 @@ describe("NotifyService", () => {
     expect(sender.to(CHATS.acme.owner)).toHaveLength(3);
   });
 
+  it("tells the exporter about a second document hold on the same order without repeating itself", async () => {
+    const { service, sender } = setup();
+    const hold = (id: string, reason: "hidden_text" | "documents_mismatch", orderRef = "po-0142"): Notice => ({
+      ...SAMPLES.operation_held,
+      id,
+      reason,
+      orderRef,
+    });
+    await service.notify(hold("h-1", "hidden_text"));
+    await service.notify(hold("h-2", "documents_mismatch"));
+    await service.notify(hold("h-3", "hidden_text", "po-0150"));
+    await service.notify({ ...SAMPLES.operation_held, id: "h-4", reason: "new_supplier_wait" });
+
+    const toExporter = sender.to(CHATS.lingnan.operator).map((m) => m.text);
+    expect(toExporter).toHaveLength(3);
+    expect(toExporter[0]).toMatch(/^Your documents for PO-0142 are under review\. The balance is not paid yet\./);
+    expect(toExporter[1]).toBe(
+      "Another document for PO-0142 is under review. The balance is still not paid. Accepted proof of shipment is needed by Nov 20. If anything else is needed, Acme Imports will contact you.",
+    );
+    expect(toExporter[2]).toMatch(/^Your documents for PO-0142/);
+
+    // The importer keeps the detailed version every time.
+    const toImporter = sender.to(CHATS.acme.owner).map((m) => m.text);
+    expect(toImporter[1]).toContain("the shipping documents do not match the signed order");
+  });
+
   it("counts diff values withheld because they failed their check", async () => {
     const { service, logger } = setup();
     const n: Notice = {

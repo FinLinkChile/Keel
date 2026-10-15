@@ -1,7 +1,7 @@
 // NotifyService: validate, deduplicate, route, cap per chat, render and send.
 // The bot decides and executes nothing: a notice that does not validate is dropped and counted.
 import { checkTradeDiff, withheldCount } from "../domain/diffs";
-import { accountsOf, Notice, NoticeId, type NoticeKind } from "../domain/notice";
+import { accountsOf, isDocumentReason, Notice, NoticeId, type NoticeKind } from "../domain/notice";
 import { route } from "./routing";
 import type { ChatId, Clock, Logger, MessageSender, RecipientDirectory, Renderer } from "./ports";
 
@@ -45,6 +45,8 @@ interface Window {
 
 export class NotifyService {
   private readonly seen = new Set<string>();
+  // "orderRef:side" that already got a document hold. In memory, like deduplication.
+  private readonly documentHolds = new Set<string>();
   private readonly windows = new Map<ChatId, Window>();
   private readonly counters: NotifyStats = {
     received: 0,
@@ -114,6 +116,7 @@ export class NotifyService {
     const now = clock.now();
     const ctx = { now, name: (a: string) => directory.name(a) ?? a };
     const reached = new Set<ChatId>();
+    const holdsBefore = this.markDocumentHold(notice);
     let sent = 0;
 
     for (const recipient of route(notice)) {
@@ -124,7 +127,7 @@ export class NotifyService {
         continue;
       }
       // Rendered once per recipient. A chat registered under two roles gets the first one only.
-      const message = renderer.render(notice, recipient, ctx);
+      const message = renderer.render(notice, recipient, { ...ctx, repeatDocumentHold: holdsBefore.has(recipient.side ?? "") });
       for (const chatId of chats) {
         if (reached.has(chatId)) continue;
         reached.add(chatId);
@@ -147,6 +150,18 @@ export class NotifyService {
       }
     }
     return { status: "accepted", sent };
+  }
+
+  // Sides of the order that had a document hold before this notice; records this one.
+  private markDocumentHold(notice: Notice): ReadonlySet<string> {
+    const before = new Set<string>();
+    if (notice.kind !== "operation_held" || !isDocumentReason(notice.reason)) return before;
+    for (const side of ["importer", "exporter"]) {
+      const key = `${notice.orderRef}:${side}`;
+      if (this.documentHolds.has(key)) before.add(side);
+      this.documentHolds.add(key);
+    }
+    return before;
   }
 
   // Fixed window per chat, starting at its first capped message.
