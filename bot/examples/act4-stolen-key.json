@@ -1,0 +1,17 @@
+[
+  {
+    "id": "act4-transfer-blocked",
+    "kind": "transfer_blocked",
+    "mode": "trade",
+    "occurredAt": 1793156400,
+    "accountId": "acme-imports",
+    "txHash": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e"
+  },
+  {
+    "id": "act4-agent-revoked",
+    "kind": "agent_revoked",
+    "mode": "trade",
+    "occurredAt": 1793157000,
+    "accountId": "acme-imports"
+  }
+]
