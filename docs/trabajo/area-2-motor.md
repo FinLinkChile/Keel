@@ -129,6 +129,7 @@ El proceso que une la ingesta, el motor, el PDR y el relayer. Sin él no hay ord
 * **Plazos:** corre la vigilancia de T2.10.
 * **Llaves:** el relayer solo paga gas y envía; el firmante de política firma en un proceso separado ([custodia de llaves](../arquitectura/custodia-de-llaves.md)). El servicio no gana autoridad nueva: sin un PDR o una firma válida, el gate y el escrow revierten.
 * De dónde salen la orden, los términos, los proveedores conocidos y el historial de montos es la [decisión abierta 15](../decisiones/abiertas.md). Mientras no se cierre, el servicio los lee de archivos locales de la demo.
+* Cómo funciona, qué archivos lee y qué avisos emite: [servicio del agente](../arquitectura/servicio-del-agente.md).
 
 # Listo cuando
 
