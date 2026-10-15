@@ -1,11 +1,12 @@
 // Templates for notices about one order (Keel Trade, T4.6). One pure function per kind.
 // Each message says what happened, why, how much time is left and what the person can do.
 // Only typed fields reach the text: names come from the directory, never from the notice.
-import { checkTradeDiff, type CheckedDiff, type Shown } from "../../domain/diffs";
+import { checkTradeDiff } from "../../domain/diffs";
 import type { Message, RenderContext } from "../../domain/message";
 import type { NoticeKind, NoticeOf, Parties } from "../../domain/notice";
 import type { Recipient } from "../../domain/recipients";
 import { formatAmount, formatDate, formatDaysLeft } from "../format";
+import { diffLine } from "./diff-lines";
 
 export type Render<K extends NoticeKind> = (n: NoticeOf<K>, r: Recipient, ctx: RenderContext) => Message;
 
@@ -150,24 +151,6 @@ export const disputeResolved: Render<"dispute_resolved"> = (n, r, ctx) => {
   const head = r.side === "arbiter" ? `Your decision on ${n.orderLabel} was carried out:` : `The arbiter resolved the dispute on ${n.orderLabel}:`;
   return { text: `${head} ${toImp} to ${imp} and ${toExp} to ${exp}. The order is closed.`, link: orderLink(n) };
 };
-
-const FIELD_NAME: Record<CheckedDiff["field"], string> = {
-  document_number: "Document number",
-  on_board_date: "On board date",
-  amount_minor: "Amount",
-  currency: "Currency",
-};
-
-function shown(v: Shown, now: number): string {
-  if (v.type === "date") return formatDate(v.at, now);
-  if (v.type === "amount") return formatAmount(v.minor, v.currency);
-  return v.code;
-}
-
-function diffLine(d: CheckedDiff, now: number): string {
-  if (d.display === "values") return `${FIELD_NAME[d.field]}: ${shown(d.a, now)} and ${shown(d.b, now)}.`;
-  return `${FIELD_NAME[d.field]}: does not match, both values are in Keel.`;
-}
 
 export const operationHeld: Render<"operation_held"> = (n, r, ctx) => {
   const { imp, exp } = names(n, ctx);

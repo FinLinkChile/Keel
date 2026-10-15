@@ -14,12 +14,14 @@ export const CHATS = {
   acme: { owner: 111, operator: 222, cosigner: 333 },
   lingnan: { owner: 444, operator: 555 },
   arbiter: { owner: 888 },
+  ana: { owner: 666, cosigner: 777 },
 } as const;
 
 const ACCOUNTS: Record<string, { name: string; roles: Partial<Record<Role, ChatId[]>> }> = {
   "acme-imports": { name: "Acme Imports", roles: { owner: [111], operator: [222], cosigner: [333] } },
   lingnan: { name: "Lingnan Hydrocolloids", roles: { owner: [444], operator: [555] } },
   "hk-arbitration": { name: "HK Trade Arbitration", roles: { owner: [888] } },
+  ana: { name: "Ana", roles: { owner: [666], cosigner: [777] } },
 };
 
 export const directory: RecipientDirectory = {
@@ -35,6 +37,7 @@ const order = {
   parties: { importer: "acme-imports", exporter: "lingnan", arbiter: "hk-arbitration" },
 };
 const wallet = { mode: "trade" as const, occurredAt: oct(14), accountId: "acme-imports" };
+const personal = { mode: "personal" as const, occurredAt: oct(14), accountId: "ana" };
 
 // One valid notice per kind.
 export const SAMPLES: { [K in NoticeKind]: Extract<Notice, { kind: K }> } = {
@@ -54,7 +57,32 @@ export const SAMPLES: { [K in NoticeKind]: Extract<Notice, { kind: K }> } = {
   transfer_blocked: { ...wallet, id: "n-14", kind: "transfer_blocked", txHash: HASH },
   agent_revoked: { ...wallet, id: "n-15", kind: "agent_revoked" },
   gate_paused: { ...wallet, id: "n-16", kind: "gate_paused" },
+  payment_held: { ...personal, id: "p-1", kind: "payment_held", aliasId: "LUZ", amountClp: 45990, dueDate: oct(17), reason: "fx_divergence" },
+  payment_deadline: { ...personal, id: "p-2", kind: "payment_deadline", aliasId: "LUZ", amountClp: 45990, dueDate: oct(17), daysLeft: 3 },
+  invoice_needs_cosign: {
+    ...personal,
+    id: "p-3",
+    kind: "invoice_needs_cosign",
+    aliasId: "LUZ",
+    diffs: [{ field: "amount_clp", a: 45990, b: 459900 }],
+  },
+  invoice_held: { ...personal, id: "p-4", kind: "invoice_held", reason: "parser_failed" },
+  change_requested: {
+    ...personal,
+    id: "p-5",
+    kind: "change_requested",
+    aliasId: "LUZ",
+    triggers: ["announced_in_document", "unknown_destination"],
+    requestId: 12,
+  },
+  change_digest: { ...personal, id: "p-6", kind: "change_digest", count: 3, aliasIds: ["LUZ", "INTERNET"] },
+  payment_executed: { ...personal, id: "p-7", kind: "payment_executed", aliasId: "LUZ", amountClp: 45990 },
+  change_vetoed: { ...personal, id: "p-8", kind: "change_vetoed", aliasId: "LUZ" },
+  change_scheduled: { ...personal, id: "p-9", kind: "change_scheduled", aliasId: "LUZ", effectiveAt: oct(21) },
 };
+
+export const TRADE_SAMPLES = Object.values(SAMPLES).filter((n) => n.mode === "trade");
+export const PERSONAL_SAMPLES = Object.values(SAMPLES).filter((n) => n.mode === "personal");
 
 export class MemorySender {
   readonly sent: { chatId: ChatId; message: Message }[] = [];

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DOCUMENT_REASONS, HELD_REASONS, type Notice } from "../domain/notice";
-import { SAMPLES } from "../testing/fixtures";
+import { PERSONAL_SAMPLES, SAMPLES, TRADE_SAMPLES } from "../testing/fixtures";
 import { route } from "./routing";
 
 const who = (n: Notice) => route(n).map((r) => `${r.side}:${r.role}`);
@@ -34,7 +34,29 @@ describe("route", () => {
   });
 
   it("gives every Trade recipient a side", () => {
-    for (const n of Object.values(SAMPLES)) for (const r of route(n)) expect(r.side).toBeDefined();
+    for (const n of TRADE_SAMPLES) for (const r of route(n)) expect(r.side).toBeDefined();
+  });
+
+  it("gives no Personal recipient a side, and never an operator", () => {
+    for (const n of PERSONAL_SAMPLES) {
+      expect(route(n).length).toBeGreaterThan(0);
+      for (const r of route(n)) {
+        expect(r.side).toBeUndefined();
+        expect(r.accountId).toBe("ana");
+        expect(r.role).not.toBe("operator");
+      }
+    }
+  });
+
+  it("follows the Personal routing table", () => {
+    const roles = (n: Notice) => route(n).map((r) => r.role);
+    for (const k of ["payment_held", "payment_deadline", "invoice_held", "payment_executed", "change_vetoed"] as const) {
+      expect(roles(SAMPLES[k])).toEqual(["owner"]);
+    }
+    for (const k of ["change_scheduled", "change_requested", "change_digest"] as const) {
+      expect(roles(SAMPLES[k])).toEqual(["owner", "cosigner"]);
+    }
+    expect(roles(SAMPLES.invoice_needs_cosign)).toEqual(["cosigner", "owner"]);
   });
 
   it("reaches the arbiter only on disputes", () => {

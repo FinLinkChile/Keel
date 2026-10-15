@@ -71,6 +71,24 @@ describe("injection", () => {
     }
   });
 
+  it("never shows a payload placed in a Personal diff value, even one that passes the field's regex", async () => {
+    for (const field of ["issuer_tax_id", "invoice_number", "period", "amount_clp", "alias_id"]) {
+      for (const p of PAYLOADS) {
+        const { result, texts } = await deliver({ ...SAMPLES.invoice_needs_cosign, diffs: [{ field, a: p, b: p }] });
+        expect(result.status).toBe("accepted");
+        expectClean(texts);
+      }
+    }
+  });
+
+  it("rejects a sender domain or proposed account in a change request", async () => {
+    for (const extra of [{ fromDomain: "enel-pagos.cl" }, { proposed: [{ kind: "bank_account", value: "56912345678" }] }]) {
+      const { result, texts } = await deliver({ ...SAMPLES.change_requested, ...extra });
+      expect(result.status).toBe("rejected");
+      expect(texts).toHaveLength(0);
+    }
+  });
+
   it("rejects a name or any extra field", async () => {
     const withName = { ...SAMPLES.order_funded, parties: { ...SAMPLES.order_funded.parties, name: PAYLOADS[0] } };
     const topLevel = { ...SAMPLES.order_funded, name: PAYLOADS[1] };

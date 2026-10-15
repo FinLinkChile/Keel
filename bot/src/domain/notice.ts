@@ -3,6 +3,7 @@
 // does not fit is rejected here.
 // No free text (T4.3, critical 8): every field is an enum, an integer, a timestamp or a value
 // held to a strict regex. Every object is strict, so an extra field such as `name` fails.
+import { ALIAS_IDS } from "@keel/schemas";
 import { z } from "zod";
 import { AccountId } from "./recipients";
 
@@ -151,6 +152,105 @@ const TransferBlocked = z.strictObject({ ...wallet, kind: z.literal("transfer_bl
 const AgentRevoked = z.strictObject({ ...wallet, kind: z.literal("agent_revoked") });
 const GatePaused = z.strictObject({ ...wallet, kind: z.literal("gate_paused") });
 
+// ---------------------------------------------------------------------------
+// Keel Personal (depth depends on open decision 14)
+// ---------------------------------------------------------------------------
+
+export const AliasIdSchema = z.enum(ALIAS_IDS);
+export const AmountClp = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+
+// The fields ingest compares (COMPARED_FIELDS in ingest/src/agreement.ts), redeclared here: the
+// bot imports only types from ingest.
+export const PERSONAL_DIFF_FIELDS = ["issuer_tax_id", "invoice_number", "period", "amount_clp", "alias_id"] as const;
+export type PersonalDiffField = (typeof PERSONAL_DIFF_FIELDS)[number];
+export const PersonalDiff = z.strictObject({ field: z.enum(PERSONAL_DIFF_FIELDS), a: DiffValue, b: DiffValue });
+export type PersonalDiff = z.infer<typeof PersonalDiff>;
+
+// Engine reasons for a held payment (T2.6). The bot's own enum: the engine adapter maps to it.
+export const PAYMENT_HELD_REASONS = [
+  // issuer_tax_id differs from the RUT registered for the alias: the typical fake bill
+  "issuer_mismatch",
+  "amount_out_of_range",
+  "over_period_limit",
+  "fx_divergence",
+  "account_change_request",
+  "hidden_text",
+  "simulation_failed",
+] as const;
+export type PaymentHeldReason = (typeof PAYMENT_HELD_REASONS)[number];
+
+// Same values as CHANGE_TRIGGERS in ingest/src/beneficiaryChange.ts.
+export const CHANGE_TRIGGERS = ["announced_in_document", "unknown_destination"] as const;
+
+const uniqueList = <T extends z.ZodType>(item: T, max: number) =>
+  z
+    .array(item)
+    .min(1)
+    .max(max)
+    .refine((xs) => new Set(xs).size === xs.length, { message: "duplicate values" });
+
+const personal = { ...base, mode: z.literal("personal"), accountId: AccountId };
+
+const PaymentHeld = z.strictObject({
+  ...personal,
+  kind: z.literal("payment_held"),
+  aliasId: AliasIdSchema,
+  amountClp: AmountClp,
+  dueDate: Timestamp,
+  reason: z.enum(PAYMENT_HELD_REASONS),
+});
+// One id per reminder: 5, 3 and 1 days are three notices.
+const PaymentDeadline = z.strictObject({
+  ...personal,
+  kind: z.literal("payment_deadline"),
+  aliasId: AliasIdSchema,
+  amountClp: AmountClp,
+  dueDate: Timestamp,
+  daysLeft: DaysLeft,
+});
+const InvoiceNeedsCosign = z.strictObject({
+  ...personal,
+  kind: z.literal("invoice_needs_cosign"),
+  aliasId: AliasIdSchema,
+  diffs: z.array(PersonalDiff).min(1).max(8),
+});
+const InvoiceHeld = z.strictObject({
+  ...personal,
+  kind: z.literal("invoice_held"),
+  aliasId: AliasIdSchema.optional(),
+  reason: z.enum(["parser_failed", "extractor_failed"]),
+});
+// Never the sender's domain nor the proposed destinations: a look-alike domain is the attack,
+// and it is compared calmly in the app's readable diff (T4.2), not in a chat.
+const ChangeRequested = z.strictObject({
+  ...personal,
+  kind: z.literal("change_requested"),
+  aliasId: AliasIdSchema,
+  triggers: uniqueList(z.enum(CHANGE_TRIGGERS), CHANGE_TRIGGERS.length),
+  requestId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+});
+const ChangeDigest = z.strictObject({
+  ...personal,
+  kind: z.literal("change_digest"),
+  count: z.number().int().positive().max(10_000),
+  aliasIds: uniqueList(AliasIdSchema, ALIAS_IDS.length),
+});
+const PaymentExecuted = z.strictObject({ ...personal, kind: z.literal("payment_executed"), aliasId: AliasIdSchema, amountClp: AmountClp });
+const ChangeVetoed = z.strictObject({ ...personal, kind: z.literal("change_vetoed"), aliasId: AliasIdSchema });
+const ChangeScheduled = z.strictObject({ ...personal, kind: z.literal("change_scheduled"), aliasId: AliasIdSchema, effectiveAt: Timestamp });
+
+const PERSONAL_OPTIONS = [
+  PaymentHeld,
+  PaymentDeadline,
+  InvoiceNeedsCosign,
+  InvoiceHeld,
+  ChangeRequested,
+  ChangeDigest,
+  PaymentExecuted,
+  ChangeVetoed,
+  ChangeScheduled,
+] as const;
+
 export const TradeNotice = z.discriminatedUnion("kind", [
   OrderOpened,
   OrderFunded,
@@ -171,13 +271,17 @@ export const TradeNotice = z.discriminatedUnion("kind", [
 ]);
 export type TradeNotice = z.infer<typeof TradeNotice>;
 
-export const Notice = TradeNotice;
+export const PersonalNotice = z.discriminatedUnion("kind", [...PERSONAL_OPTIONS]);
+export type PersonalNotice = z.infer<typeof PersonalNotice>;
+
+export const Notice = z.discriminatedUnion("kind", [...TradeNotice.options, ...PERSONAL_OPTIONS]);
 export type Notice = z.infer<typeof Notice>;
 export type NoticeKind = Notice["kind"];
 export type NoticeOf<K extends NoticeKind> = Extract<Notice, { kind: K }>;
 
 export type OrderNotice = Extract<Notice, { orderRef: string }>;
 export type WalletNotice = Exclude<TradeNotice, OrderNotice>;
+export const isPersonal = (n: Notice): n is PersonalNotice => n.mode === "personal";
 export const isOrderNotice = (n: Notice): n is OrderNotice => "orderRef" in n;
 
 // Accounts a notice names, checked against the directory before anything is sent.

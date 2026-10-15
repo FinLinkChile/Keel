@@ -1,6 +1,6 @@
 // NotifyService: validate, deduplicate, route, cap per chat, render and send.
 // The bot decides and executes nothing: a notice that does not validate is dropped and counted.
-import { checkTradeDiff, withheldCount } from "../domain/diffs";
+import { checkPersonalDiff, checkTradeDiff, withheldCount, type CheckedDiff } from "../domain/diffs";
 import { accountsOf, isDocumentReason, Notice, NoticeId, type NoticeKind } from "../domain/notice";
 import { route } from "./routing";
 import type { ChatId, Clock, Logger, MessageSender, RecipientDirectory, Renderer } from "./ports";
@@ -13,6 +13,7 @@ const UNCAPPED: ReadonlySet<NoticeKind> = new Set<NoticeKind>([
   "transfer_blocked",
   "agent_revoked",
   "gate_paused",
+  "payment_held",
 ]);
 
 const HOUR_MS = 3_600_000;
@@ -103,14 +104,17 @@ export class NotifyService {
     }
     this.seen.add(notice.id);
 
-    if (notice.kind === "operation_held" && notice.diffs) {
-      const checked = notice.diffs.map((d) => checkTradeDiff(d, notice.currency));
-      const withheld = withheldCount(checked);
-      if (withheld > 0) {
-        this.counters.diffValuesWithheld += withheld;
-        const fields = checked.filter((c) => c.display === "field_only" && !c.valid).map((c) => c.field);
-        logger.log({ event: "diff_withheld", noticeId: notice.id, kind: notice.kind, fields });
-      }
+    const checked: CheckedDiff[] =
+      notice.kind === "operation_held"
+        ? (notice.diffs ?? []).map((d) => checkTradeDiff(d, notice.currency))
+        : notice.kind === "invoice_needs_cosign"
+          ? notice.diffs.map(checkPersonalDiff)
+          : [];
+    const withheld = withheldCount(checked);
+    if (withheld > 0) {
+      this.counters.diffValuesWithheld += withheld;
+      const fields = checked.filter((c) => c.display === "field_only" && !c.valid).map((c) => c.field);
+      logger.log({ event: "diff_withheld", noticeId: notice.id, kind: notice.kind, fields });
     }
 
     const now = clock.now();

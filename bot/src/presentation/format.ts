@@ -29,3 +29,19 @@ export function formatDaysLeft(days: number): string {
   if (days === 0) return "the deadline is today";
   return days === 1 ? "1 day left" : `${days} days left`;
 }
+
+// 45990 -> "$45.990": Chilean pesos, no decimals, dot as thousands separator.
+export function formatClp(amount: number): string {
+  return `$${String(amount).replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
+}
+
+// 2026, 10 -> "Oct 2026"
+export function formatPeriod(year: number, month: number): string {
+  return `${MONTHS[month - 1]} ${year}`;
+}
+
+// Personal: due in N days.
+export function formatDueIn(days: number): string {
+  if (days === 0) return "is due today";
+  return days === 1 ? "is due tomorrow" : `is due in ${days} days`;
+}

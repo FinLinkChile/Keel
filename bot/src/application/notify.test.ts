@@ -113,6 +113,28 @@ describe("NotifyService", () => {
     expect(toImporter[1]).toContain("the shipping documents do not match the signed order");
   });
 
+  it("caps notices born from emails, but never a held payment", async () => {
+    const { service, sender } = setup(2);
+    for (let i = 0; i < 20; i++) await service.notify({ ...SAMPLES.change_requested, id: `change-${i}`, requestId: i + 1 });
+    expect(sender.to(CHATS.ana.owner)).toHaveLength(3);
+    for (let i = 0; i < 5; i++) await service.notify({ ...SAMPLES.payment_held, id: `held-${i}`, reason: "issuer_mismatch" });
+    expect(sender.to(CHATS.ana.owner)).toHaveLength(8);
+  });
+
+  it("counts Personal diff values withheld", async () => {
+    const { service } = setup();
+    const n: Notice = {
+      ...SAMPLES.invoice_needs_cosign,
+      diffs: [
+        { field: "amount_clp", a: 45990, b: "45990 call +56912345678" },
+        { field: "period", a: "202610", b: "2026-10" },
+        { field: "invoice_number", a: "56912345678", b: "4521" },
+      ],
+    };
+    expect(await service.notify(n)).toMatchObject({ status: "accepted", sent: 2 });
+    expect(service.stats().diffValuesWithheld).toBe(2);
+  });
+
   it("counts diff values withheld because they failed their check", async () => {
     const { service, logger } = setup();
     const n: Notice = {

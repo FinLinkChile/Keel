@@ -1,0 +1,37 @@
+[
+  {
+    "id": "personal-luz-amount-mismatch",
+    "kind": "invoice_needs_cosign",
+    "mode": "personal",
+    "accountId": "ana",
+    "occurredAt": 1792569600,
+    "aliasId": "LUZ",
+    "diffs": [
+      {
+        "field": "amount_clp",
+        "a": 45990,
+        "b": 459900
+      }
+    ]
+  },
+  {
+    "id": "personal-internet-number-mismatch",
+    "kind": "invoice_needs_cosign",
+    "mode": "personal",
+    "accountId": "ana",
+    "occurredAt": 1792573200,
+    "aliasId": "INTERNET",
+    "diffs": [
+      {
+        "field": "invoice_number",
+        "a": "88213",
+        "b": "88231"
+      },
+      {
+        "field": "period",
+        "a": "202610",
+        "b": "202609"
+      }
+    ]
+  }
+]

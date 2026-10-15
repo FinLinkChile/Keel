@@ -4,6 +4,7 @@ import type { Notice, NoticeKind } from "../../domain/notice";
 import type { Recipient } from "../../domain/recipients";
 import * as order from "./trade-order";
 import type { Render } from "./trade-order";
+import * as personal from "./personal";
 import * as wallet from "./trade-wallet";
 
 const TEMPLATES: { [K in NoticeKind]: Render<K> } = {
@@ -23,6 +24,15 @@ const TEMPLATES: { [K in NoticeKind]: Render<K> } = {
   transfer_blocked: wallet.transferBlocked,
   agent_revoked: wallet.agentRevoked,
   gate_paused: wallet.gatePaused,
+  payment_held: personal.paymentHeld,
+  payment_deadline: personal.paymentDeadline,
+  invoice_needs_cosign: personal.invoiceNeedsCosign,
+  invoice_held: personal.invoiceHeld,
+  change_requested: personal.changeRequested,
+  change_digest: personal.changeDigest,
+  payment_executed: personal.paymentExecuted,
+  change_vetoed: personal.changeVetoed,
+  change_scheduled: personal.changeScheduled,
 };
 
 export function render(notice: Notice, recipient: Recipient, ctx: RenderContext): Message {

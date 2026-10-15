@@ -1,6 +1,6 @@
 // Routing table: which sides and roles each notice reaches. The templates get the recipient, so
 // the same event is told differently on each side.
-import { isDocumentReason, type Notice, type Parties } from "../domain/notice";
+import { isDocumentReason, isPersonal, type Notice, type Parties, type PersonalNotice, type TradeNotice } from "../domain/notice";
 import type { Recipient, Role, Side } from "../domain/recipients";
 
 type Route = Partial<Record<Side, readonly Role[]>>;
@@ -8,7 +8,7 @@ type Route = Partial<Record<Side, readonly Role[]>>;
 const BOTH: Route = { importer: ["owner", "operator"], exporter: ["owner", "operator"] };
 const WALLET: Route = { importer: ["owner", "cosigner"] };
 
-function routeOf(n: Notice): Route {
+function routeOf(n: TradeNotice): Route {
   switch (n.kind) {
     case "order_opened":
     case "order_funded":
@@ -39,10 +39,29 @@ function routeOf(n: Notice): Route {
   }
 }
 
+// Keel Personal: one account, no order with two parties, so no side.
+function personalRoles(n: PersonalNotice): readonly Role[] {
+  switch (n.kind) {
+    case "payment_held":
+    case "payment_deadline":
+    case "invoice_held":
+    case "payment_executed":
+    case "change_vetoed":
+      return ["owner"];
+    case "change_scheduled":
+    case "change_requested":
+    case "change_digest":
+      return ["owner", "cosigner"];
+    case "invoice_needs_cosign":
+      return ["cosigner", "owner"];
+  }
+}
+
 const accountOn = (parties: Parties, side: Side) => parties[side];
 
 // Order of the result: importer, exporter, arbiter, and the roles in table order.
 export function route(n: Notice): Recipient[] {
+  if (isPersonal(n)) return personalRoles(n).map((role) => ({ accountId: n.accountId, role }));
   const table = routeOf(n);
   const out: Recipient[] = [];
   for (const side of ["importer", "exporter", "arbiter"] as const) {
