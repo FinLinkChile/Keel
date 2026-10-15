@@ -65,6 +65,11 @@ describe("evaluateFunding", () => {
       expect(ruleOf({ ...context, escrowOrder: null }, "order-signed")).toMatchObject({ tier: 4, reason: "ORDER_NOT_FOUND" });
     });
 
+    it("treats the NONE state as an order that does not exist", () => {
+      const escrowOrder = { ...context.escrowOrder!, state: "NONE" as const };
+      expect(ruleOf({ ...context, escrowOrder }, "order-signed")).toMatchObject({ tier: 4, reason: "ORDER_NOT_FOUND" });
+    });
+
     it("blocks an order that is no longer open", () => {
       const escrowOrder = { ...context.escrowOrder!, state: "FUNDED" as const };
       expect(ruleOf({ ...context, escrowOrder }, "order-signed")).toMatchObject({ tier: 4, reason: "ORDER_NOT_OPEN" });

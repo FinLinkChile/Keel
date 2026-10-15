@@ -94,7 +94,7 @@ const same = (a: Hex, b: Hex) => a.toLowerCase() === b.toLowerCase();
 
 function orderSigned(order: PurchaseOrder, ctx: FundingContext): RuleResult<FundingRule, FundingReason> {
   const rule = "order-signed";
-  if (ctx.escrowOrder === null) return { rule, tier: 4, reason: "ORDER_NOT_FOUND" };
+  if (ctx.escrowOrder === null || ctx.escrowOrder.state === "NONE") return { rule, tier: 4, reason: "ORDER_NOT_FOUND" };
   if (ctx.escrowOrder.state !== "OPEN") return { rule, tier: 4, reason: "ORDER_NOT_OPEN" };
   // The order we are about to fund must be exactly the one both parties signed
   if (!same(ctx.escrowOrder.orderHash, structHash("PurchaseOrder", order))) {
