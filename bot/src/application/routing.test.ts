@@ -13,6 +13,9 @@ describe("route", () => {
     expect(who(SAMPLES.deadline_approaching)).toEqual(["importer:operator", "exporter:owner", "exporter:operator"]);
     expect(who(held("over_limit_cosign"))).toEqual(["importer:cosigner", "importer:owner"]);
     expect(who(held("new_supplier_wait"))).toEqual(["importer:owner", "importer:operator"]);
+    for (const r of ["funding_blocked", "simulation_failed", "agent_data_incomplete"] as const) {
+      expect(who(held(r))).toEqual(["importer:owner", "importer:operator"]);
+    }
     expect(who(SAMPLES.account_change_attempt)).toEqual(["importer:owner", "importer:operator", "exporter:owner"]);
     expect(who(SAMPLES.change_queued)).toEqual(["importer:cosigner", "importer:owner"]);
     for (const k of ["transfer_blocked", "agent_revoked", "gate_paused"] as const) {

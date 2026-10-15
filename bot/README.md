@@ -166,7 +166,7 @@ In Trade, `orderRef` is opaque and only builds the app URL; `orderLabel` is what
 
 Enums of the bot. How producers reach the bot is not decided yet: `POST /notices` is a proposal, and each producer's reason codes are mapped into these enums by its adapter, to be agreed with Area 2 (engine) and Area 3 (ingest):
 
-* `operation_held.reason`: `new_supplier_wait`, `over_limit_cosign`, `documents_mismatch`, `two_source_mismatch`, `hidden_text`, `account_change_mention`, `bl_reused` (the bill of lading already settled another order) and `document_unreadable` (neither reader could read it; the importer is asked to get a clean copy). All but the first two are document reasons: the exporter gets the generic version.
+* `operation_held.reason`: `new_supplier_wait`, `over_limit_cosign`, `documents_mismatch`, `two_source_mismatch`, `hidden_text`, `account_change_mention`, `bl_reused` (the bill of lading already settled another order) and `document_unreadable` (neither reader could read it; the importer is asked to get a clean copy). Three more come from the engine (T2.6): `funding_blocked` (the engine refused the deposit), `simulation_failed` (the step would revert on chain, so nothing was sent) and `agent_data_incomplete` (the agent's data does not match the order). Document reasons are the six from `documents_mismatch` to `document_unreadable`: the exporter gets the generic version.
 * `payment_held.reason`: `issuer_mismatch`, `amount_out_of_range`, `over_period_limit`, `fx_divergence`, `account_change_request`, `hidden_text`, `simulation_failed`.
 * `change_queued.changeKind`: `limit`, `supplier_added`, `role_change`, `policy_signer`. An assumption, to align with what Area 1's Delay queues once it exists.
 * `currency`: `USD`, `EUR`, `CNY`, `HKD`, the commercial invoice enum. Decimals per currency live in `presentation/format.ts`, because the payment token is open decision 1.
@@ -189,7 +189,7 @@ Trade diffs cover the twelve fields ingest compares on a transport document and 
 | `order_opened`, `order_funded`, `shipment_accepted`, `balance_released`, `refunded`, `order_cancelled` | owner, operator | owner, operator | |
 | `advance_released`, `deadline_approaching` | operator | owner, operator | |
 | `operation_held` `over_limit_cosign` | cosigner, owner | | |
-| `operation_held` `new_supplier_wait` | owner, operator | | |
+| `operation_held` `new_supplier_wait`, `funding_blocked`, `simulation_failed`, `agent_data_incomplete` | owner, operator | | |
 | `operation_held` document reasons | owner, operator, with the detail | operator, generic version | |
 | `account_change_attempt` | owner, operator | owner | |
 | `change_queued` | cosigner, owner | | |

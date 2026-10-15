@@ -208,6 +208,20 @@ export const operationHeld: Render<"operation_held"> = (n, r, ctx) => {
         ),
         link: orderLink(n),
       };
+    // Engine holds: internal to the importer's side, so they never reach the exporter (routing).
+    case "funding_blocked":
+    case "simulation_failed":
+    case "agent_data_incomplete": {
+      const what: Record<typeof n.reason, string> = {
+        funding_blocked: `Keel did not accept the deposit for ${n.orderLabel}: the order does not meet the wallet's rules.`,
+        simulation_failed: `Keel stopped a payment step for ${n.orderLabel}: it would have failed on the network, so nothing was sent.`,
+        agent_data_incomplete: `Keel stopped a payment step for ${n.orderLabel}: the agent's records do not match the signed order.`,
+      };
+      return {
+        text: lines(what[n.reason], "Nothing was paid.", until && `${exp} must ship by ${until}.`, "Review the order in Keel."),
+        link: orderLink(n),
+      };
+    }
     default: {
       const why: Record<typeof n.reason, string> = {
         documents_mismatch: "the shipping documents do not match the signed order.",

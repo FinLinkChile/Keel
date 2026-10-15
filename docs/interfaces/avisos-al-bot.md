@@ -5,7 +5,7 @@ description: "Cómo le entregan el motor, la ingesta y otros productores los avi
 tags: [bot, avisos, telegram, ingesta, motor, t4-3, t4-6]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T02:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T22:00:00Z }
 ---
 
 **[PROPUESTA]** Diseño del Área 4 (T4.3 y T4.6) para que lo usen las Áreas 2 y 3. El código ya existe en `bot/` **[HECHO]**. Está por confirmar con las Áreas 2 y 3.
@@ -69,6 +69,6 @@ Nunca llegan al chat el dominio del remitente, las cuentas encontradas en un doc
 
 # Lo abierto
 
-- **Motor (Área 2):** cómo llegan sus avisos (`payment_held`, `payment_deadline`, `operation_held`, `deadline_approaching`). Cada productor manda su propio código de motivo y un adaptador lo traduce al enum del bot. Esa traducción se acuerda con el Área 2.
+- **Motor (Área 2):** cómo llegan sus avisos (`payment_held`, `payment_deadline`, `operation_held`, `deadline_approaching`). Cada productor manda su propio código de motivo y un adaptador lo traduce al enum del bot. Esa traducción se acuerda con el Área 2. Para las retenciones de Trade ya hay tres motivos del motor, pedidos por el Área 2 en el PR #50: `FUNDING_BLOCKED` pasa a `funding_blocked`, `SIMULATION_REVERTED` a `simulation_failed`, y `ATTESTATION_UNKNOWN` e `IMPORTER_NOT_REGISTERED` a `agent_data_incomplete`. Llegan solo al dueño y al operador del importador, porque son fallas de su lado, y el mensaje no nombra ningún documento.
 - **Resumen de solicitudes de cambio (Área 3):** alguien en ingesta debe ejecutar `changeDigest` periódicamente (por ejemplo, una vez al día) y mandarlo. Falta acordar si las solicitudes de cambio se avisan además una por una. Hoy el bot acepta las dos cosas, con tope por chat.
 - **Eventos del escrow (Área 1):** el escucha de `OrderOpened`, `OrderFunded`, `AdvanceReleased` y los demás eventos de `TradeEscrow`, cuando exista, entrega por `POST /notices`.

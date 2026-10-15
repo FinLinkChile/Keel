@@ -176,6 +176,18 @@ describe("templates", () => {
     }
   });
 
+  it("tells the importer about engine holds without naming a document", () => {
+    expect(as({ ...SAMPLES.operation_held, reason: "funding_blocked" }, "importer").text).toBe(
+      "Keel did not accept the deposit for PO-0142: the order does not meet the wallet's rules. Nothing was paid. Lingnan Hydrocolloids must ship by Nov 20. Review the order in Keel.",
+    );
+    expect(as({ ...SAMPLES.operation_held, reason: "simulation_failed", deadline: undefined }, "importer").text).toBe(
+      "Keel stopped a payment step for PO-0142: it would have failed on the network, so nothing was sent. Nothing was paid. Review the order in Keel.",
+    );
+    const n = as({ ...SAMPLES.operation_held, reason: "agent_data_incomplete" }, "importer", "operator");
+    expect(n.text).toMatch(/^Keel stopped a payment step for PO-0142: the agent's records do not match the signed order\./);
+    expect(n.link?.path).toBe("/orders/po-0142");
+  });
+
   it("falls back to the field name when a value fails its check", () => {
     const n: Notice = {
       ...SAMPLES.operation_held,

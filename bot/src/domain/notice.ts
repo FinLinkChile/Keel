@@ -99,6 +99,13 @@ export const HELD_REASONS = [
   "bl_reused",
   // Neither the parser nor the extractor could read a document
   "document_unreadable",
+  // Engine holds (T2.6). The engine refused the deposit: tier 4, a party not registered, roles not
+  // independent, a token not allowed or the deadline passed
+  "funding_blocked",
+  // The step would revert on chain, so nothing was sent
+  "simulation_failed",
+  // The agent's data does not match the order: unknown attestation or importer without a RUT
+  "agent_data_incomplete",
 ] as const;
 export type HeldReason = (typeof HELD_REASONS)[number];
 
