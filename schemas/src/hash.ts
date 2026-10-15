@@ -1,6 +1,6 @@
 // Hashing of the shared interfaces. Imported as `@keel/schemas/hash`.
 // It must match contracts/src/KeelHash.sol byte for byte: hash.test.ts runs both.
-import { concat, hashDomain, hashStruct, hashTypedData, keccak256, stringToHex, toBytes } from "viem";
+import { concat, encodeAbiParameters, hashDomain, hashStruct, hashTypedData, keccak256, stringToHex, toBytes } from "viem";
 import {
   EIP712_TYPES,
   type Eip712Messages,
@@ -49,11 +49,12 @@ export function bytes32Text(text: string): Hex {
   return stringToHex(text, { size: 32 });
 }
 
-// keccak256 of the document number exactly as the extractor returns it
-// (`document_number`: uppercase, no separators).
-export function blNumberHash(documentNumber: string): Hex {
+// keccak256(abi.encode(carrier, number)), with the number exactly as the extractor
+// returns it (`document_number`: uppercase, no separators). A BL number is unique per
+// carrier, not globally, so the carrier is part of the key.
+export function blNumberHash(carrier: Hex, documentNumber: string): Hex {
   if (!/^[A-Z0-9]{6,20}$/.test(documentNumber)) throw new Error(`not a valid document number: ${documentNumber}`);
-  return keccak256(toBytes(documentNumber));
+  return keccak256(encodeAbiParameters([{ type: "address" }, { type: "string" }], [carrier, documentNumber]));
 }
 
 // keccak256 of the required document names, sorted, without duplicates, joined with commas.
@@ -67,5 +68,7 @@ export function requiredDocsHash(docs: readonly RequiredDocType[]): Hex {
 export function docsHash(fileHashes: readonly Hex[]): Hex {
   if (fileHashes.length === 0) throw new Error("a document package has at least one file");
   for (const h of fileHashes) if (!/^0x[0-9a-f]{64}$/.test(h)) throw new Error(`not a lowercase bytes32: ${h}`);
+  // The same file twice is not a different package
+  if (new Set(fileHashes).size !== fileHashes.length) throw new Error("a document package lists the same file twice");
   return keccak256(concat([...fileHashes].sort()));
 }

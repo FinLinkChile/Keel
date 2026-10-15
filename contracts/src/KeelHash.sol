@@ -8,13 +8,15 @@ import {
     DisputeResolution,
     FundIntent,
     PolicyDecision,
-    DocumentDecision
+    DocumentDecision,
+    PaymentIntent
 } from "./KeelTypes.sol";
 
 // EIP-712 hashes of the shared structs. Owned by Area 2.
 // It must match schemas/src/hash.ts byte for byte: schemas/src/hash.test.ts runs both.
 // Domain: name = "Keel", version = "1", chainId, verifyingContract = the contract that
-// checks the signature (PDRGate for PolicyDecision, TradeEscrow for everything else).
+// checks the signature (the gate of the mode for PolicyDecision, TradeEscrow for
+// everything else). PaymentIntent is here so PDRGate can move to this single source.
 library KeelHash {
     bytes32 internal constant DOMAIN_TYPEHASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
@@ -33,7 +35,11 @@ library KeelHash {
         keccak256("DisputeResolution(bytes32 orderId,uint256 toImporter,uint256 toExporter)");
 
     bytes32 internal constant FUND_INTENT_TYPEHASH = keccak256(
-        "FundIntent(bytes32 orderId,address escrow,address token,uint256 amount,uint64 deadline,uint256 nonce)"
+        "FundIntent(bytes32 orderId,bytes32 orderHash,address escrow,address token,uint256 amount,uint64 deadline,uint256 nonce)"
+    );
+
+    bytes32 internal constant PAYMENT_INTENT_TYPEHASH = keccak256(
+        "PaymentIntent(uint8 aliasId,address recipient,uint256 amountUsdc,bytes32 invoiceKey,uint64 deadline,uint256 nonce)"
     );
 
     bytes32 internal constant POLICY_DECISION_TYPEHASH = keccak256(
@@ -108,12 +114,19 @@ library KeelHash {
             abi.encode(
                 FUND_INTENT_TYPEHASH,
                 intent.orderId,
+                intent.orderHash,
                 intent.escrow,
                 intent.token,
                 intent.amount,
                 intent.deadline,
                 intent.nonce
             )
+        );
+    }
+
+    function hash(PaymentIntent memory i) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(PAYMENT_INTENT_TYPEHASH, i.aliasId, i.recipient, i.amountUsdc, i.invoiceKey, i.deadline, i.nonce)
         );
     }
 
