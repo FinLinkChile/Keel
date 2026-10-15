@@ -22,7 +22,8 @@ From the repository root, with variables in the root `.env` (see `.env.example`)
 # Send one file of notices and exit. BOT_SENDER=console prints instead of sending.
 npm run notify -w bot -- examples/act2-document-fraud.json
 
-# Long running: POST /notices (if BOT_INBOUND_TOKEN is set) and /start, /status
+# Long running: POST /notices (if BOT_INBOUND_TOKEN is set), POST /ingest/outcomes
+# (if BOT_INGEST_TOKEN is set) and /start, /status
 npm run start -w bot
 ```
 
@@ -65,7 +66,10 @@ Validated with zod at startup. A missing or malformed variable stops the bot bef
 | `TELEGRAM_ALLOWED_CHAT_IDS` | Required. Comma separated; group ids are negative |
 | `BOT_RECIPIENTS_FILE` | Required. Directory of accounts, names and chats (below) |
 | `APP_BASE_URL` | Optional, `http` or `https`. Public `https`: button. Local or `http`: URL in the text. Unset: no link |
-| `BOT_INBOUND_TOKEN` | Bearer token of `POST /notices`. At least 32 characters and different from `INGEST_WEBHOOK_TOKEN`. Without it the endpoint does not start |
+| `BOT_INBOUND_TOKEN` | Bearer token of `POST /notices`. At least 32 characters and different from `INGEST_WEBHOOK_TOKEN`. Without it the route does not exist |
+| `BOT_INGEST_TOKEN` | Bearer token of `POST /ingest/outcomes`. At least 32 characters, different from `BOT_INBOUND_TOKEN` and from `INGEST_WEBHOOK_TOKEN`. Without it the route does not exist |
+| `BOT_PERSONAL_ACCOUNT_ID` | Optional. The personal account ingest reads bills for; must be in the directory. Without it, ingest's Personal sources answer `source_disabled` |
+| `BOT_ORDERS_FILE` | Optional, relative to `bot/`. Order book (below). Without it, ingest's Trade source answers `source_disabled` |
 | `BOT_HOST` | Default `127.0.0.1` |
 | `BOT_PORT` | Default `8789` (ingest uses `8788`) |
 | `BOT_MAX_MESSAGES_PER_CHAT_PER_HOUR` | Default `30` |
@@ -90,6 +94,22 @@ Names live in the directory, never in a notice, so `POST /notices` has no free t
 
 Startup fails if the file does not validate, if a personal account has an `operator` or if a chat is not in `TELEGRAM_ALLOWED_CHAT_IDS`. An account or role without chats is not an error: that recipient gets nothing and it is logged.
 
+## Orders
+
+Ingest names an order by its bytes32 `orderId` and the parties by wallet address. A notice needs the label people use, the parties' accounts and the shipment deadline, so the bot keeps an order book that mirrors the signed orders (never a document):
+
+```json
+{
+  "orders": {
+    "0x0000000000000000000000000000000000000000000000000000000000000142": {
+      "label": "PO-0142", "importer": "acme-imports", "exporter": "lingnan", "arbiter": "hk-arbitration", "shipmentDeadline": 1795132800
+    }
+  }
+}
+```
+
+The bytes32 id becomes the notice's `orderRef`, so the app link opens the same order. Startup fails if the file does not validate, if a label is not a valid `orderLabel`, if an account is not in the directory or if an order names the same account twice. There is no address map: ingest's outcomes already say which side uploaded (`party`), and an address is never shown. `examples/orders.json` holds the three demo orders, and the act files use their ids.
+
 ## Layers
 
 ```
@@ -98,9 +118,10 @@ src/
   application/     NotifyService, routing table, ports
   presentation/    one pure template per kind, formatting
   adapters/
-    inbound/       http-source (POST /notices), file-source, ingest-mapper
+    inbound/       http-source (routes), ingest-source (POST /ingest/outcomes), file-source,
+                   ingest-mapper
     outbound/      telegram-sender (grammY), console-sender, link placement
-    config/        env, recipients-file
+    config/        env, recipients-file, orders-file
     telegram/      /start, /status and the allowlist middleware
   main.ts          composition: the only place that joins ports and adapters
   cli.ts, start.ts entry points
@@ -145,7 +166,7 @@ In Trade, `orderRef` is opaque and only builds the app URL; `orderLabel` is what
 
 Enums of the bot. How producers reach the bot is not decided yet: `POST /notices` is a proposal, and each producer's reason codes are mapped into these enums by its adapter, to be agreed with Area 2 (engine) and Area 3 (ingest):
 
-* `operation_held.reason`: `new_supplier_wait`, `over_limit_cosign`, `documents_mismatch`, `two_source_mismatch`, `hidden_text`, `account_change_mention`.
+* `operation_held.reason`: `new_supplier_wait`, `over_limit_cosign`, `documents_mismatch`, `two_source_mismatch`, `hidden_text`, `account_change_mention`, `bl_reused` (the bill of lading already settled another order) and `document_unreadable` (neither reader could read it; the importer is asked to get a clean copy). All but the first two are document reasons: the exporter gets the generic version.
 * `payment_held.reason`: `issuer_mismatch`, `amount_out_of_range`, `over_period_limit`, `fx_divergence`, `account_change_request`, `hidden_text`, `simulation_failed`.
 * `change_queued.changeKind`: `limit`, `supplier_added`, `role_change`, `policy_signer`. An assumption, to align with what Area 1's Delay queues once it exists.
 * `currency`: `USD`, `EUR`, `CNY`, `HKD`, the commercial invoice enum. Decimals per currency live in `presentation/format.ts`, because the payment token is open decision 1.
@@ -154,8 +175,10 @@ Enums of the bot. How producers reach the bot is not decided yet: `POST /notices
 
 T3.5 says the notice shows both readings. A regex is not enough for identifiers: `56912345678` passes the invoice number regex and is a phone number. So:
 
-* Fixed shape fields (amount, currency, on board date, period, alias) show both values, each revalidated against its field.
-* Identifiers (`document_number`, `issuer_tax_id`, `invoice_number`) only say which field disagrees. Both values are in the app (T4.2), so T3.5 is met in the app and the T4.3 rule in the chat.
+* Fixed shape fields show both values, each revalidated against its field. Trade: `doc_type`, `on_board_date`, `port_of_loading` and `port_of_discharge` (UN/LOCODE, five characters), `amount_minor` with the order's currency, `currency`, `incoterm`. Personal: `period`, `amount_clp`, `alias_id`. The enums come from `@keel/schemas`.
+* Identifiers only say which field disagrees. Trade: `document_number`, `invoice_number`, `order_number`, `importer_tax_id` and `hs_code` (6 to 10 digits, room for a phone number). Personal: `issuer_tax_id`, `invoice_number`. Both values are in the app (T4.2), so T3.5 is met in the app and the T4.3 rule in the chat.
+
+Trade diffs cover the twelve fields ingest compares on a transport document and a commercial invoice, so a disagreement on any of them reaches the importer instead of failing validation.
 
 `diffs` is a list of `{ field, a, b }`; the ingest mapper puts the parser in `a` and the LLM in `b`. If a value fails its check the notice still goes out, because it is a security alert, but that line only says the field does not match. The case is logged and counted.
 
@@ -185,9 +208,47 @@ The exporter is never told which control fired: "hidden text" would teach an att
 
 ## Inputs
 
-* `POST /notices`: `Authorization: Bearer <BOT_INBOUND_TOKEN>`, compared in constant time; body up to 64 KB; a `Notice` or an array of up to 100. `401` without a valid token; `400` if any notice does not validate, and then none of the batch is sent; `202` with each notice's status otherwise.
+Both HTTP routes share one server on `BOT_HOST:BOT_PORT`, each with its own Bearer token compared in constant time and a 64 KB body limit. A route without its token does not exist (`404`).
+
+* `POST /notices`: `Authorization: Bearer <BOT_INBOUND_TOKEN>`; a `Notice` or an array of up to 100. `401` without a valid token; `400` if any notice does not validate, and then none of the batch is sent; `202` with each notice's status otherwise.
+* `POST /ingest/outcomes`: `Authorization: Bearer <BOT_INGEST_TOKEN>`; ingest's own output, which the bot maps (see "For Area 3").
 * `file-source`: `npm run notify -w bot -- <file>`. The examples in `examples/` are the four Trade demo acts and `personal-two-sources.json`, with fictitious accounts and chats. `examples.test.ts` keeps them valid.
 * `ingest-mapper`: turns ingest's `escalated`, `held` and `change_requested` outcomes and `changeDigest` into notices. It imports from `@keel/ingest` with `import type` only, because ingest pulls heavy SDKs. It is written against ingest's types but not wired to ingest: how producers reach the bot is not decided yet, and wiring it is Area 3's side. The personal `accountId` comes from configuration, since ingest knows no accounts.
+
+### For Area 3
+
+Ingest posts what it already produces, as is; it does not need to know the `Notice` format.
+
+The call is optional and must never block ingest:
+
+* Ingest calls the bot only if it has `BOT_URL` and `BOT_INGEST_TOKEN` configured.
+* If the bot is down or slow, the email or document is processed anyway: a short timeout, and the error is only logged. A notice is a warning to a person, never a step of the payment path.
+* Someone in ingest runs `IngestStore.changeDigest(since)` periodically, for example once a day, and posts the result.
+* Still to agree with Area 3: whether change requests are also notified one by one besides the digest. Today the bot accepts both, and the per-chat cap applies to both.
+
+```
+POST /ingest/outcomes
+Authorization: Bearer <BOT_INGEST_TOKEN>
+
+{ "source": "email", "outcome": <EmailOutcome> }
+{ "source": "change_digest", "since": "<ISO 8601>", "requests": [<StoredChangeRequest>, ...] }
+{ "source": "trade_upload", "outcome": <TradeOutcome> }
+```
+
+* After `receiveEmail`, post its outcome. After `IngestStore.changeDigest(since)`, post the requests with the same `since`.
+* Answers: `401` without the token; `400` with `invalid_body` if the body lacks this shape, `mapper_failed` if the outcome cannot be mapped (only the error class is logged) or `source_disabled` if the source is not configured; `202` with `{ "status": "accepted" | "duplicate" | "rejected" | "ignored" }`. `ignored` is for `quarantined`, `duplicate` and `ready` emails: nothing to tell. `rejected` means the mapped notice did not validate.
+* Posting the same outcome twice is safe: the notice id comes from the message hash or the request id.
+* `trade_upload` answers `501` for now. Its mapper is written once `area3/trade-ingest` is merged, because the `TradeOutcome` type is not on `dev` yet. It needs `BOT_ORDERS_FILE` to turn the `orderId` into a label and accounts. Planned mapping:
+
+| `TradeOutcome` | Notice |
+|---|---|
+| `held`, `disagreement` | `operation_held` `two_source_mismatch`, with `diffs` (parser in `a`, LLM in `b`) |
+| `held`, `doc_type_mismatch` | `operation_held` `documents_mismatch` |
+| `held`, `bl_used_by_other_order` | `operation_held` `bl_reused` |
+| `held`, `parser_failed` or `extractor_failed` | `operation_held` `document_unreadable` |
+| any reading with `alert` | `account_change_attempt`. The destinations in `found` never reach the chat |
+| `ready` without `alert` | nothing |
+| `rejected`, `quarantined`, `duplicate` | nothing |
 
 ### Adding a producer
 
@@ -208,5 +269,6 @@ Chain and engine notices an attacker cannot repeat at will always go out: `opera
 * A local `APP_BASE_URL` goes as text, not as a button.
 * Telegram is blocked in mainland China. The corridor is Chile and Hong Kong, where it works, but a mainland exporter would need another channel.
 * How deep Keel Personal goes in the delivery is open decision 14. The bot covers all nine Personal kinds, but only those that ingest and the engine already produce are exercised by the demo files.
-* How producers reach the bot is not decided yet: `POST /notices` with the bot's own `Notice` is a proposal, and each producer's reason codes are mapped by its adapter, to be agreed with Area 2 (engine) and Area 3 (ingest).
+* How producers reach the bot is not decided yet: `POST /notices` with the bot's own `Notice` and `POST /ingest/outcomes` with ingest's own output are a proposal, and each producer's reason codes are mapped by its adapter, to be agreed with Area 2 (engine) and Area 3 (ingest).
+* The order book is a file, like ingest's `INGEST_ORDERS_FILE`. Who keeps both in sync with the signed orders is not decided yet.
 * Dates are shown in UTC; the year is shown only when it is not the current one.

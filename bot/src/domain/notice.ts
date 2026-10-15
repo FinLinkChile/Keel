@@ -3,7 +3,7 @@
 // does not fit is rejected here.
 // No free text (T4.3, critical 8): every field is an enum, an integer, a timestamp or a value
 // held to a strict regex. Every object is strict, so an extra field such as `name` fails.
-import { ALIAS_IDS } from "@keel/schemas";
+import { ALIAS_IDS, CURRENCIES } from "@keel/schemas";
 import { z } from "zod";
 import { AccountId } from "./recipients";
 
@@ -21,8 +21,7 @@ export const Timestamp = z.number().int().positive().max(4_102_444_800);
 export const AmountMinor = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 export const AmountMinorOrZero = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 
-// Same enum as the commercial invoice.
-export const CURRENCIES = ["USD", "EUR", "CNY", "HKD"] as const;
+// Same enum as the commercial invoice (@keel/schemas).
 export const Currency = z.enum(CURRENCIES);
 export type Currency = z.infer<typeof Currency>;
 
@@ -46,7 +45,21 @@ export const DaysLeft = z.number().int().nonnegative().max(365);
 // it is just never shown.
 export const DiffValue = z.union([z.string().max(200), z.number()]);
 
-export const TRADE_DIFF_FIELDS = ["document_number", "on_board_date", "amount_minor", "currency"] as const;
+// The fields ingest compares on a Keel Trade document: transport document, then commercial invoice.
+export const TRADE_DIFF_FIELDS = [
+  "doc_type",
+  "document_number",
+  "on_board_date",
+  "port_of_loading",
+  "port_of_discharge",
+  "invoice_number",
+  "order_number",
+  "amount_minor",
+  "currency",
+  "incoterm",
+  "importer_tax_id",
+  "hs_code",
+] as const;
 export type TradeDiffField = (typeof TRADE_DIFF_FIELDS)[number];
 
 // a and b are the two readings. The ingest mapper puts the parser in a and the LLM in b.
@@ -82,6 +95,10 @@ export const HELD_REASONS = [
   "two_source_mismatch",
   "hidden_text",
   "account_change_mention",
+  // The bill of lading was already used to settle another order (T3.7)
+  "bl_reused",
+  // Neither the parser nor the extractor could read a document
+  "document_unreadable",
 ] as const;
 export type HeldReason = (typeof HELD_REASONS)[number];
 
@@ -92,6 +109,8 @@ export const DOCUMENT_REASONS = [
   "two_source_mismatch",
   "hidden_text",
   "account_change_mention",
+  "bl_reused",
+  "document_unreadable",
 ] as const satisfies readonly HeldReason[];
 export const isDocumentReason = (r: HeldReason): boolean => (DOCUMENT_REASONS as readonly HeldReason[]).includes(r);
 
@@ -125,7 +144,7 @@ const OperationHeld = z
     deadline: Timestamp.optional(),
     amountMinor: AmountMinor.optional(),
     currency: Currency.optional(),
-    diffs: z.array(TradeDiff).min(1).max(8).optional(),
+    diffs: z.array(TradeDiff).min(1).max(TRADE_DIFF_FIELDS.length).optional(),
   })
   .refine((n) => (n.amountMinor === undefined) === (n.currency === undefined), {
     message: "amountMinor and currency go together",

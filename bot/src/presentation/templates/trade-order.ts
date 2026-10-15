@@ -209,7 +209,10 @@ export const operationHeld: Render<"operation_held"> = (n, r, ctx) => {
         two_source_mismatch: "the two readings of the shipping documents disagree.",
         hidden_text: "a shipping document has hidden text.",
         account_change_mention: "a shipping document mentions a different bank account. The account in the signed order did not change.",
+        bl_reused: "the bill of lading was already used for another order.",
+        document_unreadable: "Keel could not read a shipping document.",
       };
+      const ask = n.reason === "document_unreadable" ? "a clean copy of the document" : "valid documents";
       const diffs = (n.diffs ?? []).map((d) => diffLine(checkTradeDiff(d, n.currency), ctx.now));
       return {
         text: lines(
@@ -217,8 +220,10 @@ export const operationHeld: Render<"operation_held"> = (n, r, ctx) => {
           ...diffs,
           "Nothing was paid.",
           until
-            ? `Ask ${exp} for valid documents before ${until}. If there is no accepted proof of shipment by then, the balance goes back to you.`
-            : "Review the documents in Keel.",
+            ? `Ask ${exp} for ${ask} before ${until}. If there is no accepted proof of shipment by then, the balance goes back to you.`
+            : n.reason === "document_unreadable"
+              ? `Ask ${exp} for ${ask}.`
+              : "Review the documents in Keel.",
         ),
         link: documentsLink(n),
       };

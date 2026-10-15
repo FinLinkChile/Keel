@@ -4,11 +4,12 @@
     "kind": "deadline_approaching",
     "mode": "trade",
     "occurredAt": 1794916800,
-    "orderRef": "po-0150",
+    "orderRef": "0x0000000000000000000000000000000000000000000000000000000000000150",
     "orderLabel": "PO-0150",
     "parties": {
       "importer": "acme-imports",
-      "exporter": "lingnan"
+      "exporter": "lingnan",
+      "arbiter": "hk-arbitration"
     },
     "deadline": 1795132800,
     "daysLeft": 3
@@ -18,11 +19,12 @@
     "kind": "deadline_approaching",
     "mode": "trade",
     "occurredAt": 1795089600,
-    "orderRef": "po-0150",
+    "orderRef": "0x0000000000000000000000000000000000000000000000000000000000000150",
     "orderLabel": "PO-0150",
     "parties": {
       "importer": "acme-imports",
-      "exporter": "lingnan"
+      "exporter": "lingnan",
+      "arbiter": "hk-arbitration"
     },
     "deadline": 1795132800,
     "daysLeft": 1
@@ -32,11 +34,12 @@
     "kind": "refunded",
     "mode": "trade",
     "occurredAt": 1795435200,
-    "orderRef": "po-0150",
+    "orderRef": "0x0000000000000000000000000000000000000000000000000000000000000150",
     "orderLabel": "PO-0150",
     "parties": {
       "importer": "acme-imports",
-      "exporter": "lingnan"
+      "exporter": "lingnan",
+      "arbiter": "hk-arbitration"
     },
     "amountMinor": 3360000,
     "currency": "USD"

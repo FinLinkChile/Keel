@@ -1,11 +1,13 @@
 // Revalidation of the two readings of a two source mismatch (T3.5).
 // T3.5 says the notice shows both values, but a regex is not enough for identifiers:
 // "CALL56912345678" passes the document number regex and is a phone number. So:
-// - fixed shape fields (dates, amounts, currency, period, alias) show both values, each
+// - fixed shape fields (dates, amounts, enums, ports, period, alias) show both values, each
 //   revalidated here;
+// - identifiers, and codes long enough to hold a phone number (hs_code), only say which field
+//   disagrees;
 // - identifiers only say which field disagrees, and the app shows both values (T4.2).
 // A value that fails its check never blocks the notice: the line falls back to the field name.
-import { ALIAS_IDS, type AliasId } from "@keel/schemas";
+import { ALIAS_IDS, INCOTERMS, TRANSPORT_DOC_TYPES, type AliasId, type Incoterm, type TransportDocType } from "@keel/schemas";
 import { z } from "zod";
 import {
   AmountClp,
@@ -22,6 +24,10 @@ export type Shown =
   | { type: "date"; at: number }
   | { type: "amount"; minor: number; currency: Currency }
   | { type: "currency"; code: Currency }
+  | { type: "incoterm"; code: Incoterm }
+  | { type: "doc_type"; docType: TransportDocType }
+  // UN/LOCODE: five characters, no room for a phone number
+  | { type: "port"; code: string }
   | { type: "clp"; amount: number }
   // YYYYMM
   | { type: "period"; year: number; month: number }
@@ -34,7 +40,12 @@ export type CheckedDiff =
   // valid is false when a value failed its field's check: logged and counted, never shown
   | { field: DiffField; display: "field_only"; valid: boolean };
 
+// Same regexes as the extraction schemas in @keel/schemas.
 const DOCUMENT_NUMBER = z.string().regex(/^[A-Z0-9]{6,20}$/);
+const INVOICE_CODE = z.string().regex(/^[A-Z0-9]{1,20}$/);
+const HS_CODE = z.string().regex(/^[0-9]{6,10}$/);
+const UN_LOCODE = z.string().regex(/^[A-Z]{2}[A-Z0-9]{3}$/);
+// Normalized RUT, for the Personal issuer and the Trade importer
 const ISSUER_TAX_ID = z.string().regex(/^[0-9]{7,8}[0-9K]$/);
 const INVOICE_NUMBER = z.string().regex(/^[0-9]{1,12}$/);
 const PERIOD = z.string().regex(/^20[0-9]{2}(0[1-9]|1[0-2])$/);
@@ -65,10 +76,24 @@ export function checkTradeDiff(diff: TradeDiff, orderCurrency?: Currency): Check
   switch (diff.field) {
     case "document_number":
       return identifier(diff, DOCUMENT_NUMBER);
+    case "invoice_number":
+    case "order_number":
+      return identifier(diff, INVOICE_CODE);
+    case "importer_tax_id":
+      return identifier(diff, ISSUER_TAX_ID);
+    case "hs_code":
+      return identifier(diff, HS_CODE);
     case "on_board_date":
       return both(diff, Timestamp, (at) => ({ type: "date", at }));
     case "currency":
       return both(diff, Currency, (code) => ({ type: "currency", code }));
+    case "incoterm":
+      return both(diff, z.enum(INCOTERMS), (code) => ({ type: "incoterm", code }));
+    case "doc_type":
+      return both(diff, z.enum(TRANSPORT_DOC_TYPES), (docType) => ({ type: "doc_type", docType }));
+    case "port_of_loading":
+    case "port_of_discharge":
+      return both(diff, UN_LOCODE, (code) => ({ type: "port", code }));
     case "amount_minor": {
       const checked = both(diff, AmountMinor, (minor) => ({ type: "amount", minor, currency: orderCurrency ?? "USD" }));
       if (checked.display === "values" && orderCurrency === undefined) return { field: diff.field, display: "field_only", valid: true };

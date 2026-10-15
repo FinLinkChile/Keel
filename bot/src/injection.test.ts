@@ -2,7 +2,7 @@
 // person through the bot. Every payload either fails validation or is rendered without it.
 import { describe, expect, it } from "vitest";
 import { NotifyService } from "./application/notify";
-import type { Notice } from "./domain/notice";
+import { TRADE_DIFF_FIELDS, type Notice } from "./domain/notice";
 import { templateRenderer } from "./presentation/templates";
 import { directory, MemoryLogger, MemorySender, NOW_MS, SAMPLES } from "./testing/fixtures";
 
@@ -62,13 +62,27 @@ describe("injection", () => {
   });
 
   it("never shows a payload placed in a diff value, even one that passes the field's regex", async () => {
-    for (const field of ["document_number", "on_board_date", "amount_minor", "currency"]) {
+    for (const field of TRADE_DIFF_FIELDS) {
       for (const p of PAYLOADS) {
         const { result, texts } = await deliver(heldWithDiffs(p, p, field));
         expect(result.status).toBe("accepted");
         expectClean(texts);
       }
     }
+  });
+
+  it("never shows an HS code or order number that could be a phone number", async () => {
+    const { result, texts } = await deliver({
+      ...SAMPLES.operation_held,
+      reason: "two_source_mismatch",
+      diffs: [
+        { field: "hs_code", a: "56912345678", b: "1302320000" },
+        { field: "order_number", a: "CALL56912", b: "PO0142" },
+      ],
+    });
+    expect(result.status).toBe("accepted");
+    expect(texts.length).toBeGreaterThan(0);
+    for (const t of texts) expect(t).not.toMatch(/569123|CALL|1302320000|PO0142/);
   });
 
   it("never shows a payload placed in a Personal diff value, even one that passes the field's regex", async () => {

@@ -2,6 +2,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { parseOrders } from "./adapters/config/orders-file";
 import { parseDirectory } from "./adapters/config/recipients-file";
 import { NotifyService } from "./application/notify";
 import { templateRenderer } from "./presentation/templates";
@@ -13,7 +14,25 @@ const recipients = read("recipients.json") as { accounts: Record<string, { roles
 const allowed = new Set(Object.values(recipients.accounts).flatMap((a) => Object.values(a.roles).flat()));
 
 describe("examples", () => {
-  for (const file of readdirSync(DIR).filter((f) => f !== "recipients.json" && f.endsWith(".json"))) {
+  const NOT_NOTICES = new Set(["recipients.json", "orders.json"]);
+  const noticeFiles = readdirSync(DIR).filter((f) => !NOT_NOTICES.has(f) && f.endsWith(".json"));
+
+  it("orders.json loads and every order notice matches its entry", () => {
+    const d = parseDirectory(recipients, allowed);
+    const book = parseOrders(read("orders.json"), (a) => d.name(a) !== undefined);
+    expect(book.size).toBe(3);
+    for (const file of noticeFiles) {
+      for (const n of read(file) as { orderRef?: string; orderLabel?: string; parties?: object }[]) {
+        if (!n.orderRef) continue;
+        const entry = book.get(n.orderRef);
+        expect(entry, `${file} ${n.orderLabel}`).toBeDefined();
+        expect(entry?.label).toBe(n.orderLabel);
+        expect(entry?.parties).toEqual(n.parties);
+      }
+    }
+  });
+
+  for (const file of noticeFiles) {
     it(`${file} is accepted in full`, async () => {
       const sender = new MemorySender();
       const service = new NotifyService(

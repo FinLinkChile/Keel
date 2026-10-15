@@ -113,6 +113,54 @@ describe("templates", () => {
     expect(text).not.toContain("MAEU");
   });
 
+  it("revalidates and shows the fixed shape fields of ingest Trade, and only names the codes", () => {
+    const n: Notice = {
+      ...SAMPLES.operation_held,
+      reason: "two_source_mismatch",
+      diffs: [
+        { field: "doc_type", a: "BILL_OF_LADING", b: "AIR_WAYBILL" },
+        { field: "port_of_loading", a: "CNSHA", b: "CNNGB" },
+        { field: "port_of_discharge", a: "CLSAI", b: "CLVAP" },
+        { field: "incoterm", a: "FOB", b: "CIF" },
+        { field: "currency", a: "USD", b: "HKD" },
+        { field: "invoice_number", a: "INV2026001", b: "INV2026010" },
+        { field: "order_number", a: "PO0142", b: "PO0124" },
+        { field: "importer_tax_id", a: "761234560", b: "761234569" },
+        { field: "hs_code", a: "130232", b: "130239" },
+      ],
+    };
+    const text = as(n, "importer").text;
+    for (const line of [
+      "Document type: bill of lading and air waybill.",
+      "Port of loading: CNSHA and CNNGB.",
+      "Port of discharge: CLSAI and CLVAP.",
+      "Incoterm: FOB and CIF.",
+      "Currency: USD and HKD.",
+      "Invoice number: does not match, both values are in Keel.",
+      "Order number: does not match, both values are in Keel.",
+      "Importer tax ID: does not match, both values are in Keel.",
+      "HS code: does not match, both values are in Keel.",
+    ]) {
+      expect(text).toContain(line);
+    }
+    expect(text).not.toMatch(/INV2026|PO0142|761234|13023/);
+  });
+
+  it("holds the balance for a reused bill of lading or an unreadable document", () => {
+    expect(as({ ...SAMPLES.operation_held, reason: "bl_reused" }, "importer").text).toBe(
+      "Keel is holding the balance for PO-0142: the bill of lading was already used for another order. Nothing was paid. Ask Lingnan Hydrocolloids for valid documents before Nov 20. If there is no accepted proof of shipment by then, the balance goes back to you.",
+    );
+    expect(as({ ...SAMPLES.operation_held, reason: "document_unreadable" }, "importer").text).toBe(
+      "Keel is holding the balance for PO-0142: Keel could not read a shipping document. Nothing was paid. Ask Lingnan Hydrocolloids for a clean copy of the document before Nov 20. If there is no accepted proof of shipment by then, the balance goes back to you.",
+    );
+    expect(as({ ...SAMPLES.operation_held, reason: "document_unreadable", deadline: undefined }, "importer").text).toContain(
+      "Ask Lingnan Hydrocolloids for a clean copy of the document.",
+    );
+    for (const reason of ["bl_reused", "document_unreadable"] as const) {
+      expect(as({ ...SAMPLES.operation_held, reason }, "exporter", "operator").text).toMatch(/^Your documents for PO-0142 are under review\./);
+    }
+  });
+
   it("falls back to the field name when a value fails its check", () => {
     const n: Notice = {
       ...SAMPLES.operation_held,

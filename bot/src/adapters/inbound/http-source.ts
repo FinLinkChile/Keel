@@ -1,8 +1,9 @@
-// POST /notices: the local entry point for producers. Same pattern as ingest/src/server.ts:
-// Bearer token compared in constant time, body size limit, listens on BOT_HOST.
-// The body is a Notice or an array of them. 401 without a valid token, 400 if any notice
-// does not validate (nothing is sent), 202 otherwise.
-// How producers reach the bot is not decided yet: this endpoint is a proposal.
+// HTTP entry points of the bot. Closed by default: a route exists only if its token is set.
+//   POST /notices          a Notice or an array of them          Bearer BOT_INBOUND_TOKEN
+//   POST /ingest/outcomes  ingest's own output, mapped here       Bearer BOT_INGEST_TOKEN
+// Same pattern as ingest/src/server.ts: Bearer token compared in constant time, 64 KB body
+// limit, listens on BOT_HOST. How producers reach the bot is not decided yet: these routes are
+// a proposal.
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type RequestListener, type Server, type ServerResponse } from "node:http";
 import type { NotifyResult } from "../../application/notify";
@@ -15,7 +16,7 @@ const MIN_TOKEN_LENGTH = 32;
 
 const digest = (s: string) => createHash("sha256").update(s).digest();
 
-function reply(res: ServerResponse, code: number, body: object): void {
+export function reply(res: ServerResponse, code: number, body: object): void {
   res.writeHead(code, { "content-type": "application/json", "cache-control": "no-store" }).end(JSON.stringify(body));
 }
 
@@ -34,27 +35,47 @@ export interface NoticeSink {
   notify(input: unknown): Promise<NotifyResult>;
 }
 
-export function createNoticeHandler(token: string, sink: NoticeSink): RequestListener {
-  if (token.length < MIN_TOKEN_LENGTH) throw new ConfigError(`BOT_INBOUND_TOKEN must be at least ${MIN_TOKEN_LENGTH} characters`);
-  const expected = digest(token);
-  const authorized = (req: IncomingMessage) => {
-    const auth = req.headers.authorization ?? "";
-    return auth.startsWith("Bearer ") && timingSafeEqual(digest(auth.slice(7)), expected);
+// A route receives the parsed JSON body once the token and the size are checked.
+export type JsonRoute = (json: unknown, res: ServerResponse) => Promise<void>;
+
+export interface HttpRoutes {
+  notices?: { token: string; sink: NoticeSink };
+  ingest?: { token: string; route: JsonRoute };
+}
+
+export function createHttpHandler(routes: HttpRoutes): RequestListener {
+  const table = new Map<string, { expected: Buffer; route: JsonRoute }>();
+  const add = (path: string, name: string, token: string, route: JsonRoute) => {
+    if (token.length < MIN_TOKEN_LENGTH) throw new ConfigError(`${name} must be at least ${MIN_TOKEN_LENGTH} characters`);
+    table.set(path, { expected: digest(token), route });
   };
+  if (routes.notices) add("/notices", "BOT_INBOUND_TOKEN", routes.notices.token, noticesRoute(routes.notices.sink));
+  if (routes.ingest) add("/ingest/outcomes", "BOT_INGEST_TOKEN", routes.ingest.token, routes.ingest.route);
 
   return async (req, res) => {
-    if (req.url !== "/notices") return reply(res, 404, { error: "not_found" });
+    const entry = table.get(req.url ?? "");
+    if (!entry) return reply(res, 404, { error: "not_found" });
     if (req.method !== "POST") return reply(res, 405, { error: "method_not_allowed" });
-    if (!authorized(req)) return reply(res, 401, { error: "unauthorized" });
+    const auth = req.headers.authorization ?? "";
+    if (!(auth.startsWith("Bearer ") && timingSafeEqual(digest(auth.slice(7)), entry.expected))) {
+      return reply(res, 401, { error: "unauthorized" });
+    }
     const body = await readBody(req);
     if (body === null) return reply(res, 413, { error: "too_large" });
-
     let json: unknown;
     try {
       json = JSON.parse(body.toString("utf8"));
     } catch {
       return reply(res, 400, { error: "invalid_json" });
     }
+    await entry.route(json, res);
+  };
+}
+
+// The body is a Notice or an array of them. 400 if any notice does not validate (nothing is
+// sent), 202 otherwise with each notice's status.
+function noticesRoute(sink: NoticeSink): JsonRoute {
+  return async (json, res) => {
     const notices = Array.isArray(json) ? json : [json];
     if (notices.length === 0 || notices.length > MAX_NOTICES) return reply(res, 400, { error: "bad_batch_size" });
     // All or nothing at the schema level, so a producer never gets half a batch sent.
@@ -64,14 +85,13 @@ export function createNoticeHandler(token: string, sink: NoticeSink): RequestLis
       await sink.notify(notices[invalid]);
       return reply(res, 400, { error: "invalid_notice", index: invalid });
     }
-
     const results: NotifyResult["status"][] = [];
     for (const n of notices) results.push((await sink.notify(n)).status);
     reply(res, 202, { results });
   };
 }
 
-export function startNoticeServer(handler: RequestListener, host: string, port: number): Promise<Server> {
+export function startHttpServer(handler: RequestListener, host: string, port: number): Promise<Server> {
   return new Promise((resolve) => {
     const server = createServer(handler).listen(port, host, () => resolve(server));
   });

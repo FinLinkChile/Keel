@@ -4,18 +4,26 @@
     "kind": "account_change_attempt",
     "mode": "trade",
     "occurredAt": 1792569600,
-    "orderRef": "po-0142",
+    "orderRef": "0x0000000000000000000000000000000000000000000000000000000000000142",
     "orderLabel": "PO-0142",
-    "parties": { "importer": "acme-imports", "exporter": "lingnan" }
+    "parties": {
+      "importer": "acme-imports",
+      "exporter": "lingnan",
+      "arbiter": "hk-arbitration"
+    }
   },
   {
     "id": "act2-held-account-mention",
     "kind": "operation_held",
     "mode": "trade",
     "occurredAt": 1792569660,
-    "orderRef": "po-0142",
+    "orderRef": "0x0000000000000000000000000000000000000000000000000000000000000142",
     "orderLabel": "PO-0142",
-    "parties": { "importer": "acme-imports", "exporter": "lingnan" },
+    "parties": {
+      "importer": "acme-imports",
+      "exporter": "lingnan",
+      "arbiter": "hk-arbitration"
+    },
     "reason": "account_change_mention",
     "deadline": 1795132800
   },
@@ -24,9 +32,13 @@
     "kind": "operation_held",
     "mode": "trade",
     "occurredAt": 1792573200,
-    "orderRef": "po-0142",
+    "orderRef": "0x0000000000000000000000000000000000000000000000000000000000000142",
     "orderLabel": "PO-0142",
-    "parties": { "importer": "acme-imports", "exporter": "lingnan" },
+    "parties": {
+      "importer": "acme-imports",
+      "exporter": "lingnan",
+      "arbiter": "hk-arbitration"
+    },
     "reason": "documents_mismatch",
     "deadline": 1795132800
   }

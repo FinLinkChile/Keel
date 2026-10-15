@@ -121,6 +121,26 @@ describe("NotifyService", () => {
     expect(sender.to(CHATS.ana.owner)).toHaveLength(8);
   });
 
+  it("accepts a diff of any field ingest Trade compares, such as port_of_loading", async () => {
+    const { service, sender } = setup();
+    const n: Notice = {
+      ...SAMPLES.operation_held,
+      reason: "two_source_mismatch",
+      diffs: [{ field: "port_of_loading", a: "CNSHA", b: "CNNGB" }],
+    };
+    expect(await service.notify(n)).toEqual({ status: "accepted", sent: 3 });
+    expect(sender.to(CHATS.acme.owner)[0]?.text).toContain("Port of loading: CNSHA and CNNGB.");
+  });
+
+  it("never caps the new document hold reasons", async () => {
+    const { service, sender } = setup(1);
+    for (const [i, reason] of (["bl_reused", "document_unreadable", "bl_reused"] as const).entries()) {
+      await service.notify({ ...SAMPLES.operation_held, id: `hold-${i}`, reason, orderRef: `po-${i}` });
+    }
+    expect(sender.to(CHATS.acme.owner)).toHaveLength(3);
+    expect(service.stats().rateLimited).toBe(0);
+  });
+
   it("counts Personal diff values withheld", async () => {
     const { service } = setup();
     const n: Notice = {

@@ -4,11 +4,12 @@
     "kind": "order_opened",
     "mode": "trade",
     "occurredAt": 1792569600,
-    "orderRef": "po-0131",
+    "orderRef": "0x0000000000000000000000000000000000000000000000000000000000000131",
     "orderLabel": "PO-0131",
     "parties": {
       "importer": "acme-imports",
-      "exporter": "lingnan"
+      "exporter": "lingnan",
+      "arbiter": "hk-arbitration"
     },
     "amountMinor": 4800000,
     "currency": "USD",
@@ -19,11 +20,12 @@
     "kind": "order_funded",
     "mode": "trade",
     "occurredAt": 1792573200,
-    "orderRef": "po-0131",
+    "orderRef": "0x0000000000000000000000000000000000000000000000000000000000000131",
     "orderLabel": "PO-0131",
     "parties": {
       "importer": "acme-imports",
-      "exporter": "lingnan"
+      "exporter": "lingnan",
+      "arbiter": "hk-arbitration"
     },
     "amountMinor": 4800000,
     "currency": "USD"
@@ -33,11 +35,12 @@
     "kind": "advance_released",
     "mode": "trade",
     "occurredAt": 1792573500,
-    "orderRef": "po-0131",
+    "orderRef": "0x0000000000000000000000000000000000000000000000000000000000000131",
     "orderLabel": "PO-0131",
     "parties": {
       "importer": "acme-imports",
-      "exporter": "lingnan"
+      "exporter": "lingnan",
+      "arbiter": "hk-arbitration"
     },
     "amountMinor": 1440000,
     "currency": "USD"
@@ -47,11 +50,12 @@
     "kind": "shipment_accepted",
     "mode": "trade",
     "occurredAt": 1794564000,
-    "orderRef": "po-0131",
+    "orderRef": "0x0000000000000000000000000000000000000000000000000000000000000131",
     "orderLabel": "PO-0131",
     "parties": {
       "importer": "acme-imports",
-      "exporter": "lingnan"
+      "exporter": "lingnan",
+      "arbiter": "hk-arbitration"
     },
     "onBoardDate": 1794441600
   },
@@ -60,11 +64,12 @@
     "kind": "balance_released",
     "mode": "trade",
     "occurredAt": 1794564300,
-    "orderRef": "po-0131",
+    "orderRef": "0x0000000000000000000000000000000000000000000000000000000000000131",
     "orderLabel": "PO-0131",
     "parties": {
       "importer": "acme-imports",
-      "exporter": "lingnan"
+      "exporter": "lingnan",
+      "arbiter": "hk-arbitration"
     },
     "amountMinor": 3360000,
     "currency": "USD"
