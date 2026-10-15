@@ -4,7 +4,7 @@ title: "El flujo clave en seis pasos"
 description: "Vista completa del flujo de Keel Trade: negociación, firma, depósito, anticipo, embarque, saldo y vencimiento. Punto de entrada a cada paso."
 tags: [flujo, escrow, gatillos]
 modo: trade
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T01:40:00Z }
 ---
 
 ```
@@ -39,9 +39,9 @@ Caminos laterales: **disputa** (cualquiera de las partes la abre antes del cierr
 | 0 | [Negociación](paso-0-negociacion.md) | Fuera de la cadena |
 | 1 | [Firma de la orden de compra](paso-1-firma-orden.md) | `open` |
 | 2 | [Depósito y bloqueo](paso-2-deposito.md) | `fund` |
-| 3 | [Gatillo 1: anticipo](paso-3-anticipo.md) | `releaseAdvance` |
+| 3 | [Gatillo 1: anticipo](paso-3-anticipo.md) | `fund` (misma transacción del depósito) |
 | 4 | [Embarque y documentos](paso-4-embarque.md) | Atestación de la naviera |
-| 5 | [Gatillo 2: saldo](paso-5-saldo.md) | `submitShipment` |
+| 5 | [Gatillo 2: saldo](paso-5-saldo.md) | `submitShipment`, luego `releaseBalance` o `approveBalance` |
 | 6 | [Vencimiento y reembolso](paso-6-reembolso.md) | `refundAfterDeadline` |
 | Lateral | [Disputa y cancelación](disputa-y-cancelacion.md) | `raiseDispute`, `resolve`, `cancel` |
 

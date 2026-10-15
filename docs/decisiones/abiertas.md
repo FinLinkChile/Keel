@@ -4,7 +4,7 @@ title: "Decisiones abiertas"
 description: "Las 14 preguntas que el equipo todavía no cierra. Si un componente toca alguna, se decide con el equipo antes de escribir código."
 tags: [decisiones-abiertas, pendiente]
 modo: ambos
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T01:40:00Z }
 ---
 
 No resolver ninguna por cuenta propia. Cuando el equipo cierra una, se actualiza primero el concepto afectado, luego esta tabla y después el código. Los números son estables: el código y los README los citan.
@@ -12,12 +12,12 @@ No resolver ninguna por cuenta propia. Cuando el equipo cierra una, se actualiza
 | # | Pregunta | Quién decide | Concepto afectado |
 | --- | --- | --- | --- |
 | 1 | ¿Qué red cerrada se usa (por ejemplo FISCO BCOS) y qué token de pago existe en ella? De esto depende si Safe, Zodiac Roles y Delay se pueden desplegar ahí tal como están | Equipo y Contratos, miércoles 14 | [Sistema de pago](../pagos/sistema-de-pago.md), [stack](../arquitectura/stack.md) |
-| 2 | ¿El anticipo se libera en la misma transacción del depósito? | Contratos | [Paso 3](../flujo/paso-3-anticipo.md) |
-| 3 | **Decidida el 14 de octubre (Área 2).** El `DocumentDecision` es obligatorio, con dos salidas: el importador puede aprobar el saldo a mano (`BalanceApproval`) y con una atestación registrada no hay reembolso automático. Lo firma el `documentVerifier` fijado en cada orden, que no es ninguna de las partes ni la naviera. Detalle en el [paso 5](../flujo/paso-5-saldo.md). | Motor y Contratos | [Paso 5](../flujo/paso-5-saldo.md), [PDR](../interfaces/pdr.md) |
-| 4 | ¿Se usa ventana de disputa por defecto? ¿De cuántos días? | Equipo | [Paso 5](../flujo/paso-5-saldo.md) |
-| 5 | ¿La disputa la resuelve el árbitro solo o 2 de 3? | Equipo | [Disputa y cancelación](../flujo/disputa-y-cancelacion.md) |
-| 6 | ¿Cuánto dura el margen de gracia entre la fecha límite de embarque y el reembolso? | | [Paso 6](../flujo/paso-6-reembolso.md) |
-| 7 | ¿El token elegido soporta `permit`? | Contratos | [Paso 2](../flujo/paso-2-deposito.md) |
+| 2 | **Decidida el 14 de octubre (Área 1, Adrean).** Sí: `fund` recibe el total y paga el anticipo en la misma transacción, sin estado Depositado. Elimina la carrera entre liberar el anticipo y una cancelación ya firmada. | Contratos | [Paso 3](../flujo/paso-3-anticipo.md) |
+| 3 | **Decidida el 14 de octubre por las Áreas 1 y 2.** El `DocumentDecision` es obligatorio, con dos salidas: el importador puede aprobar el saldo a mano (`BalanceApproval`, función `approveBalance`, en cualquier momento) y con una atestación registrada no hay reembolso automático. `releaseBalance` con el `DocumentDecision` se puede llamar solo después de la ventana de disputa. Lo firma el `documentVerifier` fijado en cada orden, que no es ninguna de las partes ni la naviera. Detalle en el [paso 5](../flujo/paso-5-saldo.md). | Motor y Contratos | [Paso 5](../flujo/paso-5-saldo.md), [PDR](../interfaces/pdr.md) |
+| 4 | **[PROPUESTA] Decidida por el Área 1 (Adrean) el 14 de octubre, falta que el equipo la confirme.** `disputeWindow` lo fija cada orden, sin valor por defecto en el contrato; la app sugiere 3 días y la demo usa 2 minutos. | Equipo | [Paso 5](../flujo/paso-5-saldo.md) |
+| 5 | **[PROPUESTA] Decidida por el Área 1 (Adrean) el 14 de octubre, falta que el equipo la confirme.** Resuelve el árbitro solo; las partes pueden salir de la disputa cancelando de mutuo acuerdo. 2 de 3 queda como trabajo futuro. | Equipo | [Disputa y cancelación](../flujo/disputa-y-cancelacion.md) |
+| 6 | **[PROPUESTA] Decidida por el Área 1 (Adrean) el 14 de octubre, falta que el equipo la confirme.** `refundGrace` es un parámetro del despliegue del escrow: 1 día en producción, 60 segundos en la demo. | Contratos | [Paso 6](../flujo/paso-6-reembolso.md) |
+| 7 | **Decidida el 14 de octubre (Área 1, Adrean).** El depósito es `approve` exacto más `fund`, sin `fundWithPermit`: no está verificado que el USDC de la red acepte `permit` firmado por una Safe con ERC-1271, y así funciona con cualquier token. | Contratos | [Paso 2](../flujo/paso-2-deposito.md) |
 | 8 | ¿Se admite pago diferido (por ejemplo, saldo a 30 días desde la fecha *on board*, como en el caso marítimo de la entrevista)? | | [Paso 5](../flujo/paso-5-saldo.md) |
 | 9 | ¿Se confirman los niveles de permiso propuestos para Keel Trade? | | [Niveles de permiso](../arquitectura/niveles-de-permiso.md) |
 | 10 | ¿Estado actual de la regulación de stablecoins en Hong Kong y de cripto en China? | Red Team y Evidencia, antes del deck | [Regulación](../pagos/regulacion.md) |
@@ -30,6 +30,5 @@ Una celda vacía en "quién decide" significa que las fuentes no lo asignan toda
 
 # Otras cuestiones abiertas, registradas en su concepto
 
-- Aprobación exacta más `fund`, o `fundWithPermit`: tarea T1.2 del [Área 1](../trabajo/area-1-contratos.md). Depende de la decisión 7.
 - Qué actos de Keel Personal entran en el deck y en el video: [demo](../entrega/demo.md). Depende de la decisión 14.
 - Dónde entra Keel Personal en el orden de recorte: [recortes](../trabajo/recortes.md). Depende de la decisión 14.

@@ -155,6 +155,8 @@ export interface ShipmentAttestation {
 // Signed by importer and exporter to cancel by mutual agreement.
 export interface CancelOrder {
   orderId: Hex;
+  // cancelNonceOf(orderId) read from the TradeEscrow right before signing. It changes on
+  // every state transition, so a signature is only valid in the state it was signed for.
   nonce: bigint;
 }
 
@@ -355,6 +357,12 @@ export const ESCROW_ERRORS = [
   "BadResolution",
   "TokenNotAllowed",
   "AmountMismatch",
+  "ZeroAddress",
+  "InvalidOrder",
+  "BadOrderId",
+  "DeadlinePassed",
+  "InvalidAttestation",
+  "BadArbiterSignature",
 ] as const;
 export type EscrowError = (typeof ESCROW_ERRORS)[number];
 
@@ -363,10 +371,11 @@ export type EscrowError = (typeof ESCROW_ERRORS)[number];
 // ---------------------------------------------------------------------------
 
 // On-chain states of the escrow (docs/flujo/estados-del-escrow.md). SETTLED, REFUNDED,
-// RESOLVED and CANCELLED are final. The uint8 values belong to TradeEscrow (Area 1).
+// RESOLVED and CANCELLED are final. The index is the uint8 TradeEscrow uses: NONE = 0
+// means there is no order with that id. fund goes from OPEN straight to ADVANCE_PAID.
 export const ESCROW_STATES = [
+  "NONE",
   "OPEN",
-  "FUNDED",
   "ADVANCE_PAID",
   // Shipment attested, balance not released yet: no refund after the deadline from here
   "SHIPPED",
