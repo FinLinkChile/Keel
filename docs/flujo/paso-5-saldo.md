@@ -4,7 +4,7 @@ title: "Paso 5, gatillo 2: saldo"
 description: "Qué verifica submitShipment, los dos caminos para liberar el saldo (releaseBalance tras la ventana, approveBalance en cualquier momento), qué compara el motor para el DocumentDecision y cómo opera la ventana de disputa."
 tags: [paso-5, saldo, gatillo-2, submit-shipment, release-balance, approve-balance, pdr]
 modo: trade
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T01:40:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T21:00:00Z }
 ---
 
 El gatillo 2 tiene dos pasos: primero se registra el embarque y después se libera el saldo.
@@ -13,13 +13,18 @@ El gatillo 2 tiene dos pasos: primero se registra el embarque y después se libe
 
 El contrato verifica, en este orden:
 
-1. Que la orden esté en AnticipoPagado (`InvalidState`). Con una disputa abierta no se puede registrar.
-2. Que la atestación corresponda a esta orden (`InvalidAttestation`).
-3. Que la firma sea válida y venga de la naviera fijada en la orden (`BadCarrierSignature`).
-4. Que la fecha *on board* sea igual o anterior a la fecha límite de embarque (`ShipmentTooLate`) y no esté en el futuro (`InvalidAttestation`).
-5. Que esa naviera no haya usado ese BL en otra orden (`BillOfLadingAlreadyUsed`). La clave es `keccak256(abi.encode(naviera de la orden, blNumberHash))`, así una naviera no puede bloquear el BL de otra.
+1. Que la orden esté en AnticipoPagado (`InvalidState`). Se registra una sola vez: después ya está en Embarcado o en un estado posterior.
+2. Que todavía no se pueda reembolsar (`DeadlinePassed` si `now > shipmentDeadline + refundGrace`). Es exactamente la comparación de `refundAfterDeadline`: en cada segundo es posible uno de los dos, nunca ambos ni ninguno.
+3. Que la atestación corresponda a esta orden (`InvalidAttestation`).
+4. Que la firma sea válida y venga de la naviera fijada en la orden (`BadCarrierSignature`).
+5. Que la fecha *on board* sea igual o anterior a la fecha límite de embarque (`ShipmentTooLate`), no esté en el futuro y no sea anterior al momento del depósito (`InvalidAttestation`): un embarque previo al depósito no prueba que se cumplió esta orden.
+6. Que esa naviera no haya usado ese BL en otra orden (`BillOfLadingAlreadyUsed`). La clave es `keccak256(abi.encode(naviera de la orden, blNumberHash))`, así una naviera no puede bloquear el BL de otra.
 
 La orden pasa a Embarcado. No se mueve dinero y desde aquí no hay reembolso por vencimiento.
+
+**Reglas para la naviera y el motor:** `onBoardDate` es un timestamp, no un día. Un BL dice solo la fecha; si la naviera firma las 00:00 de ese día y el depósito fue más tarde el mismo día, el escrow rechaza la atestación (`InvalidAttestation`). La naviera firma un instante no anterior al depósito ni posterior a la fecha límite, y el motor, que compara días, no lo rechaza por eso. La atestación tiene que llegar a la cadena antes de `shipmentDeadline + refundGrace`: el margen de gracia es también el último plazo para registrar el embarque ([paso 6](paso-6-reembolso.md)).
+
+**Riesgo declarado:** si el importador deposita muy cerca de la fecha límite, la ventana válida de *on board* (entre el depósito y la fecha límite) se achica, y un embarque cargado antes del depósito no se puede atestar. El exportador conserva el anticipo y el saldo vuelve al importador por vencimiento.
 
 # Paso B: liberar el saldo
 
