@@ -84,9 +84,9 @@ Cada Safe lleva la configuración de su modo: la Safe de una persona no tiene pe
 
 **Personal (base):** la intención es `PaymentIntent`. El calldata es `abi.encodeCall(IERC20.transfer, (intent.recipient, intent.amountUsdc))`. Antes de ejecutar, verifica y marca `invoiceKey` como pagada (`InvoiceAlreadyPaid`): la idempotencia queda en cadena, así que ni un motor comprometido puede pagar dos veces la misma factura (crítica 11). Emite `PaymentExecuted(intentHash, pdrHash, tier, invoiceKey)`. Este gate ya tiene código y pruebas locales.
 
-**Trade (agregado):** la intención es `FundIntent`. El calldata es la llamada de depósito al escrow. La idempotencia queda en el escrow: una orden solo se deposita una vez (`InvalidState`). Emite `FundingExecuted(intentHash, pdrHash, tier, orderId)`.
+**Trade (agregado):** un gate propio, separado de PDRGate (nombre provisional `FundingGate`); su estructura interna la define el Área 1. La intención es `FundIntent`, que trae `orderHash`: el gate lo compara con la orden que guardó el escrow. El gate también verifica en la cadena que `(exporter, payoutAddress)` esté en el registro de proveedores conocidos, que solo cambia por el Delay (T1.11). Para el nivel 3 (depósito sobre el cupo) el gate ejecuta con un segundo rol con cupo mayor (por ejemplo `AGENT_COSIGNED`), que usa solo cuando trae la cofirma. El calldata es la llamada de depósito al escrow. La idempotencia queda en el escrow: una orden solo se deposita una vez (`InvalidState`). Emite `FundingExecuted(intentHash, pdrHash, tier, orderId)`.
 
-`setPolicySigner` y `setPolicyHash` solo pueden llamarse desde la Safe, y solo por el camino del Delay (T1.4). Si es un gate con dos entradas o un gate por modo es una decisión abierta ([PDR](../interfaces/pdr.md)).
+`setPolicySigner` y `setPolicyHash` solo pueden llamarse desde la Safe, y solo por el camino del Delay (T1.4). Las Áreas 1 y 2 decidieron un gate por modo ([PDR](../interfaces/pdr.md)).
 
 **T1.7 Batería de pruebas negativas (crítica 14).**
 Con Foundry y la configuración real de Roles. Cada caso debe revertir con el error esperado.

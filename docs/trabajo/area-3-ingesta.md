@@ -54,7 +54,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
 
 **T3.7 Claves de idempotencia y de documento (crítica 11).**
 * **Personal (base):** `invoiceKey = keccak256(issuer_tax_id, invoice_number, period)`, calculada con los valores normalizados. Reemplaza al hash del PDF, que se evade cambiando un píxel. Se deduplica al ingresar y además se hace cumplir en cadena (T1.6).
-* **Trade (agregado):** `blNumberHash = keccak256(número de documento normalizado)`. Debe calcularse igual que en la atestación de la naviera, o el motor nunca dará conformidad. `docsHash = keccak256` del paquete de archivos, en un orden definido. La unicidad se hace cumplir en cadena: un BL no liquida dos órdenes (T1.9).
+* **Trade (agregado):** `blNumberHash = keccak256(abi.encode(carrier, número de documento normalizado))`, con `blNumberHash` de `schemas/src/hash.ts`. Debe calcularse igual que en la atestación de la naviera, o el motor nunca dará conformidad. `docsHash = keccak256` del paquete de archivos, en un orden definido. La unicidad se hace cumplir en cadena: un BL no liquida dos órdenes (T1.9).
 
 **T3.8 Corpus de documentos.**
 * **Personal (base):**

@@ -14,7 +14,7 @@ Keel emite un PDR en dos momentos:
 
 | Momento | Qué decide el motor | Quién lo verifica en la cadena |
 |---|---|---|
-| Depósito | Que la orden está firmada, el proveedor es conocido y el monto cabe en el cupo | PDRGate, antes de ejecutar por el Roles Modifier |
+| Depósito | Que la orden está firmada, el proveedor es conocido y el monto cabe en el cupo | El gate de Trade, antes de ejecutar por el Roles Modifier |
 | Gatillo 2 | Que el BL y la factura coinciden con la orden y con la atestación de la naviera | TradeEscrow, en `submitShipment` |
 
 Flujo por decisión:
@@ -55,7 +55,9 @@ struct DocumentDecision {
 }
 ```
 
-* Dominio EIP 712: `name = "Keel"`, `version = "1"`, `chainId`, y como `verifyingContract` el contrato que verifica cada firma (PDRGate para `PolicyDecision`, TradeEscrow para la orden, la atestación y `DocumentDecision`).
-* El PDR completo, en JSON con las reglas evaluadas y sus resultados, se guarda fuera de cadena en `evidence/pdr/<hash>.json`. En cadena va su hash.
-* **Abierto:** cómo acepta PDRGate las dos intenciones (`PaymentIntent` y `FundIntent`): un gate con dos entradas o un gate por modo. Lo deciden las Áreas 1 y 2 antes del congelamiento.
+* Dominio EIP 712: `name = "Keel"`, `version = "1"`, `chainId`, y como `verifyingContract` el contrato que verifica cada firma (el gate del modo para `PolicyDecision`: PDRGate en Personal, el gate de Trade en Trade; TradeEscrow para la orden, la atestación y `DocumentDecision`).
+* `FundIntent` incluye `orderHash`, el hash EIP-712 de la orden que firmaron ambas partes, para que el gate de Trade compruebe en la cadena que se deposita exactamente esa orden.
+* El PDR completo, en JSON con las reglas evaluadas y sus resultados, se guarda fuera de cadena en `evidence/pdr/<pdrHash>.json`, donde `pdrHash` es el digest EIP-712 de la decisión que PDRGate emite en su evento. En cadena va ese hash. Lo genera `engine/src/pdr.ts` (`saveEvidence`).
+* En nivel 3, el motor entrega al Área 4 una solicitud de cofirma (`cosignRequest`): el mismo digest y los datos tipados que la billetera del cosignatario firma con `signTypedData`.
+* **Decidido por las Áreas 1 y 2 (14 de octubre): un gate por modo.** PDRGate es el gate de Keel Personal (`PaymentIntent`, transferencia a un beneficiario de la lista blanca). Keel Trade tiene su propio gate (nombre provisional `FundingGate`), que recibe `FundIntent` y arma por dentro el depósito en el escrow. La estructura interna de los gates (si comparten código y cómo) la define el Área 1. Razones: cada gate queda atado a una sola Safe y una billetera usa un solo modo, así que un gate con dos entradas desplegaría en cada billetera una función que nunca debe usarse, y cada modo versiona sus reglas por separado.
 * **Abierto:** qué firmante de política acepta el escrow para `DocumentDecision` (uno registrado en el contrato o uno fijado en cada orden) y si esa decisión es obligatoria para liberar el saldo.

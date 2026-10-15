@@ -13,4 +13,4 @@ La joya probatoria: transacciones revertidas en la cadena, lanzadas deliberadame
 
 # Dónde se guarda
 
-El PDR completo, en JSON con las reglas evaluadas y sus resultados, se guarda fuera de cadena en `evidence/pdr/<hash>.json`. En cadena va su hash, en el evento del gate. El struct está en [PDR](../interfaces/pdr.md) y el script de evidencia es la tarea T5.5 del [Área 5](../trabajo/area-5-redteam-evidencia.md).
+El PDR completo, en JSON con las reglas evaluadas y sus resultados, se guarda fuera de cadena en `evidence/pdr/<pdrHash>.json`, donde `pdrHash` es el digest EIP-712 de la decisión. En cadena va ese mismo hash, en el evento del gate (`PaymentExecuted`), así que desde una transacción se llega directo al archivo. El struct está en [PDR](../interfaces/pdr.md) y el script de evidencia es la tarea T5.5 del [Área 5](../trabajo/area-5-redteam-evidencia.md).

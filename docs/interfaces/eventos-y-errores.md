@@ -15,6 +15,6 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
 
 **Trade (agregado):**
 
-* PDRGate, eventos: `FundingExecuted`, `OperationHeld`. Los errores son los mismos, salvo `InvoiceAlreadyPaid`, que no aplica.
+* Gate de Trade, eventos: `FundingExecuted`, `OperationHeld`. Los errores son los mismos, salvo `InvoiceAlreadyPaid`, que no aplica.
 * TradeEscrow, eventos: `OrderOpened`, `OrderFunded`, `AdvanceReleased`, `ShipmentAccepted`, `BalanceReleased`, `Refunded`, `DisputeRaised`, `DisputeResolved`, `OrderCancelled`.
 * TradeEscrow, errores: `InvalidState`, `OrderExists`, `BadImporterSignature`, `BadExporterSignature`, `BadCarrierSignature`, `BadDocumentDecision`, `ShipmentTooLate`, `BillOfLadingAlreadyUsed`, `DeadlineNotReached`, `NotParty`, `BadResolution`, `TokenNotAllowed`, `AmountMismatch`.

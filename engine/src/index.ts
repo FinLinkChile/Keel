@@ -1,10 +1,15 @@
 // Policy engine. Owned by Area 2.
 import type { InvoiceExtraction, PaymentIntent, Tier } from "@keel/schemas";
 
-export interface RuleResult {
-  rule: string;
+export * from "./funding";
+export * from "./pdr";
+
+export interface RuleResult<R extends string = string, C extends string = string> {
+  rule: R;
   // Minimum tier this rule forces. The final tier is the maximum across rules.
   tier: Tier;
+  // Why the rule gave that tier, as a code for templated notices
+  reason?: C;
 }
 
 export interface Evaluation {

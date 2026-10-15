@@ -30,7 +30,7 @@ struct PurchaseOrder {
 
 struct ShipmentAttestation {
     bytes32 orderId;        // a qué orden corresponde
-    bytes32 blNumberHash;   // hash del número de BL
+    bytes32 blNumberHash;   // keccak256(abi.encode(carrier, número de BL)): único por naviera
     uint64  onBoardDate;    // fecha de embarque real
     bytes32 portOfLoading;  // puerto de carga
     bytes32 docsHash;       // hash del paquete de documentos
