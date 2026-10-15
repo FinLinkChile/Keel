@@ -153,3 +153,101 @@ contract Mock1271 {
         return ecrecover(h, v, r, s) == signer ? bytes4(0x1626ba7e) : bytes4(0xffffffff);
     }
 }
+
+/// @notice Emulates the subset of Zodiac Roles v2 semantics the Trade roles rely on (AGENT and
+/// AGENT_COSIGNED, docs/trabajo/area-1-contratos.md T1.2): membership per role, a per-period
+/// allowance per role spent by the approve amount, only `token.approve(escrow, amount)` and
+/// `escrow.fund(orderId)`, no value, no delegatecall. Errors mirror the real contract
+/// (NoMembership, ConditionViolation(Status, info)); the exact Status the real Roles returns
+/// for each case must be confirmed on the fork (T1.7). Separate from MockRoles so the Personal
+/// mock and the PDRGate tests stay byte for byte as they were.
+contract MockTradeRoles is IRoles {
+    // Subset of Zodiac Roles v2 PermissionChecker.Status, same numeric order as the real enum
+    uint8 constant DelegateCallNotAllowed = 1;
+    uint8 constant TargetAddressNotAllowed = 2;
+    uint8 constant FunctionNotAllowed = 3;
+    uint8 constant SendNotAllowed = 4;
+    uint8 constant ParameterNotAMatch = 10;
+    uint8 constant AllowanceExceeded = 17;
+
+    error NoMembership();
+    error ConditionViolation(uint8 status, bytes32 info);
+    error ModuleTransactionFailed();
+
+    struct Allowance {
+        uint256 balance;
+        uint256 refill;
+        uint256 period;
+        uint256 start;
+    }
+
+    MockSafe public immutable avatar;
+    address public immutable token;
+    address public immutable escrow;
+    bytes4 constant APPROVE = 0x095ea7b3;
+    bytes4 constant FUND = bytes4(keccak256("fund(bytes32)"));
+
+    mapping(bytes32 => mapping(address => bool)) public members;
+    mapping(bytes32 => Allowance) public allowances;
+    /// @dev Test switch: report failure by returning false (without executing) for this target.
+    address public returnFalseFor;
+
+    constructor(MockSafe avatar_, address token_, address escrow_) {
+        avatar = avatar_;
+        token = token_;
+        escrow = escrow_;
+    }
+
+    modifier onlyAvatar() {
+        require(msg.sender == address(avatar), "only avatar");
+        _;
+    }
+
+    function assignRole(bytes32 role, address m, bool on) external onlyAvatar {
+        members[role][m] = on;
+    }
+
+    function setAllowance(bytes32 role, uint256 refill, uint256 period) external onlyAvatar {
+        allowances[role] = Allowance(refill, refill, period, block.timestamp);
+    }
+
+    function setReturnFalseFor(address target) external {
+        returnFalseFor = target;
+    }
+
+    function remaining(bytes32 role) external view returns (uint256) {
+        return allowances[role].balance;
+    }
+
+    function execTransactionWithRole(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        Operation operation,
+        bytes32 roleKey,
+        bool shouldRevert
+    ) external returns (bool success) {
+        if (!members[roleKey][msg.sender]) revert NoMembership();
+        if (operation != Operation.Call) revert ConditionViolation(DelegateCallNotAllowed, 0);
+        if (value != 0) revert ConditionViolation(SendNotAllowed, 0);
+        if (to == token) {
+            if (data.length != 68 || bytes4(data[:4]) != APPROVE) revert ConditionViolation(FunctionNotAllowed, 0);
+            (address spender, uint256 amount) = abi.decode(data[4:], (address, uint256));
+            if (spender != escrow) revert ConditionViolation(ParameterNotAMatch, 0);
+            Allowance storage a = allowances[roleKey];
+            if (block.timestamp >= a.start + a.period) {
+                a.start = block.timestamp;
+                a.balance = a.refill;
+            }
+            if (amount > a.balance) revert ConditionViolation(AllowanceExceeded, 0);
+            a.balance -= amount;
+        } else if (to == escrow) {
+            if (data.length != 36 || bytes4(data[:4]) != FUND) revert ConditionViolation(FunctionNotAllowed, 0);
+        } else {
+            revert ConditionViolation(TargetAddressNotAllowed, 0);
+        }
+        if (to == returnFalseFor) return false;
+        success = avatar.execTransactionFromModule(to, 0, data, 0);
+        if (shouldRevert && !success) revert ModuleTransactionFailed();
+    }
+}

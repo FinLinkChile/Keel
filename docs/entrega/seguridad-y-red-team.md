@@ -4,14 +4,14 @@ title: "Informe de seguridad y métricas del red team"
 description: "Qué lleva el informe de seguridad (30% del puntaje), los riesgos que se declaran y las métricas que mide la batería de red team."
 tags: [informe-de-seguridad, red-team, metricas, riesgos]
 modo: ambos
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T16:30:00Z }
 ---
 
 El informe de seguridad vale el 30% del puntaje. Su matriz de amenazas, con control y riesgo residual, es la de [amenazas](../flujo/amenazas.md), más las de [Keel Personal](../personal/amenazas.md).
 
 # Riesgos declarados
 
-Riesgos declarados con honestidad: el contrato de escrow es código propio sin auditoría; la naviera del prototipo es una llave de prueba; el registro de partes lo administra Keel; el token de pago tiene riesgo de emisor; en una red cerrada la verificación pública depende de quién tenga acceso a ella; la bitácora prueba lo que el sistema registró, no que nada se haya escapado.
+Riesgos declarados con honestidad: el contrato de escrow es código propio sin auditoría; la naviera del prototipo es una llave de prueba; los proveedores y terceros de confianza los aprueba la propia empresa en su gate (no se verifica en la cadena que sean empresas reales); el token de pago tiene riesgo de emisor; en una red cerrada la verificación pública depende de quién tenga acceso a ella; la bitácora prueba lo que el sistema registró, no que nada se haya escapado.
 
 # Métricas del red team
 
