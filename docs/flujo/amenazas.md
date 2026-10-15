@@ -4,7 +4,7 @@ title: "Amenazas que el flujo debe resistir"
 description: "Modelo de amenazas de Keel Trade: cada amenaza con su ejemplo, la defensa y el riesgo residual declarado."
 tags: [amenazas, seguridad, riesgo-residual]
 modo: trade
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T16:30:00Z }
 ---
 
 | Amenaza | Ejemplo | Defensa | Riesgo residual |
@@ -16,12 +16,14 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
 | Agencia excesiva (OWASP LLM06) | El agente intenta una acción fuera de su tarea | Rol Zodiac limitado al escrow, con cupo | Acciones dentro del rol siguen siendo posibles |
 | Mismo BL para dos órdenes | Cobrar dos veces con un embarque | Registro de `blNumberHash` usados | Depende de normalizar bien el número |
 | Llave del agente o del relayer robada | Intento de mover fondos | Sin PDR válido no pasa por el gate de Trade; el rol solo permite llamar al escrow, con cupo | Ninguna autoridad propia; puede gastar gas |
-| Llave de política robada | PDR falsos | El Roles limita destino y cupo; el escrow solo paga a las partes de la orden | Puede depositar órdenes firmadas dentro del cupo y aprobar documentos no conformes. Mientras el gate de Trade no verifique en la cadena el registro de proveedores (T1.11), eso incluye una orden firmada por ambas partes con una dirección de cobro nueva |
+| Llave de política robada | PDR falsos | El Roles limita destino y cupo; el escrow solo paga a las partes de la orden; el gate de Trade solo deposita órdenes cuyo proveedor (exportador y `payoutAddress`) y cuyos naviera, árbitro y verificador están activos en los registros de la Safe, que solo la Safe agrega, con espera y veto (`FundingGate`) | Puede depositar, dentro del cupo, órdenes firmadas por ambas partes con proveedor y terceros ya aprobados, y aprobar documentos no conformes de las órdenes que nombran a esa llave como verificador. Con la llave del cosignatario además (nivel 3), lo mismo con el cupo mayor; nunca a una cuenta de cobro nueva (pruebas `test_goal_*` de `FundingGate.t.sol`) |
 | Importador retira tras ver el embarque | Deja al exportador sin cobrar | El contrato no tiene función de retiro unilateral | Disputa de mala fe, que resuelve el árbitro |
 | Exportador nunca embarca | Se queda con el anticipo | Reembolso del saldo por vencimiento | El anticipo solo se recupera por disputa |
 | El motor no puede leer el BL o no responde | Saldo trabado aunque el embarque ocurrió | El importador aprueba a mano (`BalanceApproval`); una orden Embarcado no se reembolsa por vencimiento y va a disputa | Si el importador no aprueba, el exportador depende del árbitro |
 | Colusión de exportador y naviera | Atestación de un embarque que no ocurrió | Ventana de disputa, árbitro, reputación e identidad verificada | Riesgo residual declarado |
 | Árbitro corrupto | Reparte a favor de una parte | Solo puede repartir entre las partes; opción de 2 de 3 | Reparto injusto |
+| Proveedor o naviera que la empresa no aprobó | Orden firmada por ambas partes con una cuenta de cobro nueva o con una naviera que controla el exportador | El gate de Trade exige proveedor y terceros activos en el registro de la Safe; agregar uno espera `configDelay` con veto por cambio | Los propios dueños de la Safe pueden encolar y esperar; la defensa es el aviso y el veto del cosignatario |
+| Llave del cosignatario robada | Vetar toda alta de proveedor y pausar el gate de Trade | El cosignatario solo puede vetar cambios en cola y pausar: no agrega, no reanuda, no paga; la Safe lo reemplaza con `setCosigner` | Demora las altas y los depósitos hasta que la Safe lo rote |
 | Evento externo que amplía permisos (estilo Bankr) | Un NFT o un mensaje que cambia la configuración | Solo la Safe gobierna los módulos, por el Delay | Compromiso de la propia Safe |
 | Repetición de firmas | Reusar la firma de una orden en otra | EIP-712 con `chainId`, contrato, `orderId` y `nonce` | Ninguna identificada en el diseño; lo demuestran las pruebas |
 | Reentrancia | Token malicioso que reentra | Solo tokens permitidos; checks, effects, interactions; guard de reentrancia | |
