@@ -61,11 +61,11 @@ Bills of lading have no standard format across carriers. The parser reads docume
 * Amounts use the dot as decimal mark (`25,000.00`); `25.000,00` is held rather than guessed.
 * Ports resolve to UN/LOCODE from the printed code or from the names of the corridor's ports and airports (China, Hong Kong, Chile). A place outside that table is held.
 * The invoice total must state its currency, so `TOTAL PACKAGES: 20` is never read as an amount. Two different totals, or two HS codes, hold the invoice.
-* `document_number`, `invoice_number` and `order_number` are compacted (uppercase, no spaces, hyphens, slashes or dots). `blNumberHash(carrier, number)` takes that form, with the carrier of the signed order, so the carrier's attestation must be built from it. A B/L number is unique per carrier, as on chain.
+* `document_number`, `invoice_number` and `order_number` are compacted (uppercase, no spaces, hyphens, slashes or dots). `blNumberHash(carrier, number)` takes that form, with the carrier of the signed order, so the carrier's attestation must be built from it. A B/L number is unique per carrier, as on chain. Compaction maps numbers that differ only by separators to the same value (`AB-12` and `AB1-2` both become `AB12`); real B/L formats (SCAC prefix plus digits) do not collide this way.
 
 ### Corpus (T3.8)
 
-`redteam/corpus/trade` holds 12 legitimate sets (a transport document and an invoice each, 24 PDFs) and 30 adversarial variants, rendered from `src/testing/tradeCorpus.ts`, with a `manifest.json` that gives each case its upload conditions, its expected outcome and whether it conforms to the order (for the engine). `src/trade/corpus.test.ts` runs the whole corpus in CI with an honest model double and with a compromised one, and checks that the committed files match their specs.
+`redteam/corpus/trade` holds 12 legitimate sets (a transport document and an invoice each, 24 PDFs) and 30 adversarial variants, rendered from `src/testing/tradeCorpus.ts`, with a `manifest.json` that gives each case its upload conditions, its expected ingest outcome, the honest extraction (`truth`), whether its data conform to the order, and, for the documents that reach the engine, the engine's expected decision and reason codes (`expected.engine`). Each order carries its signed `PurchaseOrder`, `OrderTerms` (with the `hsCodes` the goods rule reads) and the carrier's attestation. The engine labels were checked once against `evaluateDocuments` of Area 2. `src/trade/corpus.test.ts` runs the whole corpus in CI with an honest model double and with a compromised one, and checks that the committed files match their specs.
 
 What the tests prove, with an honest model: all 24 legitimate documents are read field by field and the 12 packages are complete; every adversarial variant ends in its expected state. With a model that obeys the attacker (it shifts the BL number, the on board date, the amount and the order number): every legitimate document is held for disagreement and no adversarial document is accepted. This holds for the corpus layouts and the tested attacks. It does not prove how a given real LLM behaves: `npm run corpus:run -w ingest` measures that.
 
@@ -113,6 +113,7 @@ An admin can switch the LLM and the DMARC policy at runtime. Requests carry `Aut
   "settings": { "provider": "anthropic", "model": "claude-opus-5-5", "requireDmarc": true },
   "updatedAt": "2026-10-12T15:04:05.000Z",
   "updatedBy": "env",
+  "baseURL": null,
   "availableProviders": ["anthropic", "openai-compatible"]
 }
 ```
@@ -120,11 +121,11 @@ An admin can switch the LLM and the DMARC policy at runtime. Requests carry `Aut
 `PUT /admin/settings` with header `X-Admin-Actor: <who>` and any subset of the settings:
 
 ```json
-{ "provider": "openai-compatible", "model": "qwen-plus", "baseURL": "https://<endpoint>/v1", "requireDmarc": false }
+{ "provider": "openai-compatible", "model": "qwen-plus", "requireDmarc": false }
 ```
 
 * Only providers listed in `availableProviders` (those with an API key in the environment) are accepted. API keys are never accepted or returned by this API.
-* `baseURL` applies only to `openai-compatible` and must be https (plain http only to localhost).
+* Base URLs are never accepted by this API: the redacted documents and the provider's API key travel to them, so whoever held the admin token could otherwise point the extractor at their own server. They come from the environment only, one per provider (`ANTHROPIC_BASE_URL`, `LLM_COMPAT_BASE_URL`, or `LLM_BASE_URL` for the provider in `LLM_PROVIDER`), must be https (plain http only to localhost), and `GET` shows the current one so the admin knows where documents go. `openai-compatible` is offered only when its base URL is set.
 * Invalid input returns `400 {"error": "invalid_settings", "message": ...}` and changes nothing.
 * Every effective change is logged as `{"type": "settings_changed", "actor", "at", "changes": {field: {from, to}}}`. Relaxing `requireDmarc` lowers the bar for who can send invoices, and switching providers changes where redacted invoice text is sent; the screen should say so before confirming.
 * `requireDmarc` defaults to `true`. The log receives only the message hash, the status, the reason and the SPF/DKIM/DMARC keywords. The server refuses to start without a token of at least 32 characters and listens on 127.0.0.1 unless `INGEST_HOST` says otherwise.
@@ -137,10 +138,10 @@ The extractor is provider-agnostic. The prompt, the schema the model sees and th
 
 | `LLM_PROVIDER` | `LLM_MODEL` | Input sent | Notes |
 |---|---|---|---|
-| `anthropic` (default) | defaults to `claude-opus-5-5` | Strict JSON Schema output, server-side refusal fallback. `LLM_BASE_URL` (https) points it at a proxy such as LiteLLM; then the request goes without beta features and the transfer is logged as `anthropic-proxy` |
+| `anthropic` (default) | defaults to `claude-opus-5-5` | Strict JSON Schema output, server-side refusal fallback. `ANTHROPIC_BASE_URL` or `LLM_BASE_URL` (https) points it at a proxy such as LiteLLM; then the request goes without beta features and the transfer is logged as `anthropic-proxy` |
 | `openai` | required | Responses API, strict JSON Schema |
 | `gemini` | required | `responseJsonSchema`, temperature 0 |
-| `openai-compatible` | required, plus `LLM_BASE_URL` | Qwen (Alibaba DashScope), DeepSeek, Kimi or a self-hosted model |
+| `openai-compatible` | required, plus `LLM_COMPAT_BASE_URL` or `LLM_BASE_URL` | Qwen (Alibaba DashScope), DeepSeek, Kimi or a self-hosted model |
 
 The registered issuer RUTs are never given to the model, so it cannot "correct" a fraudulent issuer and hide it from the two-source comparison. Whatever the provider returns is rejected unless it matches the schema exactly.
 

@@ -68,4 +68,6 @@ El parser y el extractor pasan por las mismas funciones (`ingest/src/trade/norma
 | `on_board_date` | Medianoche UTC. Solo fechas sin ambigüedad (`12-OCT-2026`, `OCT 12, 2026`, `2026-10-12`). `10/12/2026` es 10 de diciembre en Chile y 12 de octubre en una plantilla de EE. UU.: se retiene |
 | Puertos | UN/LOCODE. El parser reconoce el código impreso o los nombres de los puertos y aeropuertos del corredor (China, Hong Kong y Chile). Un lugar fuera de esa tabla se retiene |
 
+Límite declarado: la compactación junta números que solo difieren en los separadores (`AB-12` y `AB1-2` quedan `AB12`). Con los formatos reales de BL (prefijo SCAC más dígitos) no ocurre, pero se declara.
+
 Límite declarado: el parser lee documentos que imprimen cada campo después de su rótulo. Cubre los formatos del corpus (dos navieras y una aerolínea, en `redteam/corpus/trade`), no cualquier BL.
