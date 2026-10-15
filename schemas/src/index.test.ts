@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { CommercialInvoiceExtraction, EIP712_TYPES, TransportDocumentExtraction } from "./index";
+import { CommercialInvoiceExtraction, EIP712_TYPES, ESCROW_STATES, TransportDocumentExtraction } from "./index";
 
 const transport = {
   doc_type: "BILL_OF_LADING",
@@ -84,6 +84,13 @@ describe("JSON Schema", () => {
       const bounded = spec.type !== "string" || "pattern" in spec || "enum" in spec;
       expect(bounded, field).toBe(true);
     }
+  });
+});
+
+describe("ESCROW_STATES", () => {
+  it("starts with NONE, so each index is the uint8 the escrow stores", () => {
+    expect(ESCROW_STATES.indexOf("NONE")).toBe(0);
+    expect(ESCROW_STATES.indexOf("OPEN")).toBe(1);
   });
 });
 
