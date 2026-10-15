@@ -105,7 +105,7 @@ export default function Connect() {
 
       <View style={{ marginTop: 'auto', gap: 12 }}>
         {connected ? (
-          <Button label="Continue" onPress={() => router.push('/dev/components')} />
+          <Button label="Continue" onPress={() => router.replace('/home')} />
         ) : (
           <Button label="Set up test wallet" onPress={createWallet} disabled={signer === undefined} />
         )}

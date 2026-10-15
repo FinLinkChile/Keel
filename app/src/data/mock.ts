@@ -10,7 +10,7 @@ const id = (n: number): Hex => `0x${n.toString(16).padStart(64, '0')}`;
 const fill = (digit: string): Hex => `0x${digit.repeat(64)}`;
 
 const PARTIES: Party[] = [
-  { id: 'acme-imports', name: 'Pacífico Foods SpA', place: 'Chile', address: '0x7A3f91C2b04E6d1A8c3F5e2D9b7A0c4E1f6B55D8' },
+  { id: 'acme-imports', name: 'Pacífico Foods SpA', place: 'Chile', address: '0x7A3f91C2b04E6d1A8c3F5e2D9b7A0c4E1f6B55D8', tint: 3 },
   { id: 'lingnan', name: 'Lingnan Hydrocolloids', place: 'Hong Kong', address: '0x5C1e0a9B7d3F2c6E8a4B1d9F0e7C3a5B2d6E04a1', tint: 0 },
   { id: 'kowloon', name: 'Kowloon Fine Chemicals', place: 'Hong Kong', address: '0x9B2d4F6a8C0e1B3d5F7a9C2e4B6d8F0a1C3e7A62', tint: 1 },
   { id: 'pearl-delta', name: 'Pearl Delta Ingredients', place: 'Guangzhou', address: '0x2E4a6C8e0B1d3F5a7C9e2B4d6F8a0C1e3B5d9F17', tint: 2 },
@@ -101,26 +101,39 @@ const ORDERS: Order[] = [
   order({ n: 0x119, goods: 'Pectin', quantity: '800 kg', exporter: 'pearl-delta', totalMinor: 1_120_000, stage: 'cancelled', deadline: day(10, 10), hsCode: '130220', signedAt: day(9, 10), advancePaidAt: day(9, 10), closedAt: day(9, 28) }),
 ];
 
-const ACCOUNT: Account = { party: 'acme-imports', role: 'importer', title: 'owner' };
-
-const WALLET: Wallet = {
-  currency: 'USD',
-  availableMinor: 13_240_000n,
-  lockedMinor: 3_475_000n,
-  agent: { on: true, usedMinor: 4_900_000n, monthlyLimitMinor: 8_000_000n },
+const ACCOUNTS: Record<Role, Account> = {
+  importer: { party: 'acme-imports', role: 'importer', title: 'owner' },
+  exporter: { party: 'lingnan', role: 'exporter', title: 'owner' },
 };
 
-const NEEDS_YOU: NeedsYou[] = [
-  { kind: 'sign_order', orderId: id(0x157) },
-  { kind: 'verify_supplier', party: 'kowloon' },
-];
+const WALLETS: Record<Role, Wallet> = {
+  importer: {
+    currency: 'USD',
+    availableMinor: 13_240_000n,
+    lockedMinor: 3_475_000n,
+    agent: { on: true, usedMinor: 4_900_000n, monthlyLimitMinor: 8_000_000n },
+  },
+  exporter: {
+    currency: 'USD',
+    availableMinor: 8_615_000n,
+    lockedMinor: 4_400_000n,
+  },
+};
+
+const NEEDS_YOU: Record<Role, NeedsYou[]> = {
+  importer: [
+    { kind: 'sign_order', orderId: id(0x157) },
+    { kind: 'verify_supplier', party: 'kowloon' },
+  ],
+  exporter: [{ kind: 'upload_documents', orderId: id(0x142) }],
+};
 
 export const mockData: KeelData = {
-  account: async () => ACCOUNT,
+  account: async (role) => ACCOUNTS[role],
   party: async (party) => PARTIES.find((p) => p.id === party),
   partyByAddress: async (a) => PARTIES.find((p) => p.address.toLowerCase() === a.toLowerCase()),
-  wallet: async () => WALLET,
+  wallet: async (role) => WALLETS[role],
   orders: async () => ORDERS,
   order: async (orderId) => ORDERS.find((o) => o.po.orderId === orderId),
-  needsYou: async () => NEEDS_YOU,
+  needsYou: async (role) => NEEDS_YOU[role],
 };

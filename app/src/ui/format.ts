@@ -33,3 +33,19 @@ export function initials(name: string): string {
     .map((w) => w[0])
     .join('');
 }
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Unix seconds -> "Nov 20". Contract dates are UTC days, so the day never shifts with the phone.
+export function formatDay(unixSeconds: number | bigint): string {
+  const d = new Date(Number(unixSeconds) * 1000);
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+}
+
+// 4_900_000n (49,000.00) -> "49k": compact figure for limits and gauges
+export function formatCompact(minor: bigint, decimals = 2): string {
+  const whole = Number(minor / 10n ** BigInt(decimals));
+  if (whole >= 1_000_000) return `${+(whole / 1_000_000).toFixed(1)}M`;
+  if (whole >= 1_000) return `${+(whole / 1_000).toFixed(1)}k`;
+  return String(whole);
+}

@@ -10,7 +10,8 @@ export type Party = {
   place: string;
   // Company wallet that signs orders (the importer and exporter of a PurchaseOrder)
   address: Hex;
-  // Avatar colour, fixed per party; undefined for your own company
+  // Avatar colour when the party is shown as a counterparty. Your own company is drawn
+  // without it.
   tint?: number;
 };
 
@@ -57,21 +58,24 @@ export type Wallet = {
   currency: string;
   availableMinor: bigint;
   lockedMinor: bigint;
-  agent: { on: boolean; usedMinor: bigint; monthlyLimitMinor: bigint };
+  // The importer's agent, which funds the escrow. The exporter has no agent that spends.
+  agent?: { on: boolean; usedMinor: bigint; monthlyLimitMinor: bigint };
 };
 
 export type NeedsYou =
   | { kind: 'sign_order'; orderId: Hex }
-  | { kind: 'verify_supplier'; party: PartyId };
+  | { kind: 'verify_supplier'; party: PartyId }
+  | { kind: 'upload_documents'; orderId: Hex };
 
 // Read side of the app. The mock implementation lives in ./mock.ts; a real one reads the
 // contract events and the agent service.
 export interface KeelData {
-  account(): Promise<Account>;
+  // The company behind the connected wallet, for the role chosen at Connect
+  account(role: Role): Promise<Account>;
   party(id: PartyId): Promise<Party | undefined>;
   partyByAddress(address: Hex): Promise<Party | undefined>;
-  wallet(): Promise<Wallet>;
+  wallet(role: Role): Promise<Wallet>;
   orders(): Promise<Order[]>;
   order(orderId: Hex): Promise<Order | undefined>;
-  needsYou(): Promise<NeedsYou[]>;
+  needsYou(role: Role): Promise<NeedsYou[]>;
 }

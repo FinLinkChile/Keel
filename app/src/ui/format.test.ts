@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { addressGroups, formatAddress, formatMinor, initials } from './format';
+import { addressGroups, formatAddress, formatCompact, formatDay, formatMinor, initials } from './format';
 
 describe('formatMinor', () => {
   it('groups thousands and keeps the minor digits', () => {
@@ -38,5 +38,19 @@ describe('initials', () => {
     expect(initials('Lingnan Hydrocolloids')).toBe('LH');
     expect(initials('Pacífico Foods SpA')).toBe('PF');
     expect(initials('Kowloon Fine Chemicals')).toBe('KF');
+  });
+});
+
+describe('formatDay and formatCompact', () => {
+  it('reads contract dates in UTC', () => {
+    expect(formatDay(1795132800)).toBe('Nov 20');
+    expect(formatDay(1795132800n)).toBe('Nov 20');
+  });
+
+  it('shortens limits', () => {
+    expect(formatCompact(4_900_000n)).toBe('49k');
+    expect(formatCompact(8_000_000n)).toBe('80k');
+    expect(formatCompact(1_250_000_000n)).toBe('12.5M');
+    expect(formatCompact(95_000n)).toBe('950');
   });
 });
