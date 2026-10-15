@@ -39,6 +39,8 @@ Como la firma cubre el hash que calcula el servidor con los bytes que recibe, un
 
 La firma es la autenticación: no hay token. La ruta solo existe si ingesta tiene un registro de órdenes (`INGEST_ORDERS_FILE` e `INGEST_CHAIN_ID`).
 
+Si la app sube desde el navegador, ingesta responde CORS solo para el origen exacto que se configure en `INGEST_APP_ORIGIN` (https, salvo localhost) y solo en esta ruta. No se usan cookies.
+
 | Respuesta | Cuándo |
 | --- | --- |
 | 400 `invalid_request` | El cuerpo no tiene la forma esperada |

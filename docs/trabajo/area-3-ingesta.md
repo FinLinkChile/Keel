@@ -75,6 +75,9 @@ Tomadas por el Área 3 al implementar T3.1 a T3.8. Están por confirmar con las 
 * **T3.5:** se comparan todos los campos tipados, no solo los cuatro de la tarea: también tipo de documento, puertos, número de orden, incoterm, RUT del importador y código arancelario. Todos llegan al motor, así que un modelo que tuerza cualquiera de ellos debe quedar retenido.
 * **T3.6:** la alerta no bloquea la lectura. El documento sigue su curso porque el escrow solo puede pagar a `payoutAddress`, que sale de la orden firmada. Las cuentas registradas del exportador no levantan alerta.
 * **T3.7:** ingesta también rechaza un BL ya aceptado para otra orden, antes de llamar al modelo. El contrato lo vuelve a exigir (T1.9).
+* **T3.8 (Personal):** 12 facturas legítimas (arriendo, luz, internet y gastos comunes, en tres periodos) y 26 variantes adversariales en `redteam/corpus/personal`. Entran por el correo autenticado de verdad, así que también cubren remitente falso, dominio parecido, correo reenviado con el adjunto cambiado, reenvío del mismo correo y una segunda solicitud de cambio con otra pendiente. No hay factura de agua porque no existe ese alias.
+* **Avisos al bot:** ingesta manda cada resultado al bot del Área 4 tal cual, y una vez al día el resumen de solicitudes de cambio, según [avisos al bot](../interfaces/avisos-al-bot.md). Es opcional y nunca bloquea ni cambia un resultado.
+* **CORS:** la ruta de carga responde CORS solo para el origen de la app que se configure (`INGEST_APP_ORIGIN`).
 * **T3.8:** el corpus de Trade tiene 12 conjuntos legítimos y 30 variantes adversariales, en `redteam/corpus/trade`, con `manifest.json` (resultado esperado y si el documento cumple la orden). Se regenera con `npm run corpus -w ingest` y se prueba contra el LLM configurado con `npm run corpus:run -w ingest`.
 
 # Listo cuando

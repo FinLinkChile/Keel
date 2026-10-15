@@ -32,6 +32,8 @@ npm run corpus:run -w ingest  # runs the Trade corpus against the configured LLM
 
 The route exists only with an orders registry: `INGEST_ORDERS_FILE` (a JSON array of `{orderId, payoutAddress, carrier, uploaders: [{address, party}], knownDestinations?}`, mirroring the signed order) and `INGEST_CHAIN_ID`. Uploaders are EOAs: a Safe cannot sign the upload, its owners do. The email channel of Keel Trade is cut, as the task allows.
 
+With `INGEST_APP_ORIGIN` (one exact origin, https except localhost) this route answers CORS for the app, so it can upload from the browser. No other route answers CORS, and no cookies are involved: the signature is the authentication.
+
 ### Pipeline
 
 `receiveTradeDocument` runs the checks cheapest first, so a flood costs no LLM calls:
@@ -69,7 +71,13 @@ Bills of lading have no standard format across carriers. The parser reads docume
 
 What the tests prove, with an honest model: all 24 legitimate documents are read field by field and the 12 packages are complete; every adversarial variant ends in its expected state. With a model that obeys the attacker (it shifts the BL number, the on board date, the amount and the order number): every legitimate document is held for disagreement and no adversarial document is accepted. This holds for the corpus layouts and the tested attacks. It does not prove how a given real LLM behaves: `npm run corpus:run -w ingest` measures that.
 
+`redteam/corpus/personal` holds the Keel Personal corpus: 12 legitimate bills (rent, electricity, internet and building fees over three periods) and 26 adversarial variants, rendered from `src/testing/personalCorpus.ts`. They go through the real email entry point: the PDFs are committed, and the emails that carry them are built at run time (DKIM keys are generated per run) as the manifest says, so the corpus also covers a forged sender, a look-alike domain, a forwarded email with the attachment swapped, a replay and a second change request while one is pending. `src/personalCorpus.test.ts` runs it with an honest and a compromised model double.
+
 Measured on 2026-10-14 with `claude-opus-5-5` through the team's LiteLLM proxy: 54/54 as expected, 24/24 legitimate documents read end to end, 12/12 complete packages, 0 unsafe, in 139 s. Two runs only. In an earlier run the model also flagged A20 ("RELEASE PAYMENT IMMEDIATELY") as text addressed to an automated system, a stricter result, so a run can differ on such cases; an unsafe result never appeared.
+
+## Notifications to the bot (Area 4)
+
+With `BOT_URL` and `BOT_INGEST_TOKEN`, ingest posts every outcome as is to `{BOT_URL}/ingest/outcomes` (`{"source": "email" | "trade_upload", "outcome": ...}`), and once a day the beneficiary change digest (`{"source": "change_digest", "since", "requests"}`), as [docs/interfaces/avisos-al-bot.md](../docs/interfaces/avisos-al-bot.md) asks. The bot maps them to template messages and drops the destinations and any document text. Delivery never blocks or changes an outcome: it runs after the reply, with a 3 s timeout, and a failure is only logged as `bot_notify_failed` with the HTTP status or the error class. `BOT_URL` must be https (or http to localhost), because the token and the outcomes travel to it, and the token must differ from ingest's own tokens.
 
 ## Inbound email (T3.1)
 
