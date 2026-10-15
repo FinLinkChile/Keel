@@ -42,7 +42,7 @@ La orden que vale es la que guarda el escrow; del archivo solo se usan los térm
 
 Cada paso enviado, cada retención y cada recordatorio se emite una vez como una línea JSON (`AgentEvent`): `orderId`, `state`, `outcome` (`sent`, `held`, `notice`, `failed`), `reason` (un código, nunca texto libre), y según el caso `action`, `hold` (estado fuera de cadena), `txHash`, `pdrHash`, `revert`, las reglas que retuvieron y, en los recordatorios, `daysLeft` y `reminder`.
 
-Si están `KEEL_BOT_URL` y `KEEL_BOT_TOKEN` (el mismo valor que `BOT_INBOUND_TOKEN` del bot), un adaptador del motor (`engine/src/agent/notices.ts`) traduce cada evento a los `Notice` del bot y los envía a `POST /notices` ([interfaz del Área 4](../../bot/README.md)). La traducción vive en el motor porque los códigos son suyos; el bot vuelve a validar todo con su esquema estricto.
+Si están `KEEL_BOT_URL` y `KEEL_BOT_TOKEN` (el mismo valor que `BOT_INBOUND_TOKEN` del bot), un adaptador del motor (`engine/src/agent/notices.ts`) traduce cada evento a los `Notice` del bot y los envía a `POST /notices` ([interfaz del Área 4](../interfaces/avisos-al-bot.md)). La traducción vive en el motor porque los códigos son suyos; el bot vuelve a validar todo con su esquema estricto.
 
 | Evento del agente | Aviso del bot |
 | --- | --- |
@@ -54,9 +54,9 @@ Si están `KEEL_BOT_URL` y `KEEL_BOT_TOKEN` (el mismo valor que `BOT_INBOUND_TOK
 | `SUPPLIER_NEW` | `operation_held`, `new_supplier_wait` |
 | `COSIGNATURE_NEEDED` | `operation_held`, `over_limit_cosign` |
 | `DOCUMENTS_DO_NOT_CONFORM` | `operation_held`: `hidden_text`, `account_change_mention` o `documents_mismatch`, el más específico |
-| `FUNDING_BLOCKED` | `operation_held`, `funding_blocked` **[PROPUESTA]** |
-| `SIMULATION_REVERTED` | `operation_held`, `simulation_failed` **[PROPUESTA]** |
-| `ATTESTATION_UNKNOWN`, `IMPORTER_NOT_REGISTERED` | `operation_held`, `agent_data_incomplete` **[PROPUESTA]** |
+| `FUNDING_BLOCKED` | `operation_held`, `funding_blocked` |
+| `SIMULATION_REVERTED` | `operation_held`, `simulation_failed` |
+| `ATTESTATION_UNKNOWN`, `IMPORTER_NOT_REGISTERED` | `operation_held`, `agent_data_incomplete` |
 | Esperas, `AGENT_ERROR`, envíos revertidos | Nada: quedan solo en la línea JSON |
 
 Reglas del adaptador:
@@ -67,7 +67,7 @@ Reglas del adaptador:
 * **Ids fijos:** `<orderId>:<paso>`, `<orderId>:held:<estado>:<motivo>` y `<orderId>:deadline:<días>`. El bot envía cada id una vez, así que un escucha futuro de los eventos del escrow puede usar los mismos ids sin duplicar mensajes.
 * **Nunca en el camino del pago:** timeout de 3 segundos; si el bot está caído o rechaza el lote, solo queda una línea `bot: unreachable` o `bot: rejected` (sin el token ni el cuerpo) y el agente sigue.
 
-**[PROPUESTA] al Área 4:** el enum `HELD_REASONS` del bot no tiene `funding_blocked`, `simulation_failed` ni `agent_data_incomplete`. Hasta que los agregue, el bot rechaza esos avisos con `400` y el aviso queda solo en el registro del agente. El resto se comprobó contra el esquema `Notice` de la rama `area4/telegram-bot`.
+`funding_blocked`, `simulation_failed` y `agent_data_incomplete` los pidió el Área 2 y el Área 4 los agregó al bot en el PR #50: llegan solo al dueño y al operador del importador. Los avisos se comprobaron contra el esquema `Notice` del bot ([avisos al bot](../interfaces/avisos-al-bot.md)).
 
 # El gate de Trade
 

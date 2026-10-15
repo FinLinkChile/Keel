@@ -17,7 +17,7 @@ export type HeldReason =
   | "documents_mismatch"
   | "hidden_text"
   | "account_change_mention"
-  // [PROPUESTA] to Area 4: reasons the bot does not have yet
+  // Asked by Area 2 for the agent's holds, accepted by Area 4 in PR #50
   | "funding_blocked"
   | "simulation_failed"
   | "agent_data_incomplete";
