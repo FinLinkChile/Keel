@@ -128,6 +128,18 @@ contract MockRoles is IRoles {
     }
 }
 
+/// @notice Roles that reports failure by returning false instead of reverting, to show the
+/// gate does not rely on Roles reverting on its own.
+contract MockRolesReturnsFalse is IRoles {
+    function execTransactionWithRole(address, uint256, bytes calldata, Operation, bytes32, bool)
+        external
+        pure
+        returns (bool)
+    {
+        return false;
+    }
+}
+
 /// @notice ERC-1271 smart-wallet cosigner, to show a Safe can be the cosigner.
 contract Mock1271 {
     address public signer;

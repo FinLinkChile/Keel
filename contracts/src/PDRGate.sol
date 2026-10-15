@@ -25,6 +25,16 @@ contract PDRGate is IPDRGate, EIP712 {
     error InvalidTier();
     /// @dev Proposed addition: configuration functions are callable only by the Safe.
     error OnlySafe();
+    /// @dev Proposed addition: a constructor or setter address argument is address(0).
+    error ZeroAddress();
+    /// @dev Proposed addition: policy signer and cosigner would be the same address, so the tier 3
+    /// cosignature would no longer add a second person. This only rejects the identical address:
+    /// if either signer is a contract (ERC-1271 or an EIP-7702 delegated account), it does not prove
+    /// distinct key holders. That remains an off-chain and deployment check.
+    error SignerIsCosigner();
+
+    /// @dev Proposed addition: Roles returned false for the module transaction instead of reverting.
+    error ExecutionFailed();
 
     // ----------------------------------------------------------------- events beyond IPDRGate
     /// @dev Proposed additions, useful for the monitor (T2.8) and the activity log.
@@ -62,6 +72,11 @@ contract PDRGate is IPDRGate, EIP712 {
         address cosigner_,
         bytes32 policyHash_
     ) EIP712("Keel", "1") {
+        if (
+            safe_ == address(0) || address(roles_) == address(0) || address(usdc_) == address(0)
+                || policySigner_ == address(0) || cosigner_ == address(0)
+        ) revert ZeroAddress();
+        if (policySigner_ == cosigner_) revert SignerIsCosigner();
         safe = safe_;
         roles = roles_;
         usdc = usdc_;
@@ -76,6 +91,16 @@ contract PDRGate is IPDRGate, EIP712 {
     /// @inheritdoc IPDRGate
     /// @dev Permissionless: the relayer only pays gas, authority comes from the signatures.
     /// `sigCosigner` is ignored for tier 1 and required for tier 3, over the same digest.
+    ///
+    /// Failure handling: `roles.execTransactionWithRole` is called with `shouldRevert = true`,
+    /// and its boolean result is also checked (`ExecutionFailed` if false), so the gate does not
+    /// depend on Roles reverting on its own. Either way the whole transaction reverts, which rolls
+    /// back the nonce and invoice marks (tests: test_revert_ExecutionFailed_rolesReturnsFalse,
+    /// test_revert_ModuleTransactionFailed_safeExecutionFails_rollsBackState).
+    /// Limit: success means the Safe-level call did not revert; it does not inspect the boolean
+    /// returned by `transfer`. That is sufficient for USDC because its current implementation
+    /// reverts on failure instead of returning false (USDC is an upgradeable proxy, so this holds
+    /// for the current implementation only); it is not sufficient for an arbitrary ERC-20.
     function execute(
         PaymentIntent calldata intent,
         PolicyDecision calldata d,
@@ -103,6 +128,10 @@ contract PDRGate is IPDRGate, EIP712 {
         if (d.policyHash != currentPolicyHash) revert StalePolicy();
 
         // 6. expiry of the decision and deadline of the intent
+        // block.timestamp is intentional: expiries set by the policy engine are expected to be
+        // minutes to hours long (the contract does not enforce this), while a block producer can
+        // only shift the timestamp by seconds.
+        // forge-lint: disable-next-line(block-timestamp)
         if (block.timestamp > d.expiresAt || block.timestamp > intent.deadline) revert Expired();
 
         // 7. nonce
@@ -118,11 +147,18 @@ contract PDRGate is IPDRGate, EIP712 {
             if (!SignatureChecker.isValidSignatureNow(cosigner, pdrHash, sigCosigner)) revert MissingCosignature();
         }
 
-        // 10. defense in depth: Roles re-checks target, selector, recipient and allowance
-        roles.execTransactionWithRole(address(usdc), 0, data, IRoles.Operation.Call, agentRoleKey, true);
-
-        // 11.
+        // 10. emitted before the external call (checks, effects, interactions). If the call
+        // fails, the whole transaction reverts (state rollback proven by the tests named in the
+        // @dev above); under EVM semantics its logs are discarded too, which Foundry's log
+        // recording cannot observe, so that part is not covered by a test. The only earlier
+        // external calls are the ERC-1271 checks in SignatureChecker, which use staticcall and
+        // cannot change state.
+        // forge-lint: disable-next-line(reentrancy-events)
         emit PaymentExecuted(intentHash, pdrHash, d.tier, intent.invoiceKey);
+
+        // 11. defense in depth: Roles re-checks target, selector, recipient and allowance
+        bool ok = roles.execTransactionWithRole(address(usdc), 0, data, IRoles.Operation.Call, agentRoleKey, true);
+        if (!ok) revert ExecutionFailed();
     }
 
     // ----------------------------------------------------------------- views for off-chain parity (T2.1)
@@ -158,6 +194,8 @@ contract PDRGate is IPDRGate, EIP712 {
     }
 
     function setPolicySigner(address s) external onlySafe {
+        if (s == address(0)) revert ZeroAddress();
+        if (s == cosigner) revert SignerIsCosigner();
         policySigner = s;
         emit PolicySignerSet(s);
     }
@@ -168,6 +206,8 @@ contract PDRGate is IPDRGate, EIP712 {
     }
 
     function setCosigner(address c) external onlySafe {
+        if (c == address(0)) revert ZeroAddress();
+        if (c == policySigner) revert SignerIsCosigner();
         cosigner = c;
         emit CosignerSet(c);
     }
