@@ -21,11 +21,14 @@ Lo que queda escrito y firmado:
 | Ventana de disputa | `disputeWindow` | Días tras el embarque |
 | Quién prueba el embarque | `carrier` | Naviera o agente de carga registrado |
 | Quién resuelve disputas | `arbiter` | Tercero independiente |
+| Quién verifica los documentos | `documentVerifier` | Tercero independiente que firma el `DocumentDecision` del gatillo 2 |
 | Incoterm | `incoterm` | CIF |
-| Documento completo | `termsHash` | Hash de la orden con la proforma |
+| Términos de la orden | `termsHash` | Hash EIP-712 de `OrderTerms`: número de orden, moneda y monto de la factura, códigos arancelarios y hash del documento completo con la proforma |
 | Documentos exigidos | `requiredDocsHash` | BL y factura |
 
 **La consecuencia antifraude más importante:** `payoutAddress` va dentro de lo firmado por ambos. Un correo que diga "cambiamos de cuenta" no sirve de nada: cambiar la cuenta de cobro exige una orden nueva firmada por ambas partes.
+
+Con los términos pasa lo mismo: como `termsHash` es el hash de datos estructurados (`OrderTerms`) y va dentro de la orden, ambas partes firman también el número de orden, el monto y la moneda de la factura y la mercancía. En el gatillo 2 el motor compara la factura contra esos términos; si no son exactamente los firmados, el saldo se retiene. Se calcula con `termsHash` de `schemas/src/hash.ts`: es el `hashStruct` EIP-712 de `OrderTerms(string orderNumber,string currency,uint256 invoiceAmountMinor,string[] hsCodes,bytes32 documentHash)`, con los códigos arancelarios sin repetir y ordenados de menor a mayor, y `documentHash` igual al keccak256 de los bytes del documento completo.
 
 Esto también resuelve el dolor del papel: sin la firma del exportador no hay orden, y sin orden no hay anticipo.
 
@@ -34,7 +37,7 @@ Esto también resuelve el dolor del papel: sin la firma del exportador no hay or
 1. Que `orderId` no exista ya.
 2. Que la firma del importador sea válida para `importer` y la del exportador para `exporter`.
 3. Que `advanceBps <= 10000`, `totalAmount > 0` y `shipmentDeadline` esté en el futuro.
-4. Que `carrier` y `arbiter` no sean el importador ni el exportador (independencia).
+4. Que `carrier`, `arbiter` y `documentVerifier` no sean el importador ni el exportador, y que `documentVerifier` no sea la naviera (independencia: liberar el saldo exige dos firmas de terceros distintos).
 5. Que el token esté en la lista de tokens permitidos.
 
 Si las partes son Safes de empresa, la Safe valida que firmaron sus representantes según su umbral. El struct completo de la orden está en [datos firmados e interfaz](datos-firmados-e-interfaz.md).

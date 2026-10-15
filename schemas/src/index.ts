@@ -99,6 +99,9 @@ export interface PurchaseOrder {
   // Who can sign the shipment attestation
   carrier: Hex;
   arbiter: Hex;
+  // Who signs the DocumentDecision of this order. Signed by both parties and never one
+  // of them nor the carrier (decided by Area 2, open decision 3).
+  documentVerifier: Hex;
   // bytes32 text, see `bytes32Text` in ./hash.ts
   incoterm: Hex;
   // Hash of the full order document, with the proforma
@@ -107,6 +110,34 @@ export interface PurchaseOrder {
   requiredDocsHash: Hex;
   nonce: bigint;
 }
+
+// Decided by Area 2 (Oct 14): the terms behind `termsHash`. `termsHash` is the EIP-712 hash of
+// these terms (see `termsHash` in ./hash.ts), so both parties sign them through the
+// order. They are what the engine compares the commercial invoice against at trigger 2.
+export const OrderTerms = z
+  .object({
+    // Same format as `order_number` in the invoice extraction
+    orderNumber: z.string().regex(/^[A-Z0-9]{1,20}$/),
+    currency: z.enum(CURRENCIES),
+    // Amount of the commercial invoice, in the minor unit of `currency`
+    invoiceAmountMinor: z.bigint().positive(),
+    // Harmonized System codes of the goods
+    hsCodes: z.array(z.string().regex(/^[0-9]{6,10}$/)).min(1),
+    // keccak256 of the full order document, with the proforma
+    documentHash: z.string().regex(/^0x[0-9a-f]{64}$/),
+  })
+  .strict();
+export type OrderTerms = z.infer<typeof OrderTerms>;
+
+export const TERMS_EIP712_TYPES = {
+  OrderTerms: [
+    { name: "orderNumber", type: "string" },
+    { name: "currency", type: "string" },
+    { name: "invoiceAmountMinor", type: "uint256" },
+    { name: "hsCodes", type: "string[]" },
+    { name: "documentHash", type: "bytes32" },
+  ],
+} as const;
 
 // Signed by the carrier fixed in the order.
 export interface ShipmentAttestation {
@@ -125,6 +156,15 @@ export interface ShipmentAttestation {
 export interface CancelOrder {
   orderId: Hex;
   nonce: bigint;
+}
+
+// Signed by the importer: releases the balance of an order whose shipment was attested
+// when there is no DocumentDecision, for example when a bill of lading cannot be read.
+// It is the manual alternative of trigger 2 (decided by Area 2, open decision 3).
+export interface BalanceApproval {
+  orderId: Hex;
+  // EIP-712 hash of the ShipmentAttestation the importer accepts
+  attestationHash: Hex;
 }
 
 // Signed by the arbiter. The escrow only pays `importer` and `payoutAddress`, and the
@@ -194,6 +234,7 @@ export const EIP712_TYPES = {
     { name: "disputeWindow", type: "uint64" },
     { name: "carrier", type: "address" },
     { name: "arbiter", type: "address" },
+    { name: "documentVerifier", type: "address" },
     { name: "incoterm", type: "bytes32" },
     { name: "termsHash", type: "bytes32" },
     { name: "requiredDocsHash", type: "bytes32" },
@@ -209,6 +250,10 @@ export const EIP712_TYPES = {
   CancelOrder: [
     { name: "orderId", type: "bytes32" },
     { name: "nonce", type: "uint256" },
+  ],
+  BalanceApproval: [
+    { name: "orderId", type: "bytes32" },
+    { name: "attestationHash", type: "bytes32" },
   ],
   DisputeResolution: [
     { name: "orderId", type: "bytes32" },
@@ -246,6 +291,7 @@ export interface Eip712Messages {
   PurchaseOrder: PurchaseOrder;
   ShipmentAttestation: ShipmentAttestation;
   CancelOrder: CancelOrder;
+  BalanceApproval: BalanceApproval;
   DisputeResolution: DisputeResolution;
   FundIntent: FundIntent;
   PolicyDecision: PolicyDecision;
@@ -322,6 +368,8 @@ export const ESCROW_STATES = [
   "OPEN",
   "FUNDED",
   "ADVANCE_PAID",
+  // Shipment attested, balance not released yet: no refund after the deadline from here
+  "SHIPPED",
   "SETTLED",
   "REFUNDED",
   "DISPUTED",

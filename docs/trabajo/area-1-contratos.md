@@ -122,7 +122,7 @@ Script de despliegue reproducible y un archivo de direcciones que consumen las d
 * **Trade (agregado):** coordinar con el Área 5 cómo el jurado puede verificar las transacciones en una red cerrada.
 
 **T1.9 Contrato TradeEscrow (agregada por Trade, es su pieza central).**
-Implementar la máquina de estados y la interfaz de [estados del escrow](../flujo/estados-del-escrow.md) y [datos firmados e interfaz](../flujo/datos-firmados-e-interfaz.md): `open`, `fund`, `releaseAdvance`, `submitShipment`, `refundAfterDeadline`, `raiseDispute`, `resolve`, `cancel`.
+Implementar la máquina de estados y la interfaz de [estados del escrow](../flujo/estados-del-escrow.md) y [datos firmados e interfaz](../flujo/datos-firmados-e-interfaz.md): `open`, `fund`, `releaseAdvance`, `submitShipment`, `releaseBalance`, `refundAfterDeadline`, `raiseDispute`, `resolve`, `cancel`. El saldo se libera en dos pasos y una orden Embarcado no se reembolsa por vencimiento (decisión 3, [paso 5](../flujo/paso-5-saldo.md)). `open` exige que `documentVerifier` no sea una parte ni la naviera.
 * Verificación de firmas EIP 712 de importador, exportador, naviera y árbitro, con soporte de ERC-1271 para que firmen Safes.
 * Depósito exacto, comparando el saldo antes y después.
 * Patrón checks, effects, interactions y guard de reentrancia. Solo tokens permitidos.

@@ -7,7 +7,10 @@ import {
   type Eip712Type,
   type Hex,
   type KeelDomain,
+  OrderTerms as OrderTermsSchema,
+  type OrderTerms,
   PERSONAL_EIP712_TYPES,
+  TERMS_EIP712_TYPES,
   type PaymentIntent,
   type RequiredDocType,
 } from "./index";
@@ -61,6 +64,21 @@ export function blNumberHash(carrier: Hex, documentNumber: string): Hex {
 export function requiredDocsHash(docs: readonly RequiredDocType[]): Hex {
   if (docs.length === 0) throw new Error("an order requires at least one document");
   return keccak256(toBytes([...new Set(docs)].sort().join(",")));
+}
+
+// `termsHash` of the order: the EIP-712 hashStruct of its terms, exactly
+//   keccak256(abi.encode(
+//     keccak256("OrderTerms(string orderNumber,string currency,uint256 invoiceAmountMinor,string[] hsCodes,bytes32 documentHash)"),
+//     keccak256(bytes(orderNumber)), keccak256(bytes(currency)), invoiceAmountMinor,
+//     keccak256(abi.encodePacked(keccak256(bytes(hsCodes[0])), ..., keccak256(bytes(hsCodes[n])))),
+//     documentHash))
+// with the HS codes deduplicated and sorted ascending first, so their order does not change
+// the hash, and documentHash = keccak256 of the bytes of the full order document. All
+// strings are ASCII, as the schema patterns require. No domain: it is a struct hash.
+export function termsHash(terms: OrderTerms): Hex {
+  const parsed = OrderTermsSchema.parse(terms);
+  const data = { ...parsed, hsCodes: [...new Set(parsed.hsCodes)].sort() };
+  return hashStruct({ types: TERMS_EIP712_TYPES, primaryType: "OrderTerms", data } as never);
 }
 
 // Hash of a document package: keccak256 of the concatenated keccak256 of each file,

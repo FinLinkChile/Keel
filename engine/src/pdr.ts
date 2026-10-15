@@ -2,9 +2,18 @@
 // The engine never holds a key: the policy signer comes in from outside (T2.7).
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { EIP712_TYPES, type Hex, type KeelDomain, type PaymentIntent, type PolicyDecision, type Tier } from "@keel/schemas";
+import {
+  type DocumentDecision,
+  EIP712_TYPES,
+  type Hex,
+  type KeelDomain,
+  type PaymentIntent,
+  type PolicyDecision,
+  type Tier,
+} from "@keel/schemas";
 import { paymentIntentHash, typedDataDigest } from "@keel/schemas/hash";
 import { encodeFunctionData, erc20Abi, keccak256, type LocalAccount, recoverTypedDataAddress } from "viem";
+import type { DocumentRuleResult } from "./documents";
 import type { RuleResult } from "./index";
 
 // Anything that signs EIP-712 typed data: a local account in the demo, a KMS or HSM in production.
@@ -73,6 +82,38 @@ export function cosignRequest(signed: SignedPolicyDecision) {
   return { pdrHash: signed.pdrHash, typedData: policyDecisionTypedData(signed.domain, signed.decision) };
 }
 
+export interface SignedDocumentDecision {
+  decision: DocumentDecision;
+  // EIP-712 digest of the decision, the hash TradeEscrow will check
+  pdrHash: Hex;
+  signature: Hex;
+  signer: Hex;
+  domain: KeelDomain;
+}
+
+// Trigger 2: the document verifier fixed in the order signs the DocumentDecision for
+// TradeEscrow. Any other key would be rejected by the escrow, so it fails here first.
+export async function signDocumentDecision(
+  decision: DocumentDecision,
+  domain: KeelDomain,
+  signer: PolicySigner,
+  documentVerifier: Hex,
+): Promise<SignedDocumentDecision> {
+  if (signer.address.toLowerCase() !== documentVerifier.toLowerCase()) {
+    throw new Error("the signer is not the document verifier of this order");
+  }
+  const typedData = {
+    domain,
+    types: { DocumentDecision: EIP712_TYPES.DocumentDecision },
+    primaryType: "DocumentDecision" as const,
+    message: decision,
+  };
+  const signature = await signer.signTypedData(typedData);
+  const recovered = await recoverTypedDataAddress({ ...typedData, signature });
+  if (recovered.toLowerCase() !== signer.address.toLowerCase()) throw new Error("the signature does not recover to the document verifier");
+  return { decision, pdrHash: typedDataDigest(domain, "DocumentDecision", decision), signature, signer: signer.address, domain };
+}
+
 export interface PaymentPdrInput {
   intent: PaymentIntent;
   tier: Tier;
@@ -118,10 +159,12 @@ export interface PdrEvidence {
   signer: Hex;
   signature: Hex;
   domain: KeelDomain;
-  decision: PolicyDecision;
+  decision: PolicyDecision | DocumentDecision;
+  // The intent (funding or payment) or the attestation (trigger 2)
   intent: unknown;
-  calldata: Hex;
-  rules: RuleResult[];
+  // Absent for a document decision: the escrow builds the transfer itself
+  calldata?: Hex;
+  rules: readonly (RuleResult | DocumentRuleResult)[];
 }
 
 // Bigints become decimal strings so the file is plain JSON and byte-stable.

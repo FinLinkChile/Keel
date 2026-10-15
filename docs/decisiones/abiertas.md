@@ -13,7 +13,7 @@ No resolver ninguna por cuenta propia. Cuando el equipo cierra una, se actualiza
 | --- | --- | --- | --- |
 | 1 | ¿Qué red cerrada se usa (por ejemplo FISCO BCOS) y qué token de pago existe en ella? De esto depende si Safe, Zodiac Roles y Delay se pueden desplegar ahí tal como están | Equipo y Contratos, miércoles 14 | [Sistema de pago](../pagos/sistema-de-pago.md), [stack](../arquitectura/stack.md) |
 | 2 | ¿El anticipo se libera en la misma transacción del depósito? | Contratos | [Paso 3](../flujo/paso-3-anticipo.md) |
-| 3 | ¿El PDR del motor es obligatorio para liberar el saldo o solo informativo? ¿Qué firmante de política acepta el escrow: uno registrado en el contrato o uno fijado en cada orden? | Motor y Contratos | [Paso 5](../flujo/paso-5-saldo.md), [PDR](../interfaces/pdr.md) |
+| 3 | **Decidida el 14 de octubre (Área 2).** El `DocumentDecision` es obligatorio, con dos salidas: el importador puede aprobar el saldo a mano (`BalanceApproval`) y con una atestación registrada no hay reembolso automático. Lo firma el `documentVerifier` fijado en cada orden, que no es ninguna de las partes ni la naviera. Detalle en el [paso 5](../flujo/paso-5-saldo.md). | Motor y Contratos | [Paso 5](../flujo/paso-5-saldo.md), [PDR](../interfaces/pdr.md) |
 | 4 | ¿Se usa ventana de disputa por defecto? ¿De cuántos días? | Equipo | [Paso 5](../flujo/paso-5-saldo.md) |
 | 5 | ¿La disputa la resuelve el árbitro solo o 2 de 3? | Equipo | [Disputa y cancelación](../flujo/disputa-y-cancelacion.md) |
 | 6 | ¿Cuánto dura el margen de gracia entre la fecha límite de embarque y el reembolso? | | [Paso 6](../flujo/paso-6-reembolso.md) |

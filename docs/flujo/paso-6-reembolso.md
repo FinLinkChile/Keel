@@ -7,7 +7,7 @@ modo: trade
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
 ---
 
-**Condición:** pasó `shipmentDeadline` más un margen de gracia y no hay atestación válida.
+**Condición:** pasó `shipmentDeadline` más un margen de gracia y no hay atestación válida registrada. Una orden en Embarcado (atestación registrada, saldo todavía no liberado) no se reembolsa por vencimiento: se resuelve con el `DocumentDecision`, la aprobación del importador o una disputa ([paso 5](paso-5-saldo.md)).
 
 **Efecto:** el saldo no liberado vuelve al importador.
 

@@ -5,6 +5,7 @@ import {
     PurchaseOrder,
     ShipmentAttestation,
     CancelOrder,
+    BalanceApproval,
     DisputeResolution,
     FundIntent,
     PolicyDecision,
@@ -37,6 +38,10 @@ contract KeelHashHarness {
 
     function hashCancelOrder(CancelOrder calldata c) external pure returns (bytes32) {
         return KeelHash.hash(c);
+    }
+
+    function hashBalanceApproval(BalanceApproval calldata a) external pure returns (bytes32) {
+        return KeelHash.hash(a);
     }
 
     function hashDisputeResolution(DisputeResolution calldata r) external pure returns (bytes32) {
