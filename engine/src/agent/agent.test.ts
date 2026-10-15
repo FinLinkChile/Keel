@@ -263,17 +263,24 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
     await fundOrder(order);
     const keel = agent();
 
-    chain.setTime(DEADLINE - DAY);
-    expect((await keel.tick())[0]).toMatchObject({ outcome: "notice", reason: "DEADLINE_SOON" });
+    chain.setTime(DEADLINE - 6n * DAY);
+    expect((await keel.tick())[0]).toMatchObject({ outcome: "waiting", reason: "AWAITING_SHIPMENT" });
+    chain.setTime(DEADLINE - 5n * DAY);
+    expect((await keel.tick())[0]).toMatchObject({ outcome: "notice", reason: "DEADLINE_SOON", daysLeft: 5, reminder: 5 });
+    chain.setTime(DEADLINE - 4n * DAY);
+    await keel.tick();
+    // A late tick skips to the nearest reminder
+    chain.setTime(DEADLINE - DAY + 1n);
+    expect((await keel.tick())[0]).toMatchObject({ outcome: "notice", reason: "DEADLINE_SOON", daysLeft: 1, reminder: 1 });
     chain.setTime(DEADLINE + GRACE);
-    expect((await keel.tick())[0]).toMatchObject({ outcome: "notice", reason: "DEADLINE_SOON" });
+    expect((await keel.tick())[0]).toMatchObject({ outcome: "notice", reason: "DEADLINE_SOON", daysLeft: 0, reminder: 1 });
     expect(sent).toHaveLength(0);
 
     chain.setTime(DEADLINE + GRACE + 1n);
     expect((await keel.tick())[0]).toMatchObject({ outcome: "sent", action: "refundAfterDeadline" });
     expect(await stateOf(order.orderId)).toBe("REFUNDED");
     expect(await balanceOf(safe)).toBe(TOTAL / 2n);
-    expect(notices.filter((n) => n.reason === "DEADLINE_SOON")).toHaveLength(1);
+    expect(notices.filter((n) => n.reason === "DEADLINE_SOON").map((n) => n.reminder)).toEqual([5, 1]);
   });
 
   it("does not fund while the Trade gate does not exist", async () => {

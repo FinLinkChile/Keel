@@ -8,6 +8,7 @@ import { parseArgs } from "node:util";
 import type { Hex } from "@keel/schemas";
 import { createPublicClient, http, isAddress, isHash } from "viem";
 import { Agent } from "./agent/agent";
+import { botNotifier } from "./agent/notices";
 import { rpcChain } from "./agent/rpc";
 import { FileStore } from "./agent/store";
 import { loadPolicySigner, loadRelayer } from "./keys";
@@ -91,12 +92,23 @@ async function agent(args: string[]): Promise<number> {
   const data = values.data ?? env.KEEL_DATA_DIR;
   if (!data) throw new UsageError("set --data or KEEL_DATA_DIR");
 
+  // The bot is optional (T2.6): without its URL and token, events are only printed
+  const botUrl = env.KEEL_BOT_URL;
+  const botToken = env.KEEL_BOT_TOKEN;
+  if (Boolean(botUrl) !== Boolean(botToken)) throw new UsageError("set both KEEL_BOT_URL and KEEL_BOT_TOKEN, or neither");
+
   const chain = rpcChain(rpc, loadRelayer(env));
+  const store = new FileStore(data);
   const keel = new Agent(
     { chainId: await chain.chainId(), escrow, safe, policy: tradePolicy(rolesConfigHash), decisionTtlSeconds: 3600, evidenceDir: values.evidence ?? DEFAULT_EVIDENCE },
     // The Trade gate is not deployed yet: funding waits with GATE_NOT_DEPLOYED. Each sent step,
-    // hold and notice is printed once as a JSON line, the feed for the bot (Area 4).
-    { chain, store: new FileStore(data), signer: loadPolicySigner(env), notify: (e) => console.log(JSON.stringify(e)) },
+    // hold and notice is printed once as a JSON line and, with the bot configured, posted to it.
+    {
+      chain,
+      store,
+      signer: loadPolicySigner(env),
+      notify: botNotifier({ store, endpoint: botUrl && botToken ? { url: botUrl, token: botToken } : undefined }),
+    },
   );
   const intervalMs = Number(values.interval ?? 15) * 1000;
   for (;;) {

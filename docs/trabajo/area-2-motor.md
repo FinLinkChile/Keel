@@ -88,6 +88,7 @@ En Trade no aplica: el monto se pacta en la orden directamente en el token de pa
 **T2.6 Estados y aviso al fallar cerrado (crítica 19).**
 * **Personal (base):** estados del pago: `pagado`, `retenido`, `en_aprobacion`, `cambio_en_cola`, `bloqueado`. Un programador revisa cada día los pagos retenidos y avisa (vía el bot del Área 4) a 5, 3 y 1 día del vencimiento, con el motivo y las instrucciones de pago manual.
 * **Trade (agregado):** estados fuera de cadena que acompañan a los del escrow: `retenida`, `en_aprobacion`, `cambio_en_cola`, `bloqueada`. El programador revisa cada día las órdenes abiertas y avisa cuando se acerca la fecha límite de embarque, con el motivo y qué puede hacer la persona.
+* **Trade, cómo quedó:** el servicio del agente (T2.11) revisa las órdenes en cada vuelta y recuerda la fecha límite de embarque a 5, 3 y 1 día. Un adaptador del motor traduce sus eventos a los avisos del bot y los envía a `POST /notices`. Detalle y tabla de traducción: [servicio del agente](../arquitectura/servicio-del-agente.md).
 
 **T2.7 Custodia y rotación de llaves (crítica 13).**
 Escribir y aplicar esta tabla:

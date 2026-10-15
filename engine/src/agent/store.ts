@@ -3,7 +3,7 @@
 // who delivers them is open decision 15; until it closes they are JSON files of the demo:
 //
 //   <dir>/registry.json                     parties, known suppliers, amount history
-//   <dir>/orders/<orderId>/order.json       { order, terms }        (app, Area 4)
+//   <dir>/orders/<orderId>/order.json       { order, terms, label } (app, Area 4)
 //   <dir>/orders/<orderId>/shipment.json    { attestation, sigCarrier } (carrier)
 //   <dir>/orders/<orderId>/documents.json   { extractions, fileHashes } (ingest, Area 3)
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -17,6 +17,8 @@ import { reviveStruct } from "../verify";
 export interface StoredOrder {
   order: PurchaseOrder;
   terms: OrderTerms;
+  // What people call the order in the bot notices, such as PO-0131 (the bot's OrderLabel)
+  label?: string;
 }
 
 export interface StoredShipment {
@@ -31,8 +33,9 @@ export interface StoredDocuments {
 }
 
 export interface Registry {
-  // Registered parties; the importer's RUT is what the invoice is checked against
-  parties: { address: Hex; taxId?: string }[];
+  // Registered parties; the importer's RUT is what the invoice is checked against. `account` is
+  // the party's account in the bot directory (Area 4), so notices name accounts, never addresses.
+  parties: { address: Hex; taxId?: string; account?: string }[];
   knownSuppliers: KnownSupplier[];
   // Total amounts of earlier orders, by exporter address (lowercase)
   history: Record<string, bigint[]>;
@@ -68,6 +71,7 @@ export class FileStore implements AgentStore {
     return {
       order: reviveStruct(EIP712_TYPES.PurchaseOrder, raw.order),
       terms: OrderTerms.parse({ ...raw.terms, invoiceAmountMinor: BigInt(raw.terms.invoiceAmountMinor) }),
+      ...(typeof raw.label === "string" && { label: raw.label }),
     };
   }
 

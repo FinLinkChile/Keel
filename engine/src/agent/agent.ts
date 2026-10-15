@@ -90,6 +90,9 @@ export interface AgentEvent {
   rules?: readonly (RuleResult | DocumentRuleResult)[];
   // Tier 3: what the cosigner signs (Area 4)
   cosign?: { pdrHash: Hex };
+  // DEADLINE_SOON: whole days left to the shipment deadline, and the reminder it belongs to
+  daysLeft?: number;
+  reminder?: number;
   detail?: string;
 }
 
@@ -101,7 +104,12 @@ export interface AgentConfig {
   policy: TradePolicy;
   decisionTtlSeconds: number;
   evidenceDir: string;
+  // Days before the shipment deadline when the importer is reminded, once each (T2.6)
+  deadlineReminderDays?: readonly number[];
 }
+
+export const DEADLINE_REMINDER_DAYS: readonly number[] = [5, 3, 1];
+const DAY = 24n * 60n * 60n;
 
 export interface AgentDeps {
   chain: AgentChain;
@@ -109,8 +117,9 @@ export interface AgentDeps {
   // Policy key, in its own process in production (T2.7). Also the document verifier in the prototype.
   signer: PolicySigner;
   gate?: FundingGatePort;
-  // Held operations and notices go to the bot (Area 4). Each one is sent once.
-  notify?: (event: AgentEvent) => void;
+  // Held operations and notices go to the bot (Area 4). Each one is sent once, with the order
+  // as the escrow holds it when it was read (absent when the read failed).
+  notify?: (event: AgentEvent, record?: OrderRecord) => void;
 }
 
 const same = (a: Hex, b: Hex) => a.toLowerCase() === b.toLowerCase();
@@ -130,27 +139,28 @@ export class Agent {
     const now = await this.deps.chain.now();
     for (const orderId of this.deps.store.orderIds()) {
       let event: AgentEvent;
+      let record: OrderRecord | undefined;
       try {
-        const record = decodeOrderOf(await this.deps.chain.call(orderOfCall(this.config.escrow, orderId)));
+        record = decodeOrderOf(await this.deps.chain.call(orderOfCall(this.config.escrow, orderId)));
         if (record.state === "NONE" || !same(record.po.importer, this.config.safe)) continue;
         event = await this.step(orderId, record, now);
       } catch (e) {
-        event = { orderId, state: "NONE", outcome: "failed", reason: "AGENT_ERROR", detail: (e as Error).message };
+        event = { orderId, state: record?.state ?? "NONE", outcome: "failed", reason: "AGENT_ERROR", detail: (e as Error).message };
       }
       events.push(event);
-      this.report(event);
+      this.report(event, record);
     }
     return events;
   }
 
-  private report(event: AgentEvent) {
+  private report(event: AgentEvent, record?: OrderRecord) {
     if (!this.deps.notify || event.outcome === "waiting") return;
     if (event.outcome === "held" || event.outcome === "notice") {
-      const key = `${event.orderId}:${event.state}:${event.reason}:${event.revert ?? ""}`;
+      const key = `${event.orderId}:${event.state}:${event.reason}:${event.revert ?? ""}:${event.reminder ?? ""}`;
       if (this.notified.has(key)) return;
       this.notified.add(key);
     }
-    this.deps.notify(event);
+    this.deps.notify(event, record);
   }
 
   private step(orderId: Hex, record: OrderRecord, now: bigint): Promise<AgentEvent> {
@@ -247,9 +257,11 @@ export class Agent {
       return this.execute(orderId, state, "refundAfterDeadline", refundCall(this.config.escrow, orderId));
     }
     if (held) return held;
-    if (record.po.shipmentDeadline - now < BigInt(this.config.policy.funding.deadlineWarningSeconds)) {
-      return { orderId, state, outcome: "notice", reason: "DEADLINE_SOON" };
-    }
+    // One reminder per threshold: a tick that runs late skips to the nearest one, never repeats
+    const left = record.po.shipmentDeadline > now ? (record.po.shipmentDeadline - now + DAY - 1n) / DAY : 0n;
+    const daysLeft = Number(left);
+    const reminder = [...(this.config.deadlineReminderDays ?? DEADLINE_REMINDER_DAYS)].sort((a, b) => a - b).find((d) => daysLeft <= d);
+    if (reminder !== undefined) return { orderId, state, outcome: "notice", reason: "DEADLINE_SOON", daysLeft, reminder };
     return { orderId, state, outcome: "waiting", reason: "AWAITING_SHIPMENT" };
   }
 

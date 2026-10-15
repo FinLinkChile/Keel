@@ -2,10 +2,10 @@
 type: Arquitectura
 title: "Servicio del agente"
 description: "Qué hace el servicio del agente en cada vuelta, de dónde lee sus datos, qué avisos emite para el bot y dónde se conecta el gate de Trade."
-tags: [agente, relayer, t2-11, servicio, avisos, datos]
+tags: [agente, relayer, t2-11, t2-6, servicio, avisos, datos, bot]
 modo: trade
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T17:30:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T19:10:00Z }
 ---
 
 El servicio del agente (T2.11, `engine/src/agent/`) une la ingesta, el motor, el PDR y el relayer para la Safe de un importador. Se ejecuta con `npm run keel -- agent --data <carpeta>`.
@@ -17,7 +17,7 @@ Lee de TradeEscrow el estado de cada orden guardada cuyo importador es su Safe y
 | Estado | Paso |
 | --- | --- |
 | OPEN | Evalúa el depósito, firma el PDR y lo envía por el gate de Trade ([paso 2](../flujo/paso-2-deposito.md)). Proveedor nuevo: `cambio_en_cola`. Nivel 3: `en_aprobacion`, con el PDR listo para la cofirma. Nivel 4: `bloqueada` |
-| ADVANCE_PAID | Presenta la atestación de la naviera con `submitShipment` ([paso 4](../flujo/paso-4-embarque.md)). Si no hay atestación y pasó la fecha límite más `refundGrace` (leído del escrow), llama a `refundAfterDeadline` ([paso 6](../flujo/paso-6-reembolso.md)). Antes avisa que el plazo se acerca |
+| ADVANCE_PAID | Presenta la atestación de la naviera con `submitShipment` ([paso 4](../flujo/paso-4-embarque.md)). Si no hay atestación y pasó la fecha límite más `refundGrace` (leído del escrow), llama a `refundAfterDeadline` ([paso 6](../flujo/paso-6-reembolso.md)). Antes recuerda la fecha límite a 5, 3 y 1 día, una vez cada uno: si una vuelta llega tarde, salta al recordatorio más cercano y no repite los anteriores |
 | SHIPPED | Pasada la ventana de disputa, compara los documentos contra la orden y la atestación, firma el `DocumentDecision`, guarda la evidencia y llama a `releaseBalance` ([paso 5](../flujo/paso-5-saldo.md)). Si no son conformes, retiene y avisa: el importador puede liberar a mano o abrir una disputa |
 | Disputa y estados finales | Nada: en una disputa mueven los fondos el árbitro o ambas partes |
 
@@ -31,16 +31,43 @@ Mientras la [decisión abierta 15](../decisiones/abiertas.md) siga abierta, son 
 
 | Archivo | Contenido | Lo escribe |
 | --- | --- | --- |
-| `registry.json` | `parties` (dirección y, para el importador, `taxId`), `knownSuppliers` (exportador y cuenta de cobro verificados), `history` (montos anteriores por exportador) | Onboarding (Área 4) |
-| `orders/<orderId>/order.json` | `order` (la `PurchaseOrder`) y `terms` (los `OrderTerms`) | App (Área 4) |
+| `registry.json` | `parties` (dirección, `account` en el directorio del bot y, para el importador, `taxId`), `knownSuppliers` (exportador y cuenta de cobro verificados), `history` (montos anteriores por exportador) | Onboarding (Área 4) |
+| `orders/<orderId>/order.json` | `order` (la `PurchaseOrder`), `terms` (los `OrderTerms`) y `label` (la etiqueta de los avisos, como `PO-0131`) | App (Área 4) |
 | `orders/<orderId>/shipment.json` | `attestation` y `sigCarrier` | Naviera (en la demo, un script) |
 | `orders/<orderId>/documents.json` | `extractions` (`transport` e `invoice`) y `fileHashes` | Ingesta (Área 3) |
 
 La orden que vale es la que guarda el escrow; del archivo solo se usan los términos, y el motor comprueba que su hash sea el `termsHash` firmado.
 
-# Avisos para el bot
+# Avisos para el bot (T2.6)
 
-Cada paso enviado, cada retención y cada aviso se emite una vez como una línea JSON (`AgentEvent`): `orderId`, `state`, `outcome` (`sent`, `held`, `notice`, `failed`), `reason` (un código, nunca texto libre), y según el caso `action`, `hold` (estado fuera de cadena de T2.6), `txHash`, `pdrHash`, `revert` y las reglas que retuvieron. El bot (Área 4) convierte cada código en una plantilla (D8).
+Cada paso enviado, cada retención y cada recordatorio se emite una vez como una línea JSON (`AgentEvent`): `orderId`, `state`, `outcome` (`sent`, `held`, `notice`, `failed`), `reason` (un código, nunca texto libre), y según el caso `action`, `hold` (estado fuera de cadena), `txHash`, `pdrHash`, `revert`, las reglas que retuvieron y, en los recordatorios, `daysLeft` y `reminder`.
+
+Si están `KEEL_BOT_URL` y `KEEL_BOT_TOKEN` (el mismo valor que `BOT_INBOUND_TOKEN` del bot), un adaptador del motor (`engine/src/agent/notices.ts`) traduce cada evento a los `Notice` del bot y los envía a `POST /notices` ([interfaz del Área 4](../../bot/README.md)). La traducción vive en el motor porque los códigos son suyos; el bot vuelve a validar todo con su esquema estricto.
+
+| Evento del agente | Aviso del bot |
+| --- | --- |
+| `fund` enviado | `order_funded` y, si hay anticipo, `advance_released` |
+| `submitShipment` enviado | `shipment_accepted`, con la fecha *on board* de la atestación |
+| `releaseBalance` enviado | `balance_released` |
+| `refundAfterDeadline` enviado | `refunded` |
+| `DEADLINE_SOON` | `deadline_approaching`, con la fecha límite y los días que faltan |
+| `SUPPLIER_NEW` | `operation_held`, `new_supplier_wait` |
+| `COSIGNATURE_NEEDED` | `operation_held`, `over_limit_cosign` |
+| `DOCUMENTS_DO_NOT_CONFORM` | `operation_held`: `hidden_text`, `account_change_mention` o `documents_mismatch`, el más específico |
+| `FUNDING_BLOCKED` | `operation_held`, `funding_blocked` **[PROPUESTA]** |
+| `SIMULATION_REVERTED` | `operation_held`, `simulation_failed` **[PROPUESTA]** |
+| `ATTESTATION_UNKNOWN`, `IMPORTER_NOT_REGISTERED` | `operation_held`, `agent_data_incomplete` **[PROPUESTA]** |
+| Esperas, `AGENT_ERROR`, envíos revertidos | Nada: quedan solo en la línea JSON |
+
+Reglas del adaptador:
+
+* **Sin direcciones ni texto libre:** las partes van como cuentas del directorio del bot (`account` en `registry.json`) y la orden con su `label`. Sin etiqueta válida o sin cuenta del importador o del exportador no se envía el aviso, y queda una línea `bot: skipped` con el motivo. El árbitro se omite si no tiene cuenta propia.
+* **Montos:** en la unidad menor de la moneda de los términos firmados, repartidos como reparte el escrow: anticipo `total * advanceBps / 10000`, saldo y reembolso el resto.
+* **Fecha límite (D8):** toda retención antes del embarque lleva la fecha límite de embarque. Después del embarque el escrow no tiene plazo para el importador, que puede liberar a mano o abrir una disputa.
+* **Ids fijos:** `<orderId>:<paso>`, `<orderId>:held:<estado>:<motivo>` y `<orderId>:deadline:<días>`. El bot envía cada id una vez, así que un escucha futuro de los eventos del escrow puede usar los mismos ids sin duplicar mensajes.
+* **Nunca en el camino del pago:** timeout de 3 segundos; si el bot está caído o rechaza el lote, solo queda una línea `bot: unreachable` o `bot: rejected` (sin el token ni el cuerpo) y el agente sigue.
+
+**[PROPUESTA] al Área 4:** el enum `HELD_REASONS` del bot no tiene `funding_blocked`, `simulation_failed` ni `agent_data_incomplete`. Hasta que los agregue, el bot rechaza esos avisos con `400` y el aviso queda solo en el registro del agente. El resto se comprobó contra el esquema `Notice` de la rama `area4/telegram-bot`.
 
 # El gate de Trade
 
