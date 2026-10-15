@@ -17,6 +17,13 @@ describe("Keel Trade corpus with an honest model", async () => {
     expect(ADVERSARIAL_CASES.length).toBeGreaterThanOrEqual(25);
   });
 
+  it("labels the engine decision of every document that reaches the engine, and only those", () => {
+    for (const c of ADVERSARIAL_CASES) {
+      expect(c.expected.engine !== undefined, c.id).toBe(c.expected.status === "ready");
+      if (c.expected.engine?.decision === "release") expect(c.expected.conforms, c.id).toBe(true);
+    }
+  });
+
   it.each(result.legit.map((c) => [c.id, c] as const))("reads legitimate document %s end to end", (_id, c) => {
     expect(c.mismatches).toEqual([]);
   });
