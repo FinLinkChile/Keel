@@ -1,0 +1,44 @@
+[
+  {
+    "id": "act3-deadline-3-days",
+    "kind": "deadline_approaching",
+    "mode": "trade",
+    "occurredAt": 1794916800,
+    "orderRef": "po-0150",
+    "orderLabel": "PO-0150",
+    "parties": {
+      "importer": "acme-imports",
+      "exporter": "lingnan"
+    },
+    "deadline": 1795132800,
+    "daysLeft": 3
+  },
+  {
+    "id": "act3-deadline-1-day",
+    "kind": "deadline_approaching",
+    "mode": "trade",
+    "occurredAt": 1795089600,
+    "orderRef": "po-0150",
+    "orderLabel": "PO-0150",
+    "parties": {
+      "importer": "acme-imports",
+      "exporter": "lingnan"
+    },
+    "deadline": 1795132800,
+    "daysLeft": 1
+  },
+  {
+    "id": "act3-refunded",
+    "kind": "refunded",
+    "mode": "trade",
+    "occurredAt": 1795435200,
+    "orderRef": "po-0150",
+    "orderLabel": "PO-0150",
+    "parties": {
+      "importer": "acme-imports",
+      "exporter": "lingnan"
+    },
+    "amountMinor": 3360000,
+    "currency": "USD"
+  }
+]

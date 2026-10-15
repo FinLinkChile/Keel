@@ -32,6 +32,15 @@ describe("templates", () => {
     expect(as(SAMPLES.order_funded, "exporter").text).toContain("The total is locked for you.");
   });
 
+  it("tells the importer the advance is not part of a refund", () => {
+    expect(as(SAMPLES.refunded, "importer").text).toBe(
+      "33,600.00 USD went back to you for PO-0142. There was no accepted proof of shipment by the deadline. The advance already paid is not part of this refund. The order is closed.",
+    );
+    expect(as(SAMPLES.refunded, "exporter").text).toBe(
+      "33,600.00 USD went back to Acme Imports for PO-0142. There was no accepted proof of shipment by the deadline. The order is closed.",
+    );
+  });
+
   it("links to the order", () => {
     expect(as(SAMPLES.order_opened, "importer").link).toEqual({ label: "Open the order", path: "/orders/po-0142" });
   });

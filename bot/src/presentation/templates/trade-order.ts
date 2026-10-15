@@ -104,7 +104,9 @@ export const refunded: Render<"refunded"> = (n, r, ctx) => {
         )
       : lines(
           `${back} went back to you for ${n.orderLabel}.`,
-          "There was no accepted proof of shipment by the deadline. The order is closed.",
+          "There was no accepted proof of shipment by the deadline.",
+          // The advance left before shipment; a refund only returns what the escrow still held.
+          "The advance already paid is not part of this refund. The order is closed.",
         );
   return { text, link: orderLink(n) };
 };
