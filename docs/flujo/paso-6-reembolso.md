@@ -4,7 +4,7 @@ title: "Paso 6: vencimiento y reembolso"
 description: "Cuándo y cómo vuelve el saldo al importador si no hay prueba de embarque, y por qué cualquiera puede ejecutar el reembolso."
 tags: [paso-6, reembolso, vencimiento, refund]
 modo: trade
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T01:40:00Z }
 ---
 
 **Condición:** pasó `shipmentDeadline` más un margen de gracia y no hay atestación válida registrada. Una orden en Embarcado (atestación registrada, saldo todavía no liberado) no se reembolsa por vencimiento: se resuelve con el `DocumentDecision`, la aprobación del importador o una disputa ([paso 5](paso-5-saldo.md)).
@@ -15,4 +15,4 @@ Cualquiera puede ejecutar el reembolso. Es intencional: el importador no depende
 
 **Detalle técnico:** las fechas se comparan con `block.timestamp`, que el productor del bloque puede mover unos segundos. Por eso los plazos se miden en días u horas, nunca en segundos, y el margen de gracia absorbe cualquier ajuste.
 
-La duración del margen de gracia es la [decisión abierta 6](../decisiones/abiertas.md).
+El margen de gracia es `refundGrace`, un parámetro del despliegue del escrow: 1 día en producción y 60 segundos en la demo. Decidido por el Área 1 (Adrean) el 14 de octubre ([decisión 6](../decisiones/abiertas.md)).
