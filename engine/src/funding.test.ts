@@ -71,7 +71,7 @@ describe("evaluateFunding", () => {
     });
 
     it("blocks an order that is no longer open", () => {
-      const escrowOrder = { ...context.escrowOrder!, state: "FUNDED" as const };
+      const escrowOrder = { ...context.escrowOrder!, state: "ADVANCE_PAID" as const };
       expect(ruleOf({ ...context, escrowOrder }, "order-signed")).toMatchObject({ tier: 4, reason: "ORDER_NOT_OPEN" });
     });
 

@@ -1,23 +1,38 @@
 ---
 type: Paso del flujo
 title: "Paso 5, gatillo 2: saldo"
-description: "Las siete verificaciones de submitShipment, qué compara el motor para emitir el PDR de documentos y cómo opera la ventana de disputa."
-tags: [paso-5, saldo, gatillo-2, submit-shipment, pdr]
+description: "Qué verifica submitShipment, los dos caminos para liberar el saldo (releaseBalance tras la ventana, approveBalance en cualquier momento), qué compara el motor para el DocumentDecision y cómo opera la ventana de disputa."
+tags: [paso-5, saldo, gatillo-2, submit-shipment, release-balance, approve-balance, pdr]
 modo: trade
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T01:40:00Z }
 ---
+
+El gatillo 2 tiene dos pasos: primero se registra el embarque y después se libera el saldo.
+
+# Paso A: registrar el embarque (`submitShipment`)
 
 El contrato verifica, en este orden:
 
-1. Que la orden esté en el estado correcto.
-2. Que la atestación corresponda a esta orden.
-3. Que la firma sea válida y venga de la naviera fijada en la orden.
-4. Que la fecha *on board* sea igual o anterior a la fecha límite de embarque.
-5. Que ese número de BL no se haya usado en otra orden.
-6. Que exista un `DocumentDecision` firmado por el `documentVerifier` de la orden que diga que los documentos cumplen lo pactado, o una `BalanceApproval` firmada por el importador.
-7. Que no haya una disputa abierta.
+1. Que la orden esté en AnticipoPagado (`InvalidState`). Con una disputa abierta no se puede registrar.
+2. Que la atestación corresponda a esta orden (`InvalidAttestation`).
+3. Que la firma sea válida y venga de la naviera fijada en la orden (`BadCarrierSignature`).
+4. Que la fecha *on board* sea igual o anterior a la fecha límite de embarque (`ShipmentTooLate`) y no esté en el futuro (`InvalidAttestation`).
+5. Que esa naviera no haya usado ese BL en otra orden (`BillOfLadingAlreadyUsed`). La clave es `keccak256(abi.encode(naviera de la orden, blNumberHash))`, así una naviera no puede bloquear el BL de otra.
 
-Lo que el motor compara para emitir ese PDR:
+La orden pasa a Embarcado. No se mueve dinero y desde aquí no hay reembolso por vencimiento.
+
+# Paso B: liberar el saldo
+
+El saldo (`totalAmount` menos el anticipo) va a `payoutAddress` por uno de dos caminos:
+
+| Camino | Quién firma | Cuándo | Qué verifica |
+| --- | --- | --- | --- |
+| `releaseBalance(orderId, d, sigVerifier)` | El `documentVerifier` de la orden | Solo cuando se cumplió `shippedAt + disputeWindow` (`DeadlineNotReached`) | El `DocumentDecision` es de esta orden, de esta atestación y de este paquete de documentos, no venció y lo firma el verificador (`BadDocumentDecision`) |
+| `approveBalance(orderId, sigImporter)` | El importador (EOA o Safe con ERC-1271) | En cualquier momento | Firma sobre `BalanceApproval{orderId, attestationHash}`, que el contrato arma con la atestación guardada (`BadImporterSignature`) |
+
+Si ninguno de los dos llega, cualquiera de las partes puede abrir una disputa sin límite de tiempo y decide el árbitro ([disputa y cancelación](disputa-y-cancelacion.md)). Así ningún firmante caído deja el saldo atrapado.
+
+# Qué compara el motor para el `DocumentDecision`
 
 | Dato extraído | Contra qué se compara |
 | --- | --- |
@@ -27,23 +42,20 @@ Lo que el motor compara para emitir ese PDR:
 | Partes | Importador y exportador de la orden |
 | Mercancía | La descrita en la orden |
 
-El número de orden, el monto y la moneda de la factura y los códigos arancelarios salen de `OrderTerms`, los términos que ambas partes firmaron a través de `termsHash` ([paso 1](paso-1-firma-orden.md)). Si faltan o no son los firmados, el saldo se retiene.
-
-**Efecto:** se transfiere el saldo a `payoutAddress`. Si la orden tiene ventana de disputa, el saldo se libera al terminar la ventana, salvo que el importador abra una disputa.
+El número de orden, el monto y la moneda de la factura y los códigos arancelarios salen de `OrderTerms`, los términos que ambas partes firmaron a través de `termsHash` ([paso 1](paso-1-firma-orden.md)). Si faltan o no son los firmados, el motor no firma y el saldo se retiene.
 
 # Decisión del motor: obligatoria, con dos salidas
 
 Decidido por las Áreas 1 y 2 el 14 de octubre (decisión 3), a propuesta del Área 2. El saldo se libera solo con un `DocumentDecision` válido o con la aprobación manual del importador. Así, liberar el saldo exige siempre dos firmas independientes: la de la naviera y la del verificador de documentos (o la del propio importador, que es quien paga).
 
-* **Quién firma:** el `documentVerifier` que fija cada orden, firmado por ambas partes. No puede ser el importador, el exportador ni la naviera. Así el comprador no controla por sí solo el pago al vendedor, igual que en una carta de crédito revisa un tercero. En el prototipo es la llave de política del motor de Keel; en producción, quien las partes acuerden. El escrow no tiene un firmante global ni un administrador que lo cambie.
-* **Dos pasos:** primero se registra la atestación de la naviera y la orden pasa a Embarcado; después se libera el saldo con el `DocumentDecision` o con la `BalanceApproval`. Los nombres de las funciones los define el Área 1 (ver [datos firmados e interfaz](datos-firmados-e-interfaz.md)).
-* **Salida 1, aprobación manual:** si el motor no puede leer el BL o el servicio no responde, el importador firma una `BalanceApproval` sobre esa atestación y el saldo se libera. Es la alternativa manual que exige fallar cerrado.
-* **Salida 2, sin reembolso con embarque probado:** una orden en Embarcado ya no se reembolsa por vencimiento. Si el motor retiene y el importador no aprueba, los fondos siguen en el escrow hasta que una de las partes abra una disputa y decida el árbitro. Así un error de lectura nunca le quita el saldo a un exportador que sí embarcó.
+* **Quién firma:** el `documentVerifier` que fija cada orden, firmado por ambas partes. No puede ser el importador, el exportador, `payoutAddress`, la naviera ni el árbitro; el contrato solo detecta la misma dirección exacta, y exigir que sea la llave de Keel le corresponde al motor y al gate. En el prototipo es la llave de política del motor de Keel; en producción, quien las partes acuerden. El escrow no tiene un firmante global ni un administrador que lo cambie.
+* **Salida 1, aprobación del importador:** si el motor no puede leer el BL o el servicio no responde, el importador firma una `BalanceApproval` sobre esa atestación y el saldo se libera de inmediato.
+* **Salida 2, sin reembolso con embarque probado:** una orden en Embarcado ya no se reembolsa por vencimiento. Si el motor retiene y el importador no aprueba, cualquiera de las partes abre una disputa y decide el árbitro. Así un error de lectura nunca le quita el saldo a un exportador que sí embarcó.
 
-El estado de origen es AnticipoPagado, o Depositado si el anticipo es 0%. El struct de esa decisión (`DocumentDecision`) está en [PDR](../interfaces/pdr.md).
+El struct `DocumentDecision` está en [PDR](../interfaces/pdr.md).
 
 # Ventana de disputa
 
-Si se configura `disputeWindow`, el saldo no se paga de inmediato: queda marcado como embarcado y se libera al terminar la ventana, salvo que el importador abra una disputa. Es un trade-off: más protección para el importador, cobro más lento para el exportador. Las partes lo eligen en la orden.
+`disputeWindow` lo fija cada orden, en segundos. Es el plazo mínimo entre el embarque y el momento en que el verificador puede liberar el saldo: le da al importador tiempo para revisar y, si algo no calza, abrir una disputa antes de que el saldo salga. El importador puede renunciar a la ventana firmando `approveBalance`. Con `disputeWindow = 0`, el verificador puede liberar apenas se registra el embarque.
 
-Si se usa por defecto y de cuántos días es la [decisión abierta 4](../decisiones/abiertas.md).
+Decidido por el Área 1 (Adrean) el 14 de octubre ([decisión 4](../decisiones/abiertas.md)): sin valor fijo en el contrato; la app sugiere 3 días y la demo usa 2 minutos.
