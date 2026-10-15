@@ -1,16 +1,10 @@
-// Telegram bot. Owned by Area 4. T4.3, issue #28.
+// Telegram bot. Owned by Area 4. T4.3 (#28) and T4.6 (#31).
 // It only sends template messages built from typed fields (enums, amounts, dates),
 // never text taken from an email or a PDF. It answers only to registered chats and
-// signs nothing: buttons open the Keel app, where the owner's wallet signs.
-import type { PaymentState } from "@keel/schemas";
-
-export interface HeldPaymentNotice {
-  state: PaymentState;
-  amountClp: number;
-  // Unix timestamp, seconds
-  dueDate: number;
-}
-
-export function renderHeldPayment(_notice: HeldPaymentNotice): string {
-  throw new Error("not implemented: T4.3 (#28), T4.6 (#31)");
-}
+// signs nothing: links open the Keel app, where the person's wallet signs.
+export { Notice, type NoticeKind } from "./domain/notice";
+export type { Message } from "./domain/message";
+export type { Recipient, Role, Side, AccountKind } from "./domain/recipients";
+export { NotifyService, type NotifyResult, type NotifyStats } from "./application/notify";
+export { route } from "./application/routing";
+export { templateRenderer } from "./presentation/templates";
