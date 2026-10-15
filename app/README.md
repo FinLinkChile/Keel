@@ -7,7 +7,7 @@ The Keel app, with two account types:
 
 The cosigner view is shared by both.
 
-React Native with Expo and TypeScript. It runs on Android, iOS and the web from the same code. `App.tsx` is a placeholder shell. Each party signs from their own wallet (WalletConnect or a browser wallet on the web build): no owner key on any server.
+React Native with Expo and TypeScript. It runs on Android, iOS and the web from the same code. Routes live in `src/app/` (Expo Router), components in `src/ui/` and data in `src/data/`; `/dev/components` shows the base components. Each party signs from their own wallet (WalletConnect or a browser wallet on the web build): no owner key on any server.
 
 The Keel Trade flow is in [docs/flujo/flujo-clave.md](../docs/flujo/flujo-clave.md), and the Keel Personal one in [docs/personal/keel-personal.md](../docs/personal/keel-personal.md). The payout address shown to the user never comes from a document: it comes from the signed order and the party registry, or from the table of registered beneficiaries.
 
@@ -17,6 +17,8 @@ npm run start -w app   # Expo dev server, scan the QR with Expo Go
 npm run web -w app     # run in the browser
 npm run typecheck -w app
 ```
+
+`npx expo lint` does not run yet: the repository root uses TypeScript 7, which has no JavaScript API, and the hoisted `ts-api-utils` used by `eslint-config-expo` loads it and crashes. `app/eslint.config.js` stays ready for when the lint toolchain supports TypeScript 7 or the app gets its own TypeScript 6 for linting. Until then the checks are `npm run typecheck -w app` and the vitest tests (`npm test` from the root).
 
 Add Expo packages with `npx expo install <package>` from this folder, so the versions match the SDK. `AGENTS.md` has the Expo conventions for AI coding agents.
 
