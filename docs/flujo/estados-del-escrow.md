@@ -4,7 +4,7 @@ title: "Estados del escrow"
 description: "Máquina de estados de TradeEscrow, reglas de transición y las cuatro invariantes que se prueban con fuzz."
 tags: [estados, invariantes, trade-escrow, fuzz]
 modo: trade
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T01:40:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T20:30:00Z }
 ---
 
 ```mermaid
@@ -16,7 +16,6 @@ stateDiagram-v2
     Embarcado --> Liquidado: approveBalance (BalanceApproval del importador)
     Embarcado --> EnDisputa: raiseDispute (sin plazo)
     AnticipoPagado --> Reembolsado: refundAfterDeadline
-    AnticipoPagado --> EnDisputa: raiseDispute
     EnDisputa --> Resuelto: resolve (firma del árbitro)
     Abierto --> Cancelado: cancel (firmas de ambos)
     AnticipoPagado --> Cancelado: cancel (firmas de ambos)
@@ -45,4 +44,4 @@ stateDiagram-v2
 3. Un estado final nunca vuelve a mover fondos.
 4. Un mismo BL (por naviera) nunca liquida dos órdenes.
 
-La primera es la invariante principal. Además, el saldo del token en el escrow es igual a la suma de los saldos de las órdenes depositadas que no están en un estado final. Las funciones que producen cada transición están en [datos firmados e interfaz](datos-firmados-e-interfaz.md).
+La primera es la invariante principal. Además, el saldo del token en el escrow es mayor o igual a la suma de los saldos de las órdenes depositadas que no están en un estado final (mayor si alguien transfiere tokens directo al escrow, que ninguna orden puede retirar). Las funciones que producen cada transición están en [datos firmados e interfaz](datos-firmados-e-interfaz.md).

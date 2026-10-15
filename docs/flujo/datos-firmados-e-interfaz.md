@@ -4,7 +4,7 @@ title: "Datos firmados e interfaz de TradeEscrow"
 description: "Structs PurchaseOrder y ShipmentAttestation campo por campo, y la tabla de funciones del contrato con quién llama, desde qué estado y qué verifica."
 tags: [purchase-order, shipment-attestation, trade-escrow, eip-712, solidity]
 modo: trade
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T01:40:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T20:30:00Z }
 ---
 
 # Structs firmados
@@ -46,11 +46,11 @@ Los otros structs que firma alguien (`CancelOrder`, `BalanceApproval`, `DisputeR
 | --- | --- | --- | --- | --- |
 | `open(po, sigImporter, sigExporter)` | Cualquiera | nada | Abierto | Lo del [paso 1](paso-1-firma-orden.md) |
 | `fund(orderId)` | Solo el importador | Abierto | AnticipoPagado | Antes de `shipmentDeadline`; recibe exactamente el total y paga el anticipo a `payoutAddress` en la misma transacción ([paso 2](paso-2-deposito.md), [paso 3](paso-3-anticipo.md)) |
-| `submitShipment(orderId, att, sigCarrier)` | Cualquiera | AnticipoPagado | Embarcado | Atestación de esta orden, firmada por la naviera, *on board* no posterior a la fecha límite ni en el futuro, BL no usado por esa naviera ([paso 5](paso-5-saldo.md)) |
+| `submitShipment(orderId, att, sigCarrier)` | Cualquiera | AnticipoPagado | Embarcado | Solo mientras no se pueda reembolsar (`DeadlinePassed` desde `now > shipmentDeadline + refundGrace`, la misma comparación del reembolso); atestación de esta orden, firmada por la naviera, *on board* no anterior al depósito, no posterior a la fecha límite ni en el futuro, BL no usado por esa naviera ([paso 5](paso-5-saldo.md)) |
 | `releaseBalance(orderId, d, sigVerifier)` | Cualquiera | Embarcado | Liquidado | Ventana de disputa cumplida y `DocumentDecision` del `documentVerifier` de la orden, vigente y sobre esta atestación |
 | `approveBalance(orderId, sigImporter)` | Cualquiera | Embarcado | Liquidado | Firma del importador sobre `BalanceApproval{orderId, attestationHash}`, en cualquier momento |
 | `refundAfterDeadline(orderId)` | Cualquiera | AnticipoPagado | Reembolsado | Pasó `shipmentDeadline + refundGrace` ([paso 6](paso-6-reembolso.md)) |
-| `raiseDispute(orderId)` | Importador o exportador | AnticipoPagado, Embarcado | EnDisputa | En Embarcado, sin límite de tiempo ([disputa y cancelación](disputa-y-cancelacion.md)) |
+| `raiseDispute(orderId)` | Importador o exportador | Embarcado | EnDisputa | Sin límite de tiempo; desde AnticipoPagado revierte, para no bloquear un reembolso ([disputa y cancelación](disputa-y-cancelacion.md)) |
 | `resolve(orderId, toImporter, toExporter, sigArbiter)` | Cualquiera | EnDisputa | Resuelto | Firma del árbitro; la suma es exactamente el saldo restante |
 | `cancel(orderId, sigImporter, sigExporter)` | Cualquiera | Abierto, AnticipoPagado, EnDisputa | Cancelado | Firmas de ambas partes sobre `CancelOrder{orderId, cancelNonceOf(orderId)}` |
 

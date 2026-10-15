@@ -56,6 +56,9 @@ contract TradeEscrow is ITradeEscrow, EIP712, ReentrancyGuard {
 
     mapping(bytes32 orderId => OrderRecord) private _orders;
     mapping(bytes32 blKey => bool) private _blUsed;
+    /// @dev Timestamp of `fund` per order. Private on purpose: OrderRecord and orderOf keep
+    /// their ABI. submitShipment requires onBoardDate >= this value.
+    mapping(bytes32 orderId => uint64) private _fundedAt;
 
     constructor(IERC20 token_, uint64 refundGrace_) EIP712("Keel", "1") {
         if (address(token_) == address(0)) revert ZeroAddress();
@@ -117,8 +120,9 @@ contract TradeEscrow is ITradeEscrow, EIP712, ReentrancyGuard {
     /// @dev Open decision 2, closed by Area 1: the advance is released inside `fund`, so there
     /// is no intermediate state to race against a cancel. Only the importer of the order can
     /// fund, and only before shipmentDeadline. The received amount is measured as a balance
-    /// difference (AmountMismatch otherwise) before the advance leaves. With advanceBps = 0 no
-    /// advance is transferred.
+    /// difference (AmountMismatch otherwise) before the advance leaves, and OrderFunded and
+    /// AdvanceReleased are emitted after that check. With advanceBps = 0 no advance is
+    /// transferred. The funding timestamp is kept (privately) as the earliest valid on board date.
     function fund(bytes32 orderId) external nonReentrant {
         OrderRecord storage o = _orders[orderId];
         if (o.state != State.OPEN) revert InvalidState();
@@ -132,15 +136,24 @@ contract TradeEscrow is ITradeEscrow, EIP712, ReentrancyGuard {
         address payoutAddress = o.po.payoutAddress;
         o.funded = true;
         o.paidOut = advance;
+        // uint64 seconds overflow in year 2^64 / 3.15e7, far beyond any order.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        _fundedAt[orderId] = uint64(block.timestamp);
         _transition(o, State.ADVANCE_PAID);
-        emit OrderFunded(orderId, amount);
-        emit AdvanceReleased(orderId, payoutAddress, advance);
 
         uint256 before = token.balanceOf(address(this));
         token.safeTransferFrom(msg.sender, address(this), amount);
         // Exact equality is the point: a fee-on-transfer token must not fund a short deposit.
         // forge-lint: disable-next-line(incorrect-strict-equality)
         if (token.balanceOf(address(this)) - before != amount) revert AmountMismatch();
+
+        // Emitted only once the deposit is proven, so a short deposit leaves no escrow event.
+        // The only earlier external calls are to the order token, fixed at deployment, and the
+        // function is nonReentrant.
+        // forge-lint: disable-next-line(reentrancy-events)
+        emit OrderFunded(orderId, amount);
+        // forge-lint: disable-next-line(reentrancy-events)
+        emit AdvanceReleased(orderId, payoutAddress, advance);
 
         _pay(payoutAddress, advance);
     }
@@ -149,6 +162,11 @@ contract TradeEscrow is ITradeEscrow, EIP712, ReentrancyGuard {
 
     /// @notice Accepts the carrier's attestation of an on-time shipment. Anyone can submit it.
     /// No money moves here (C1), and from SHIPPED there is no refund.
+    /// @dev Window: it reverts with DeadlinePassed from the first second the refund is due,
+    /// using exactly the comparison of refundAfterDeadline (`now > shipmentDeadline +
+    /// refundGrace`), so at any second exactly one of the two is possible: no gap, no overlap.
+    /// The on board date must be between the funding time and shipmentDeadline (inclusive)
+    /// and not in the future.
     /// @param att The attestation, signed by the carrier fixed in the order.
     /// @param sigCarrier EIP-712 signature of `po.carrier` over the attestation.
     function submitShipment(bytes32 orderId, ShipmentAttestation calldata att, bytes calldata sigCarrier)
@@ -157,6 +175,7 @@ contract TradeEscrow is ITradeEscrow, EIP712, ReentrancyGuard {
     {
         OrderRecord storage o = _orders[orderId];
         if (o.state != State.ADVANCE_PAID) revert InvalidState();
+        if (_refundDue(o)) revert DeadlinePassed();
         if (att.orderId != orderId) revert InvalidAttestation();
 
         bytes32 attestationHash = KeelHash.hash(att);
@@ -167,6 +186,7 @@ contract TradeEscrow is ITradeEscrow, EIP712, ReentrancyGuard {
         if (att.onBoardDate > o.po.shipmentDeadline) revert ShipmentTooLate();
         // forge-lint: disable-next-line(block-timestamp)
         if (att.onBoardDate > block.timestamp) revert InvalidAttestation();
+        if (att.onBoardDate < _fundedAt[orderId]) revert InvalidAttestation();
 
         bytes32 blKey = keccak256(abi.encode(carrier, att.blNumberHash));
         if (_blUsed[blKey]) revert BillOfLadingAlreadyUsed();
@@ -191,6 +211,11 @@ contract TradeEscrow is ITradeEscrow, EIP712, ReentrancyGuard {
     /// documents. Anyone can submit it.
     /// @dev The decision is mandatory for this path (there is no automatic release). If the
     /// verifier is down, the importer can approve (approveBalance) or either party can dispute.
+    /// Accepted risk: the escrow keeps no policy registry. `d.policyHash` is signed but not
+    /// compared with any current version, so an old decision is limited only by `expiresAt`,
+    /// and the verifier is the one fixed in the order (it cannot be rotated). A decision still
+    /// binds this order, its accepted attestation and its documents, and the balance can only
+    /// go to the signed payoutAddress.
     /// @param sigVerifier EIP-712 signature of `po.documentVerifier` over the decision.
     function releaseBalance(bytes32 orderId, DocumentDecision calldata d, bytes calldata sigVerifier)
         external
@@ -240,8 +265,7 @@ contract TradeEscrow is ITradeEscrow, EIP712, ReentrancyGuard {
     function refundAfterDeadline(bytes32 orderId) external nonReentrant {
         OrderRecord storage o = _orders[orderId];
         if (o.state != State.ADVANCE_PAID) revert InvalidState();
-        // forge-lint: disable-next-line(block-timestamp)
-        if (block.timestamp <= uint256(o.po.shipmentDeadline) + refundGrace) revert DeadlineNotReached();
+        if (!_refundDue(o)) revert DeadlineNotReached();
 
         uint256 amount = _remaining(o);
         address importer = o.po.importer;
@@ -255,14 +279,14 @@ contract TradeEscrow is ITradeEscrow, EIP712, ReentrancyGuard {
     // ================================================================== dispute
 
     /// @notice Freezes the remaining funds until the arbiter resolves or both parties cancel.
-    /// Only importer or exporter.
-    /// @dev Open from ADVANCE_PAID and SHIPPED, with no time limit in SHIPPED: it is
-    /// the exit that keeps the balance from being trapped when the verifier is down and the
-    /// importer does not approve. A party can use it to delay payment; the arbiter decides.
+    /// Only importer or exporter, and only from SHIPPED, with no time limit.
+    /// @dev It is the exit that keeps the balance from being trapped when the verifier is down
+    /// and the importer does not approve. It is not open from ADVANCE_PAID: before a shipment
+    /// there is nothing to dispute, and a dispute there would let the exporter freeze a refund
+    /// that is due (PR #49 review). A party can use it to delay payment; the arbiter decides.
     function raiseDispute(bytes32 orderId) external nonReentrant {
         OrderRecord storage o = _orders[orderId];
-        State s = o.state;
-        if (s != State.ADVANCE_PAID && s != State.SHIPPED) revert InvalidState();
+        if (o.state != State.SHIPPED) revert InvalidState();
         if (msg.sender != o.po.importer && msg.sender != o.po.exporter) revert NotParty();
 
         _transition(o, State.DISPUTED);
@@ -371,14 +395,21 @@ contract TradeEscrow is ITradeEscrow, EIP712, ReentrancyGuard {
         ) revert InvalidOrder();
         if (po.carrier == po.arbiter) revert InvalidOrder();
         if (
-            imp == address(this) || payoutAddress == address(this) || po.carrier == address(this)
-                || po.arbiter == address(this) || verifier == address(this)
+            imp == address(this) || exp == address(this) || payoutAddress == address(this)
+                || po.carrier == address(this) || po.arbiter == address(this) || verifier == address(this)
         ) revert InvalidOrder();
         if (po.advanceBps > BPS || po.totalAmount == 0) revert InvalidOrder();
         // totalAmount * advanceBps must not overflow in fund.
         if (po.totalAmount > type(uint256).max / BPS) revert InvalidOrder();
         // forge-lint: disable-next-line(block-timestamp)
         if (po.shipmentDeadline <= block.timestamp) revert InvalidOrder();
+    }
+
+    /// @dev The single comparison that opens the refund and closes the shipment window.
+    function _refundDue(OrderRecord storage o) private view returns (bool) {
+        // Deadlines are days long and refundGrace absorbs the seconds a block producer can shift.
+        // forge-lint: disable-next-line(block-timestamp)
+        return block.timestamp > uint256(o.po.shipmentDeadline) + refundGrace;
     }
 
     function _cancelNonce(OrderRecord storage o) private view returns (uint256) {
