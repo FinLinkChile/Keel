@@ -5,7 +5,7 @@ description: "Objetivo, entregables y tareas T3.1 a T3.8: canal autenticado, pro
 tags: [area-3, ingesta, extractor, parser, t3]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T00:30:00Z }
 ---
 
 **Perfil sugerido:** backend con experiencia en LLM, parsing de PDF y correo.
@@ -64,6 +64,18 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
   * Legítimos: al menos 12 conjuntos (BL o guía aérea más factura), anonimizados, coherentes con una orden de prueba cada uno.
   * Adversariales: al menos 25 variantes: factura con cuenta de cobro distinta, texto blanco con instrucciones, letra diminuta, homoglifos en el número de BL, fecha *on board* alterada, monto alterado, BL de otra orden, BL repetido con otro píxel, firma escaneada pegada, inyección en el campo del consignatario.
 * Cada caso lleva su resultado esperado. Los corpus los usa el Área 5 para medir.
+
+# Decisiones de implementación en Keel Trade **[PROPUESTA]**
+
+Tomadas por el Área 3 al implementar T3.1 a T3.8. Están por confirmar con las áreas a las que afectan.
+
+* **T3.1:** los documentos se suben firmados con EIP-712 por un representante registrado de la orden. El formato está en [carga de documentos](../interfaces/carga-de-documentos.md) (afecta al Área 4).
+* **T3.1:** el canal de correo de Trade queda recortado, como permite "Si falta tiempo". Solo existe la carga desde la app.
+* **T3.2:** máximo 10 documentos por orden en 24 horas. Solo cuentan las cargas con firma válida, así que nadie puede gastar el cupo de una orden ajena.
+* **T3.5:** se comparan todos los campos tipados, no solo los cuatro de la tarea: también tipo de documento, puertos, número de orden, incoterm, RUT del importador y código arancelario. Todos llegan al motor, así que un modelo que tuerza cualquiera de ellos debe quedar retenido.
+* **T3.6:** la alerta no bloquea la lectura. El documento sigue su curso porque el escrow solo puede pagar a `payoutAddress`, que sale de la orden firmada. Las cuentas registradas del exportador no levantan alerta.
+* **T3.7:** ingesta también rechaza un BL ya aceptado para otra orden, antes de llamar al modelo. El contrato lo vuelve a exigir (T1.9).
+* **T3.8:** el corpus de Trade tiene 12 conjuntos legítimos y 30 variantes adversariales, en `redteam/corpus/trade`, con `manifest.json` (resultado esperado y si el documento cumple la orden). Se regenera con `npm run corpus -w ingest` y se prueba contra el LLM configurado con `npm run corpus:run -w ingest`.
 
 # Listo cuando
 

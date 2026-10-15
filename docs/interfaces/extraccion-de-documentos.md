@@ -5,7 +5,7 @@ description: "Salida del extractor en cuarentena, sin texto libre: factura de cu
 tags: [extraccion, json-schema, bl, factura]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T00:30:00Z }
 ---
 
 **Personal (base).** Factura de una cuenta recurrente:
@@ -55,3 +55,17 @@ Factura comercial:
 ```
 
 No hay nombres, descripciones, notas, datos bancarios ni direcciones de destino. Lo que se muestra a las personas (nombre del proveedor, cuenta de cobro) sale de la orden firmada y del registro de partes, nunca del documento.
+
+# Normalización en Keel Trade **[PROPUESTA]**
+
+El parser y el extractor pasan por las mismas funciones (`ingest/src/trade/normalize.ts`), así que la concordancia de dos fuentes y los hashes ven una sola forma:
+
+| Campo | Forma |
+| --- | --- |
+| `document_number` | Mayúsculas, sin espacios, guiones, barras ni puntos: `OLSU-2610 4471` queda `OLSU26104471`. Es el número que entra en `blNumberHash(carrier, number)`, así que **la atestación de la naviera tiene que construirse con esta misma forma** (Área 1 y quien firme por la naviera). Ingesta toma `carrier` de la orden firmada |
+| `invoice_number`, `order_number` | La misma compactación |
+| `amount_minor` | Solo el punto es separador decimal: `25,000.00` se lee; `25.000,00` se retiene en vez de adivinar |
+| `on_board_date` | Medianoche UTC. Solo fechas sin ambigüedad (`12-OCT-2026`, `OCT 12, 2026`, `2026-10-12`). `10/12/2026` es 10 de diciembre en Chile y 12 de octubre en una plantilla de EE. UU.: se retiene |
+| Puertos | UN/LOCODE. El parser reconoce el código impreso o los nombres de los puertos y aeropuertos del corredor (China, Hong Kong y Chile). Un lugar fuera de esa tabla se retiene |
+
+Límite declarado: el parser lee documentos que imprimen cada campo después de su rótulo. Cubre los formatos del corpus (dos navieras y una aerolínea, en `redteam/corpus/trade`), no cualquier BL.
