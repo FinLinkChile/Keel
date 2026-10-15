@@ -84,6 +84,12 @@ export const PERSONAL_GATE_ERRORS = [
   "GateIsPaused",
   "InvalidTier",
   "OnlySafe",
+  // A constructor or setter address argument is address(0)
+  "ZeroAddress",
+  // Policy signer and cosigner would be the same address
+  "SignerIsCosigner",
+  // Roles returned false for the module transaction instead of reverting
+  "ExecutionFailed",
   // Inherited from OpenZeppelin ShortStrings: only possible at deployment
   "InvalidShortString",
   "StringTooLong",
