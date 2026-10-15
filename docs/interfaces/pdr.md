@@ -5,7 +5,7 @@ description: "Qué es un PDR, en qué dos momentos se emite, los structs PolicyD
 tags: [pdr, policy-decision, document-decision, eip-712, pace]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T15:00:00Z }
 ---
 
 Adoptado del marco académico PACE (Policy-Attested Contract Execution, arXiv 2608.17220), cuyo axioma es el mismo de Keel: el LLM propone, el verificador dispone y la cadena hace cumplir.
@@ -61,3 +61,4 @@ struct DocumentDecision {
 * En nivel 3, el motor entrega al Área 4 una solicitud de cofirma (`cosignRequest`): el mismo digest y los datos tipados que la billetera del cosignatario firma con `signTypedData`.
 * **Decidido por las Áreas 1 y 2 (14 de octubre): un gate por modo.** PDRGate es el gate de Keel Personal (`PaymentIntent`, transferencia a un beneficiario de la lista blanca). Keel Trade tiene su propio gate (nombre provisional `FundingGate`), que recibe `FundIntent` y arma por dentro el depósito en el escrow. La estructura interna de los gates (si comparten código y cómo) la define el Área 1. Razones: cada gate queda atado a una sola Safe y una billetera usa un solo modo, así que un gate con dos entradas desplegaría en cada billetera una función que nunca debe usarse, y cada modo versiona sus reglas por separado.
 * **Decidido por las Áreas 1 y 2 (decisión 3):** el `DocumentDecision` es obligatorio para liberar el saldo y lo firma el `documentVerifier` fijado en cada orden. El motor solo lo firma si su llave es ese verificador (`signDocumentDecision`). La alternativa manual es la `BalanceApproval` del importador ([paso 5](../flujo/paso-5-saldo.md)).
+* **[PROPUESTA] Área 2 (15 de octubre): qué es el `policyHash` de Keel Trade.** Es el keccak256 del JSON canónico de `{ mode: "trade", rulesVersion, funding, rolesConfigHash }`: la versión de las reglas (`TRADE_RULES_VERSION`), los parámetros del motor de depósito y el hash del archivo de configuración de Roles que versiona el Área 1. Un solo hash firma el depósito y el `DocumentDecision`. Al desplegar, el gate de Trade se configura con `tradePolicyHash` (`engine/src/policy.ts`). Una prueba falla si cambian las reglas sin revisar la versión.

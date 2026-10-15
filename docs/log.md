@@ -1,5 +1,10 @@
 # Historial de la documentación
 
+## 2026-10-15
+
+* **Nuevo, T2.9**: verificador `keel verify` ([verificador](arquitectura/verificador.md)). El archivo de cada PDR guarda ahora las entradas de la decisión para que el verificador vuelva a correr las reglas, y tiene un modo sin red mientras la decisión abierta 13 siga abierta. El motor agrega `inputsHash` a la decisión de depósito y `issueDocumentPdr` para el gatillo 2. Área 2 (Darienn).
+* **Decisión [PROPUESTA]**: definición del `policyHash` de Keel Trade: versión de reglas, parámetros del motor y hash de la configuración de Roles ([PDR](interfaces/pdr.md)). La tomó el Área 2 (Darienn) porque el verificador necesita saber con qué reglas se hizo cada decisión. Afecta al Área 1: el gate de Trade se despliega con ese hash y su configuración de Roles debe quedar en un archivo versionado.
+
 ## 2026-10-14
 
 * **Aprobación del Área 1 al PR #46**: la decisión 3 queda registrada como de las Áreas 1 y 2. `ESCROW_STATES` empieza con `NONE`, porque TradeEscrow usa 0 para "no hay orden". La tabla de llaves declara que en el prototipo una sola llave aprueba depósitos y da por conformes documentos. El Área 1 ajusta en su PR de TradeEscrow los detalles de la liberación (`releaseBalance` tras la ventana de disputa, `approveBalance` del importador, disputa sin límite de tiempo en Embarcado) ([paso 5](flujo/paso-5-saldo.md)).
