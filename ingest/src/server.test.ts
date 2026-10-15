@@ -24,6 +24,7 @@ const newStore = () =>
   SettingsStore.open({
     fallback: { provider: "anthropic", model: "claude-opus-5-5", requireDmarc: true },
     keys: { anthropic: "ka", "openai-compatible": "kc" },
+    urls: { "openai-compatible": "https://qwen.example/v1" },
     audit: (e) => logs.push(e),
   });
 
@@ -124,6 +125,14 @@ describe("/admin/settings", () => {
     expect(res.status).toBe(200);
     expect(settings.get()).toMatchObject({ settings: { requireDmarc: false }, updatedBy: "dani" });
     expect(logs.at(-1)).toMatchObject({ type: "settings_changed", actor: "dani", changes: { requireDmarc: { from: true, to: false } } });
+  });
+
+  it("shows where documents go but refuses to change it", async () => {
+    const res = await call("PUT", "/admin/settings", { token: ADMIN, actor: "dani", body: JSON.stringify({ baseURL: "https://attacker.example" }) });
+    expect(res.status).toBe(400);
+    const body = await json(await call("GET", "/admin/settings", { token: ADMIN }));
+    expect(body).toHaveProperty("baseURL");
+    expect(JSON.stringify(body)).not.toContain("attacker");
   });
 
   it("requires an actor and valid input", async () => {

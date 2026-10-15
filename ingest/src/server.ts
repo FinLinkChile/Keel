@@ -18,7 +18,7 @@ import type { AliasTable } from "./parser";
 import { MAX_PDF_BYTES } from "./pdf/text";
 import { receiveTradeDocument, type TradeOutcome } from "./trade/receive";
 import { staticOrders, type OrderRegistry, type TradeOrderEntry } from "./trade/upload";
-import { initialSettings, keysFromEnv, SettingsError, SettingsStore, type SettingsAudit } from "./settings";
+import { baseUrlsFromEnv, initialSettings, keysFromEnv, SettingsError, SettingsStore, type SettingsAudit } from "./settings";
 import { IngestStore } from "./store";
 
 const MIN_TOKEN_LENGTH = 32;
@@ -214,10 +214,17 @@ export function createHandler(deps: ServerDeps): RequestListener {
     reply(res, 200, outcome);
   };
 
+  // The base URL is shown so the admin knows where documents go; it cannot be changed here
+  const adminView = () => ({
+    ...deps.settings.get(),
+    baseURL: deps.settings.baseURL() ?? null,
+    availableProviders: deps.settings.availableProviders(),
+  });
+
   const admin = async (req: IncomingMessage, res: ServerResponse, adminToken: string) => {
     if (!bearer(req, adminToken)) return reply(res, 401, { error: "unauthorized" });
     if (req.method === "GET") {
-      return reply(res, 200, { ...deps.settings.get(), availableProviders: deps.settings.availableProviders() });
+      return reply(res, 200, adminView());
     }
     if (req.method !== "PUT") return reply(res, 405, { error: "method_not_allowed" });
     const actor = header(req, "x-admin-actor");
@@ -232,7 +239,7 @@ export function createHandler(deps: ServerDeps): RequestListener {
     }
     try {
       const updated = await deps.settings.update(change, actor);
-      return reply(res, 200, { ...updated, availableProviders: deps.settings.availableProviders() });
+      return reply(res, 200, { ...updated, ...adminView() });
     } catch (e) {
       if (e instanceof SettingsError) return reply(res, 400, { error: "invalid_settings", message: e.message });
       throw e;
@@ -274,6 +281,7 @@ export async function startServer(env: Record<string, string | undefined> = proc
   const settings = await SettingsStore.open({
     fallback: initialSettings(env),
     keys: keysFromEnv(env),
+    urls: baseUrlsFromEnv(env),
     file: env.INGEST_SETTINGS_FILE || undefined,
     audit: log,
   });
