@@ -3,11 +3,11 @@ import type { ReactNode } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { Role } from '@/data';
 import { useSession } from '@/session';
 import { Address } from '@/ui/Address';
 import { Button } from '@/ui/Button';
 import { Logo } from '@/ui/Logo';
+import { Segmented } from '@/ui/Segmented';
 import { Text } from '@/ui/Text';
 import { colors, gutter, radius } from '@/ui/theme';
 
@@ -92,7 +92,9 @@ export default function Connect() {
             title="Company"
             body="Purchase orders paid through escrow: advance on signing, balance on proven shipment."
           >
-            <RolePicker role={role} onChange={setRole} />
+            <View style={{ marginLeft: 34 }}>
+              <Segmented options={ROLES} value={role} onChange={setRole} on="surface" role="radiogroup" accessibilityLabel="Role" />
+            </View>
           </Option>
           <Option
             disabled
@@ -181,48 +183,7 @@ function Option({
   );
 }
 
-const ROLES: { role: Role; label: string }[] = [
-  { role: 'importer', label: 'I import' },
-  { role: 'exporter', label: 'I export' },
+const ROLES = [
+  { value: 'importer' as const, label: 'I import' },
+  { value: 'exporter' as const, label: 'I export' },
 ];
-
-function RolePicker({ role, onChange }: { role: Role; onChange: (role: Role) => void }) {
-  return (
-    <View
-      accessibilityRole="radiogroup"
-      accessibilityLabel="Role"
-      style={{
-        flexDirection: 'row',
-        gap: 6,
-        marginLeft: 34,
-        padding: 4,
-        borderRadius: radius.pill,
-        backgroundColor: colors.surfaceRaised,
-      }}
-    >
-      {ROLES.map((r) => {
-        const on = r.role === role;
-        return (
-          <Pressable
-            key={r.role}
-            accessibilityRole="radio"
-            accessibilityState={{ checked: on }}
-            onPress={() => onChange(r.role)}
-            style={{
-              flex: 1,
-              height: 38,
-              borderRadius: radius.pill,
-              backgroundColor: on ? colors.accent : 'transparent',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text size={14} weight={700} color={on ? 'onAccent' : 'text'}>
-              {r.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}

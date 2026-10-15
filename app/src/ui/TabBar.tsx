@@ -4,12 +4,16 @@ import { forwardRef } from 'react';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useSession } from '@/session';
+
 import { Icon, type IconName } from './Icon';
 import { colors } from './theme';
 
-// Main navigation of 02 and 14: four tabs around a raised New order button.
+// Main navigation of 02 and 14: four tabs around a raised New order button. Only the
+// importer opens orders, so the exporter gets the four tabs alone.
 export function TabBar() {
   const insets = useSafeAreaInsets();
+  const { role } = useSession();
   return (
     <View accessibilityRole="tablist" style={{ height: 76 + Math.max(16, insets.bottom), backgroundColor: colors.bg }}>
       <View
@@ -34,7 +38,7 @@ export function TabBar() {
         <TabTrigger name="orders" asChild>
           <TabButton icon="orders" label="Orders" />
         </TabTrigger>
-        <View style={{ flex: 1 }} />
+        {role === 'importer' ? <View style={{ flex: 1 }} /> : null}
         <TabTrigger name="suppliers" asChild>
           <TabButton icon="suppliers" label="Suppliers" />
         </TabTrigger>
@@ -42,30 +46,32 @@ export function TabBar() {
           <TabButton icon="activity" label="Activity" />
         </TabTrigger>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="New order"
-        onPress={() => router.push('/new-order')}
-        style={({ pressed }) => ({
-          position: 'absolute',
-          // 64 of surface plus the 6px ring drawn outside it in the design: a 76px
-          // rounded square sitting in the notch of the bar
-          left: '50%',
-          top: -30,
-          marginLeft: -38,
-          width: 76,
-          height: 76,
-          borderRadius: 32,
-          backgroundColor: colors.surface,
-          borderWidth: 6,
-          borderColor: colors.bg,
-          alignItems: 'center',
-          justifyContent: 'center',
-          opacity: pressed ? 0.8 : 1,
-        })}
-      >
-        <Icon name="plus" size={26} strokeWidth={2.4} />
-      </Pressable>
+      {role === 'importer' ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="New order"
+          onPress={() => router.push('/new-order')}
+          style={({ pressed }) => ({
+            position: 'absolute',
+            // 64 of surface plus the 6px ring drawn outside it in the design: a 76px
+            // rounded square sitting in the notch of the bar
+            left: '50%',
+            top: -30,
+            marginLeft: -38,
+            width: 76,
+            height: 76,
+            borderRadius: 32,
+            backgroundColor: colors.surface,
+            borderWidth: 6,
+            borderColor: colors.bg,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: pressed ? 0.8 : 1,
+          })}
+        >
+          <Icon name="plus" size={26} strokeWidth={2.4} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }

@@ -6,6 +6,8 @@ export type PartyId = string;
 export type Party = {
   id: PartyId;
   name: string;
+  // Short form for lists and sentences: "Lingnan", "Pearl Delta"
+  short: string;
   // Shown under the name: "Hong Kong", "Chile"
   place: string;
   // Company wallet that signs orders (the importer and exporter of a PurchaseOrder)
@@ -38,6 +40,7 @@ export type OrderStage =
 export type Order = {
   label: string; // "PO-0142", as in bot/examples/orders.json
   goods: string; // "Agar powder"
+  goodsShort: string; // "Agar", for lists
   quantity: string; // "6,000 kg"
   carrier: PartyId;
   stage: OrderStage;

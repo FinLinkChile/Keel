@@ -97,7 +97,7 @@ async function resolve(d: KeelData, role: Role, n: NeedsYou): Promise<Item | und
   return counterparty && { key: `${n.kind}:${n.orderId}`, kind: n.kind, order, counterparty };
 }
 
-const shortName = (p: Party) => p.name.split(' ')[0];
+const shortName = (p: Party) => p.short;
 
 function NeedsYouSheet({ item }: { item: Item }) {
   if (item.kind === 'verify_supplier') {
