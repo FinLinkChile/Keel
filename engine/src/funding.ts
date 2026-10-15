@@ -6,6 +6,7 @@ import type { RuleResult } from "./index";
 
 export type FundingRule =
   | "order-signed"
+  | "own-order"
   | "known-supplier"
   | "period-allowance"
   | "amount-in-range"
@@ -17,6 +18,8 @@ export type FundingReason =
   | "ORDER_NOT_FOUND"
   | "ORDER_NOT_OPEN"
   | "ORDER_HASH_MISMATCH"
+  | "OWN_ORDER"
+  | "NOT_THIS_SAFE"
   | "SUPPLIER_KNOWN"
   | "SUPPLIER_NEW"
   | "PARTY_NOT_REGISTERED"
@@ -59,6 +62,8 @@ export interface KnownSupplier {
 export interface FundingContext {
   // Unix timestamp, seconds
   now: number;
+  // The Safe this engine works for: it only funds orders where that Safe is the importer
+  safe: Hex;
   // The TradeEscrow contract
   escrow: Hex;
   // The order as the escrow holds it, or null when it was never opened. The escrow
@@ -95,6 +100,13 @@ function orderSigned(order: PurchaseOrder, ctx: FundingContext): RuleResult<Fund
   return { rule, tier: 1, reason: "ORDER_OPEN" };
 }
 
+function ownOrder(order: PurchaseOrder, ctx: FundingContext): RuleResult<FundingRule, FundingReason> {
+  const rule = "own-order";
+  return same(order.importer, ctx.safe) ? { rule, tier: 1, reason: "OWN_ORDER" } : { rule, tier: 4, reason: "NOT_THIS_SAFE" };
+}
+
+// Off-chain check only: in Trade the payout address is inside the order, where Roles
+// cannot see it. Area 1 adds the on-chain check in the Trade gate (T1.11).
 function knownSupplier(order: PurchaseOrder, ctx: FundingContext): RuleResult<FundingRule, FundingReason> {
   const rule = "known-supplier";
   const parties = [order.importer, order.exporter, order.carrier, order.arbiter];
@@ -145,6 +157,7 @@ export function evaluateFunding(
 ): FundingEvaluation {
   const rules = [
     orderSigned(order, context),
+    ownOrder(order, context),
     knownSupplier(order, context),
     periodAllowance(order, context),
     amountInRange(order, context, policy),
@@ -155,6 +168,7 @@ export function evaluateFunding(
 
   const intent: FundIntent = {
     orderId: order.orderId,
+    orderHash: structHash("PurchaseOrder", order),
     escrow: context.escrow,
     token: order.token,
     amount: order.totalAmount,
