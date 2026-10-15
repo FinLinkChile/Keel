@@ -2,7 +2,7 @@
 // model sees, and the strict validation of whatever comes back. T3.4, issue #21.
 import { z } from "zod";
 import { ALIAS_IDS, InvoiceExtraction } from "@keel/schemas";
-import { normalizeInvoiceNumber, normalizePeriod, normalizeRut } from "../normalize";
+import { foldHomoglyphs, normalizeInvoiceNumber, normalizePeriod, normalizeRut } from "../normalize";
 
 export const EXTRACTION_FAILURES = [
   "unreadable_input",
@@ -127,7 +127,10 @@ export function isoDateToUnix(isoDate: string): number {
 
 // Raw model text -> InvoiceExtraction, or ExtractionError("invalid_output").
 // `restore` maps tokens back to the real values; an unknown token fails validation.
-export function toExtraction(raw: string, restore: (value: string) => string = (v) => v): InvoiceExtraction {
+// The values are folded like the parser's text: a model may copy a look-alike character as
+// printed (a superscript digit), and the deception itself is flagged by the parser.
+export function toExtraction(raw: string, rehydrate: (value: string) => string = (v) => v): InvoiceExtraction {
+  const restore = (v: string) => foldHomoglyphs(rehydrate(v)).text;
   try {
     const out = LlmOutput.parse(JSON.parse(raw));
     return InvoiceExtraction.parse({
