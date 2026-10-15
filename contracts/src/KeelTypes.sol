@@ -18,6 +18,7 @@ struct PurchaseOrder {
     uint64 disputeWindow; // seconds after the shipment
     address carrier; // who can sign the shipment attestation
     address arbiter;
+    address documentVerifier; // signs the DocumentDecision; never a party nor the carrier
     bytes32 incoterm; // bytes32 text: EXW, FOB, CIF, CFR
     bytes32 termsHash; // hash of the full order document, with the proforma
     bytes32 requiredDocsHash;
@@ -37,6 +38,13 @@ struct ShipmentAttestation {
 struct CancelOrder {
     bytes32 orderId;
     uint256 nonce;
+}
+
+// Signed by the importer: releases the balance of an attested shipment without a
+// DocumentDecision (manual alternative of trigger 2).
+struct BalanceApproval {
+    bytes32 orderId;
+    bytes32 attestationHash; // EIP-712 hash of the accepted ShipmentAttestation
 }
 
 // Signed by the arbiter. The escrow only pays `importer` and `payoutAddress`.

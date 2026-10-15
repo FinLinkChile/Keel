@@ -5,7 +5,7 @@ description: "Objetivo, entregables y tareas T1.0 a T1.11: red y token, Safe, ro
 tags: [area-1, contratos, solidity, foundry, t1]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T01:40:00Z }
 ---
 
 **Perfil sugerido:** quien tenga más experiencia en Solidity y Foundry.
@@ -46,7 +46,7 @@ Común a los dos modos:
 **Trade (agregado):**
 * Destinos permitidos: el contrato TradeEscrow y el token de pago.
 * Funciones permitidas: `fund(orderId)` en el escrow, y en el token solo la aprobación necesaria para ese depósito, con `spender` igual al escrow. Nunca `transfer` ni aprobaciones a otra dirección.
-* **Abierto:** aprobación exacta más `fund`, o `fundWithPermit` si el token lo soporta.
+* Aprobación exacta más `fund`, sin `fundWithPermit` (decisión 7, Área 1). El anticipo sale dentro de `fund` (decisión 2).
 
 Cada Safe lleva la configuración de su modo: la Safe de una persona no tiene permiso sobre el escrow, y la de una empresa no tiene `transfer` a una lista blanca.
 
@@ -122,7 +122,7 @@ Script de despliegue reproducible y un archivo de direcciones que consumen las d
 * **Trade (agregado):** coordinar con el Área 5 cómo el jurado puede verificar las transacciones en una red cerrada.
 
 **T1.9 Contrato TradeEscrow (agregada por Trade, es su pieza central).**
-Implementar la máquina de estados y la interfaz de [estados del escrow](../flujo/estados-del-escrow.md) y [datos firmados e interfaz](../flujo/datos-firmados-e-interfaz.md): `open`, `fund`, `releaseAdvance`, `submitShipment`, `refundAfterDeadline`, `raiseDispute`, `resolve`, `cancel`.
+Implementar la máquina de estados y la interfaz de [estados del escrow](../flujo/estados-del-escrow.md) y [datos firmados e interfaz](../flujo/datos-firmados-e-interfaz.md): `open`, `fund` (depósito y anticipo), `submitShipment`, `releaseBalance`, `approveBalance`, `refundAfterDeadline`, `raiseDispute`, `resolve`, `cancel`. El saldo se libera en dos pasos y una orden Embarcado no se reembolsa por vencimiento (decisión 3, [paso 5](../flujo/paso-5-saldo.md)). `open` exige que verificador, naviera y árbitro no sean una parte ni `payoutAddress`. **[HECHO]** en `contracts/src/TradeEscrow.sol`.
 * Verificación de firmas EIP 712 de importador, exportador, naviera y árbitro, con soporte de ERC-1271 para que firmen Safes.
 * Depósito exacto, comparando el saldo antes y después.
 * Patrón checks, effects, interactions y guard de reentrancia. Solo tokens permitidos.
@@ -152,4 +152,4 @@ Implementar la máquina de estados y la interfaz de [estados del escrow](../fluj
 
 # Si falta tiempo
 
-Se recorta en este orden: ConfigGuard (se declara el riesgo), recuperación social, registro de partes (queda una lista fija en el despliegue), liberación diferida por ventana de disputa, `fundWithPermit`, resolución 2 de 3. **Nunca** se recortan PDRGate, el rol AGENTE, la batería negativa, TradeEscrow con sus cuatro invariantes ni el reembolso por vencimiento.
+Se recorta en este orden: ConfigGuard (se declara el riesgo), recuperación social, registro de partes (queda una lista fija en el despliegue), liberación diferida por ventana de disputa, resolución 2 de 3. **Nunca** se recortan PDRGate, el rol AGENTE, la batería negativa, TradeEscrow con sus cuatro invariantes ni el reembolso por vencimiento.

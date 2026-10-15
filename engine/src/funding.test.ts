@@ -19,6 +19,7 @@ const order: PurchaseOrder = {
   disputeWindow: BigInt(7 * DAY),
   carrier: address(0xd5),
   arbiter: address(0xe6),
+  documentVerifier: address(0xe7),
   incoterm: bytes32Text("CIF"),
   termsHash: `0x${"11".repeat(32)}`,
   requiredDocsHash: requiredDocsHash(["BILL_OF_LADING", "COMMERCIAL_INVOICE"]),
@@ -30,7 +31,7 @@ const context: FundingContext = {
   safe: order.importer,
   escrow: address(0xf7),
   escrowOrder: { state: "OPEN", orderHash: structHash("PurchaseOrder", order) },
-  registeredParties: [order.importer, order.exporter, order.carrier, order.arbiter],
+  registeredParties: [order.importer, order.exporter, order.carrier, order.arbiter, order.documentVerifier],
   knownSuppliers: [{ exporter: order.exporter, payoutAddress: order.payoutAddress }],
   allowance: { token: order.token, remaining: 50_000_000_000n },
   history: [9_000_000_000n, 11_000_000_000n],
@@ -64,8 +65,13 @@ describe("evaluateFunding", () => {
       expect(ruleOf({ ...context, escrowOrder: null }, "order-signed")).toMatchObject({ tier: 4, reason: "ORDER_NOT_FOUND" });
     });
 
+    it("treats the NONE state as an order that does not exist", () => {
+      const escrowOrder = { ...context.escrowOrder!, state: "NONE" as const };
+      expect(ruleOf({ ...context, escrowOrder }, "order-signed")).toMatchObject({ tier: 4, reason: "ORDER_NOT_FOUND" });
+    });
+
     it("blocks an order that is no longer open", () => {
-      const escrowOrder = { ...context.escrowOrder!, state: "FUNDED" as const };
+      const escrowOrder = { ...context.escrowOrder!, state: "ADVANCE_PAID" as const };
       expect(ruleOf({ ...context, escrowOrder }, "order-signed")).toMatchObject({ tier: 4, reason: "ORDER_NOT_OPEN" });
     });
 
@@ -91,7 +97,7 @@ describe("evaluateFunding", () => {
       expect(ruleOf({ ...context, knownSuppliers }, "known-supplier")).toMatchObject({ tier: 2, reason: "SUPPLIER_NEW" });
     });
 
-    it.each(["importer", "exporter", "carrier", "arbiter"] as const)("blocks when the %s is not registered", (party) => {
+    it.each(["importer", "exporter", "carrier", "arbiter", "documentVerifier"] as const)("blocks when the %s is not registered", (party) => {
       const registeredParties = context.registeredParties.filter((p) => p !== order[party]);
       expect(ruleOf({ ...context, registeredParties }, "known-supplier")).toMatchObject({ tier: 4, reason: "PARTY_NOT_REGISTERED" });
     });
@@ -99,6 +105,24 @@ describe("evaluateFunding", () => {
     it("compares addresses without regard to checksum case", () => {
       const knownSuppliers = [{ exporter: order.exporter.toUpperCase().replace("0X", "0x") as Hex, payoutAddress: order.payoutAddress }];
       expect(ruleOf({ ...context, knownSuppliers }, "known-supplier")).toMatchObject({ tier: 1 });
+    });
+  });
+
+  describe("independent-roles", () => {
+    it.each([
+      ["the carrier is the exporter", { carrier: order.exporter }],
+      ["the arbiter is the importer", { arbiter: order.importer }],
+      ["the document verifier is the importer", { documentVerifier: order.importer }],
+      ["the document verifier is the exporter", { documentVerifier: order.exporter }],
+      ["the document verifier is the carrier", { documentVerifier: order.carrier }],
+    ])("blocks an order where %s", (_case, over) => {
+      const o = { ...order, ...over };
+      const ctx = { ...context, escrowOrder: { state: "OPEN" as const, orderHash: structHash("PurchaseOrder", o) } };
+      expect(ruleOf(ctx, "independent-roles", o)).toMatchObject({ tier: 4, reason: "ROLE_NOT_INDEPENDENT" });
+    });
+
+    it("accepts five different roles", () => {
+      expect(ruleOf(context, "independent-roles")).toMatchObject({ tier: 1, reason: "ROLES_INDEPENDENT" });
     });
   });
 

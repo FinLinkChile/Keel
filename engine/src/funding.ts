@@ -8,6 +8,7 @@ export type FundingRule =
   | "order-signed"
   | "own-order"
   | "known-supplier"
+  | "independent-roles"
   | "period-allowance"
   | "amount-in-range"
   | "shipment-deadline";
@@ -23,6 +24,8 @@ export type FundingReason =
   | "SUPPLIER_KNOWN"
   | "SUPPLIER_NEW"
   | "PARTY_NOT_REGISTERED"
+  | "ROLES_INDEPENDENT"
+  | "ROLE_NOT_INDEPENDENT"
   | "WITHIN_ALLOWANCE"
   | "OVER_ALLOWANCE"
   | "TOKEN_NOT_ALLOWED"
@@ -91,7 +94,7 @@ const same = (a: Hex, b: Hex) => a.toLowerCase() === b.toLowerCase();
 
 function orderSigned(order: PurchaseOrder, ctx: FundingContext): RuleResult<FundingRule, FundingReason> {
   const rule = "order-signed";
-  if (ctx.escrowOrder === null) return { rule, tier: 4, reason: "ORDER_NOT_FOUND" };
+  if (ctx.escrowOrder === null || ctx.escrowOrder.state === "NONE") return { rule, tier: 4, reason: "ORDER_NOT_FOUND" };
   if (ctx.escrowOrder.state !== "OPEN") return { rule, tier: 4, reason: "ORDER_NOT_OPEN" };
   // The order we are about to fund must be exactly the one both parties signed
   if (!same(ctx.escrowOrder.orderHash, structHash("PurchaseOrder", order))) {
@@ -109,12 +112,24 @@ function ownOrder(order: PurchaseOrder, ctx: FundingContext): RuleResult<Funding
 // cannot see it. Area 1 adds the on-chain check in the Trade gate (T1.11).
 function knownSupplier(order: PurchaseOrder, ctx: FundingContext): RuleResult<FundingRule, FundingReason> {
   const rule = "known-supplier";
-  const parties = [order.importer, order.exporter, order.carrier, order.arbiter];
+  const parties = [order.importer, order.exporter, order.carrier, order.arbiter, order.documentVerifier];
   if (!parties.every((p) => ctx.registeredParties.some((r) => same(r, p)))) {
     return { rule, tier: 4, reason: "PARTY_NOT_REGISTERED" };
   }
   const known = ctx.knownSuppliers.some((s) => same(s.exporter, order.exporter) && same(s.payoutAddress, order.payoutAddress));
   return known ? { rule, tier: 1, reason: "SUPPLIER_KNOWN" } : { rule, tier: 2, reason: "SUPPLIER_NEW" };
+}
+
+// Whoever proves the shipment, verifies the documents or settles a dispute is never one of
+// the parties, and the carrier and the document verifier are different: releasing the
+// balance must always take two independent signatures. The escrow checks it again at open.
+function independentRoles(order: PurchaseOrder): RuleResult<FundingRule, FundingReason> {
+  const rule = "independent-roles";
+  const parties = [order.importer, order.exporter];
+  const thirds = [order.carrier, order.arbiter, order.documentVerifier];
+  const clash =
+    thirds.some((t) => parties.some((p) => same(t, p))) || same(order.carrier, order.documentVerifier);
+  return clash ? { rule, tier: 4, reason: "ROLE_NOT_INDEPENDENT" } : { rule, tier: 1, reason: "ROLES_INDEPENDENT" };
 }
 
 function periodAllowance(order: PurchaseOrder, ctx: FundingContext): RuleResult<FundingRule, FundingReason> {
@@ -159,6 +174,7 @@ export function evaluateFunding(
     orderSigned(order, context),
     ownOrder(order, context),
     knownSupplier(order, context),
+    independentRoles(order),
     periodAllowance(order, context),
     amountInRange(order, context, policy),
     shipmentDeadline(order, context, policy),

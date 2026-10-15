@@ -99,6 +99,9 @@ export interface PurchaseOrder {
   // Who can sign the shipment attestation
   carrier: Hex;
   arbiter: Hex;
+  // Who signs the DocumentDecision of this order. Signed by both parties and never one
+  // of them nor the carrier (decided by Area 2, open decision 3).
+  documentVerifier: Hex;
   // bytes32 text, see `bytes32Text` in ./hash.ts
   incoterm: Hex;
   // Hash of the full order document, with the proforma
@@ -107,6 +110,34 @@ export interface PurchaseOrder {
   requiredDocsHash: Hex;
   nonce: bigint;
 }
+
+// Decided by Area 2 (Oct 14): the terms behind `termsHash`. `termsHash` is the EIP-712 hash of
+// these terms (see `termsHash` in ./hash.ts), so both parties sign them through the
+// order. They are what the engine compares the commercial invoice against at trigger 2.
+export const OrderTerms = z
+  .object({
+    // Same format as `order_number` in the invoice extraction
+    orderNumber: z.string().regex(/^[A-Z0-9]{1,20}$/),
+    currency: z.enum(CURRENCIES),
+    // Amount of the commercial invoice, in the minor unit of `currency`
+    invoiceAmountMinor: z.bigint().positive(),
+    // Harmonized System codes of the goods
+    hsCodes: z.array(z.string().regex(/^[0-9]{6,10}$/)).min(1),
+    // keccak256 of the full order document, with the proforma
+    documentHash: z.string().regex(/^0x[0-9a-f]{64}$/),
+  })
+  .strict();
+export type OrderTerms = z.infer<typeof OrderTerms>;
+
+export const TERMS_EIP712_TYPES = {
+  OrderTerms: [
+    { name: "orderNumber", type: "string" },
+    { name: "currency", type: "string" },
+    { name: "invoiceAmountMinor", type: "uint256" },
+    { name: "hsCodes", type: "string[]" },
+    { name: "documentHash", type: "bytes32" },
+  ],
+} as const;
 
 // Signed by the carrier fixed in the order.
 export interface ShipmentAttestation {
@@ -124,7 +155,18 @@ export interface ShipmentAttestation {
 // Signed by importer and exporter to cancel by mutual agreement.
 export interface CancelOrder {
   orderId: Hex;
+  // cancelNonceOf(orderId) read from the TradeEscrow right before signing. It changes on
+  // every state transition, so a signature is only valid in the state it was signed for.
   nonce: bigint;
+}
+
+// Signed by the importer: releases the balance of an order whose shipment was attested
+// when there is no DocumentDecision, for example when a bill of lading cannot be read.
+// It is the manual alternative of trigger 2 (decided by Area 2, open decision 3).
+export interface BalanceApproval {
+  orderId: Hex;
+  // EIP-712 hash of the ShipmentAttestation the importer accepts
+  attestationHash: Hex;
 }
 
 // Signed by the arbiter. The escrow only pays `importer` and `payoutAddress`, and the
@@ -194,6 +236,7 @@ export const EIP712_TYPES = {
     { name: "disputeWindow", type: "uint64" },
     { name: "carrier", type: "address" },
     { name: "arbiter", type: "address" },
+    { name: "documentVerifier", type: "address" },
     { name: "incoterm", type: "bytes32" },
     { name: "termsHash", type: "bytes32" },
     { name: "requiredDocsHash", type: "bytes32" },
@@ -209,6 +252,10 @@ export const EIP712_TYPES = {
   CancelOrder: [
     { name: "orderId", type: "bytes32" },
     { name: "nonce", type: "uint256" },
+  ],
+  BalanceApproval: [
+    { name: "orderId", type: "bytes32" },
+    { name: "attestationHash", type: "bytes32" },
   ],
   DisputeResolution: [
     { name: "orderId", type: "bytes32" },
@@ -246,6 +293,7 @@ export interface Eip712Messages {
   PurchaseOrder: PurchaseOrder;
   ShipmentAttestation: ShipmentAttestation;
   CancelOrder: CancelOrder;
+  BalanceApproval: BalanceApproval;
   DisputeResolution: DisputeResolution;
   FundIntent: FundIntent;
   PolicyDecision: PolicyDecision;
@@ -309,6 +357,12 @@ export const ESCROW_ERRORS = [
   "BadResolution",
   "TokenNotAllowed",
   "AmountMismatch",
+  "ZeroAddress",
+  "InvalidOrder",
+  "BadOrderId",
+  "DeadlinePassed",
+  "InvalidAttestation",
+  "BadArbiterSignature",
 ] as const;
 export type EscrowError = (typeof ESCROW_ERRORS)[number];
 
@@ -317,11 +371,14 @@ export type EscrowError = (typeof ESCROW_ERRORS)[number];
 // ---------------------------------------------------------------------------
 
 // On-chain states of the escrow (docs/flujo/estados-del-escrow.md). SETTLED, REFUNDED,
-// RESOLVED and CANCELLED are final. The uint8 values belong to TradeEscrow (Area 1).
+// RESOLVED and CANCELLED are final. The index is the uint8 TradeEscrow uses: NONE = 0
+// means there is no order with that id. fund goes from OPEN straight to ADVANCE_PAID.
 export const ESCROW_STATES = [
+  "NONE",
   "OPEN",
-  "FUNDED",
   "ADVANCE_PAID",
+  // Shipment attested, balance not released yet: no refund after the deadline from here
+  "SHIPPED",
   "SETTLED",
   "REFUNDED",
   "DISPUTED",
