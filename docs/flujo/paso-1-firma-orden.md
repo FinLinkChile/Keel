@@ -4,7 +4,7 @@ title: "Paso 1: firma de la orden de compra"
 description: "Qué condiciones quedan firmadas por importador y exportador (EIP-712), por qué payoutAddress frena el fraude de cambio de cuenta y qué verifica open."
 tags: [paso-1, eip-712, payout-address, open]
 modo: trade
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T01:40:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T02:30:00Z }
 ---
 
 Importador y exportador firman el **mismo digest EIP-712** desde sus billeteras. Si son Safes de empresa, firman con ERC-1271.
@@ -36,8 +36,8 @@ Esto también resuelve el dolor del papel: sin la firma del exportador no hay or
 
 1. Que `orderId` sea `keccak256(abi.encode(importer, exporter, nonce))` (`BadOrderId`) y no exista ya (`OrderExists`). Cada versión nueva de una orden usa un nonce nuevo.
 2. Que la firma del importador sea válida para `importer` y la del exportador para `exporter`.
-3. Que `advanceBps <= 10000`, `totalAmount > 0` y `shipmentDeadline` esté en el futuro.
-4. Que `carrier`, `arbiter` y `documentVerifier` no sean el importador, el exportador ni `payoutAddress`, y que `documentVerifier` no sea la naviera ni el árbitro (independencia: liberar el saldo exige dos firmas de terceros distintos). El contrato solo detecta la misma dirección exacta; que el verificador sea la llave de Keel lo exigen el motor y el gate.
+3. Que `advanceBps <= 10000`, `totalAmount > 0` (y no tan grande que el cálculo del anticipo desborde) y `shipmentDeadline` esté en el futuro.
+4. Que `carrier`, `arbiter` y `documentVerifier` no sean el importador, el exportador ni `payoutAddress`, que `documentVerifier` no sea la naviera ni el árbitro, y que la naviera no sea el árbitro (quien atesta el embarque no juzga una disputa sobre él). Ninguno de los tres puede ser el propio escrow. Independencia: liberar el saldo exige dos firmas de terceros distintos. El contrato solo detecta la misma dirección exacta; que el verificador sea la llave de Keel lo exigen el motor y el gate.
 5. Que el token esté en la lista de tokens permitidos.
 
 Si las partes son Safes de empresa, la Safe valida que firmaron sus representantes según su umbral. El struct completo de la orden está en [datos firmados e interfaz](datos-firmados-e-interfaz.md).

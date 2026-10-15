@@ -97,3 +97,38 @@ contract ZeroRevertToken is ERC20 {
         super._update(from, to, value);
     }
 }
+
+/// @notice Token that records the payout balance at the moment the deposit reaches the
+/// escrow and reverts if the escrow pays the payout address before receiving the deposit,
+/// to show that fund pulls (and checks) the total before the advance leaves.
+contract OrderingToken is ERC20 {
+    error AdvanceBeforeDeposit();
+
+    address public escrow;
+    address public payout;
+    bool public armed;
+    bool public depositReceived;
+    uint256 public payoutBalanceAtDeposit;
+
+    constructor() ERC20("Ordering Token", "ORD") {}
+
+    function mint(address to, uint256 amt) external {
+        _mint(to, amt);
+    }
+
+    function arm(address escrow_, address payout_) external {
+        escrow = escrow_;
+        payout = payout_;
+        armed = true;
+        depositReceived = false;
+    }
+
+    function _update(address from, address to, uint256 value) internal override {
+        if (armed && from == escrow && to == payout && !depositReceived) revert AdvanceBeforeDeposit();
+        super._update(from, to, value);
+        if (armed && to == escrow && from != address(0)) {
+            depositReceived = true;
+            payoutBalanceAtDeposit = balanceOf(payout);
+        }
+    }
+}

@@ -17,7 +17,7 @@ import {
     DocumentDecision
 } from "../src/KeelTypes.sol";
 import {MockUSDC} from "./mocks/Mocks.sol";
-import {FeeOnTransferToken, ReentrantToken, MockSafe1271, ZeroRevertToken} from "./mocks/TradeMocks.sol";
+import {FeeOnTransferToken, ReentrantToken, MockSafe1271, ZeroRevertToken, OrderingToken} from "./mocks/TradeMocks.sol";
 
 /// @notice Unit tests of TradeEscrow (T1.9): one happy path per function and one negative
 /// test per error, plus the escrow cases of T1.7. Digests are built with KeelHash and the
@@ -471,6 +471,46 @@ contract TradeEscrowTest is Test {
         _expectInvalidOrder(po);
     }
 
+    /// Whoever attests the shipment cannot judge a dispute about it.
+    function test_revert_InvalidOrder_carrierIsArbiter() public {
+        PurchaseOrder memory po = _po();
+        po.arbiter = carrier;
+        _expectInvalidOrder(po);
+    }
+
+    function test_revert_InvalidOrder_carrierIsEscrow() public {
+        PurchaseOrder memory po = _po();
+        po.carrier = address(escrow);
+        _expectInvalidOrder(po);
+    }
+
+    function test_revert_InvalidOrder_arbiterIsEscrow() public {
+        PurchaseOrder memory po = _po();
+        po.arbiter = address(escrow);
+        _expectInvalidOrder(po);
+    }
+
+    function test_revert_InvalidOrder_verifierIsEscrow() public {
+        PurchaseOrder memory po = _po();
+        po.documentVerifier = address(escrow);
+        _expectInvalidOrder(po);
+    }
+
+    /// totalAmount * advanceBps must not overflow in fund: the order is rejected at open.
+    function test_revert_InvalidOrder_totalAmountWouldOverflowAdvance() public {
+        PurchaseOrder memory po = _po();
+        po.totalAmount = type(uint256).max / 10_000 + 1;
+        _expectInvalidOrder(po);
+    }
+
+    function test_open_acceptsLargestTotalAmount() public {
+        PurchaseOrder memory po = _po();
+        po.totalAmount = type(uint256).max / 10_000;
+        _rederive(po);
+        _open(po);
+        assertEq(uint8(_state(po.orderId)), uint8(ITradeEscrow.State.OPEN));
+    }
+
     function test_revert_InvalidOrder_payoutIsEscrow() public {
         PurchaseOrder memory po = _po();
         po.payoutAddress = address(escrow);
@@ -594,6 +634,30 @@ contract TradeEscrowTest is Test {
     }
 
     /// A short deposit reverts before any advance leaves the escrow.
+    /// Ordering: the advance never leaves before the deposit reached the escrow. The escrow
+    /// already holds a stray balance, so paying first would not fail on its own; the token
+    /// reverts with AdvanceBeforeDeposit if it happens, and records that the payout address
+    /// had received nothing when the deposit arrived.
+    function test_fund_depositArrivesBeforeAdvanceLeaves() public {
+        OrderingToken ord = new OrderingToken();
+        TradeEscrow ordEscrow = new TradeEscrow(IERC20(address(ord)), GRACE);
+        PurchaseOrder memory po = _poFor(importer, exporter, address(ord));
+        _openOn(ordEscrow, po);
+        ord.mint(importer, TOTAL);
+        ord.mint(address(ordEscrow), TOTAL); // stray balance that could pay an early advance
+
+        ord.arm(address(ordEscrow), payout);
+        vm.startPrank(importer);
+        ord.approve(address(ordEscrow), TOTAL);
+        ordEscrow.fund(po.orderId);
+        vm.stopPrank();
+
+        assertTrue(ord.depositReceived());
+        assertEq(ord.payoutBalanceAtDeposit(), 0);
+        assertEq(ord.balanceOf(payout), ADVANCE);
+        assertEq(ord.balanceOf(address(ordEscrow)), TOTAL + BALANCE);
+    }
+
     function test_revert_AmountMismatch_feeOnTransferToken() public {
         FeeOnTransferToken fee = new FeeOnTransferToken();
         TradeEscrow feeEscrow = new TradeEscrow(IERC20(address(fee)), GRACE);
@@ -1551,6 +1615,23 @@ contract TradeEscrowTest is Test {
 
     /// Cross-function reentrancy: the advance payout cannot enter cancel, even with
     /// signatures valid for the state the order has inside the callback.
+    /// raiseDispute is guarded too: a payout callback cannot open a dispute in the middle of
+    /// fund (without the guard the call would reach the party check instead).
+    function test_revert_ReentrancyGuardReentrantCall_disputeFromCallback() public {
+        ReentrantToken re = new ReentrantToken();
+        TradeEscrow reEscrow = new TradeEscrow(IERC20(address(re)), GRACE);
+        PurchaseOrder memory po = _poFor(importer, exporter, address(re));
+        _openOn(reEscrow, po);
+        re.mint(importer, TOTAL);
+
+        re.arm(address(reEscrow), abi.encodeCall(ITradeEscrow.raiseDispute, (po.orderId)));
+        vm.startPrank(importer);
+        re.approve(address(reEscrow), TOTAL);
+        vm.expectRevert(ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
+        reEscrow.fund(po.orderId);
+        vm.stopPrank();
+    }
+
     function test_revert_ReentrancyGuardReentrantCall_crossFunction() public {
         ReentrantToken re = new ReentrantToken();
         TradeEscrow reEscrow = new TradeEscrow(IERC20(address(re)), GRACE);

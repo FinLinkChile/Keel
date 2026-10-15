@@ -72,9 +72,10 @@ contract TradeEscrow is ITradeEscrow, EIP712, ReentrancyGuard {
     /// new version of an order uses a new nonce. The Trade gate also binds FundIntent.orderHash
     /// to orderOf(orderId).orderHash before funding.
     /// Separation of roles: the verifier, the carrier and the arbiter must differ from the
-    /// importer, the exporter and the payoutAddress, and the verifier from the carrier and the
-    /// arbiter. Only identical addresses are detected here: another address controlled by a
-    /// party is not. Requiring the verifier to be Keel's key is enforced by the engine and the
+    /// importer, the exporter and the payoutAddress; the verifier from the carrier and the
+    /// arbiter; and the carrier from the arbiter (whoever attests the shipment cannot judge a
+    /// dispute about it). None of the three can be this escrow. Only identical addresses are
+    /// detected here: another address controlled by a party is not. Requiring the verifier to be Keel's key is enforced by the engine and the
     /// Trade gate, not by this contract.
     /// @param po The purchase order. `po.orderId` must be derived from importer, exporter and nonce.
     /// @param sigImporter EIP-712 signature of `po.importer` over the order.
@@ -258,7 +259,7 @@ contract TradeEscrow is ITradeEscrow, EIP712, ReentrancyGuard {
     /// @dev Open from ADVANCE_PAID and SHIPPED, with no time limit in SHIPPED: it is
     /// the exit that keeps the balance from being trapped when the verifier is down and the
     /// importer does not approve. A party can use it to delay payment; the arbiter decides.
-    function raiseDispute(bytes32 orderId) external {
+    function raiseDispute(bytes32 orderId) external nonReentrant {
         OrderRecord storage o = _orders[orderId];
         State s = o.state;
         if (s != State.ADVANCE_PAID && s != State.SHIPPED) revert InvalidState();
@@ -368,8 +369,14 @@ contract TradeEscrow is ITradeEscrow, EIP712, ReentrancyGuard {
             verifier == payoutAddress || verifier == po.arbiter || po.carrier == payoutAddress
                 || po.arbiter == payoutAddress
         ) revert InvalidOrder();
-        if (imp == address(this) || po.payoutAddress == address(this)) revert InvalidOrder();
+        if (po.carrier == po.arbiter) revert InvalidOrder();
+        if (
+            imp == address(this) || payoutAddress == address(this) || po.carrier == address(this)
+                || po.arbiter == address(this) || verifier == address(this)
+        ) revert InvalidOrder();
         if (po.advanceBps > BPS || po.totalAmount == 0) revert InvalidOrder();
+        // totalAmount * advanceBps must not overflow in fund.
+        if (po.totalAmount > type(uint256).max / BPS) revert InvalidOrder();
         // forge-lint: disable-next-line(block-timestamp)
         if (po.shipmentDeadline <= block.timestamp) revert InvalidOrder();
     }
