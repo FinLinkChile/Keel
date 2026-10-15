@@ -123,14 +123,15 @@ function knownSupplier(order: PurchaseOrder, ctx: FundingContext): RuleResult<Fu
 }
 
 // Whoever proves the shipment, verifies the documents or settles a dispute is never one of
-// the parties, and the carrier and the document verifier are different: releasing the
-// balance must always take two independent signatures. The escrow checks it again at open.
+// the parties nor the payout address, and the three of them are different: releasing the
+// balance must always take two independent signatures. Mirrors the role checks of
+// TradeEscrow.open, which rejects the same orders.
 function independentRoles(order: PurchaseOrder): RuleResult<FundingRule, FundingReason> {
   const rule = "independent-roles";
-  const parties = [order.importer, order.exporter];
+  const parties = [order.importer, order.exporter, order.payoutAddress];
   const thirds = [order.carrier, order.arbiter, order.documentVerifier];
   const clash =
-    thirds.some((t) => parties.some((p) => same(t, p))) || same(order.carrier, order.documentVerifier);
+    thirds.some((t) => parties.some((p) => same(t, p))) || thirds.some((t, i) => thirds.slice(i + 1).some((u) => same(t, u)));
   return clash ? { rule, tier: 4, reason: "ROLE_NOT_INDEPENDENT" } : { rule, tier: 1, reason: "ROLES_INDEPENDENT" };
 }
 
