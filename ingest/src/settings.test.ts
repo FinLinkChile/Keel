@@ -66,6 +66,13 @@ describe("SettingsStore", () => {
     expect(store.get().settings.baseURL).toBeUndefined();
   });
 
+  it("keeps the proxy of Claude when another setting changes", async () => {
+    const store = await open();
+    await store.update({ baseURL: "https://proxy.example" }, "dani");
+    await store.update({ requireDmarc: false }, "dani");
+    expect(store.get().settings).toMatchObject({ provider: "anthropic", baseURL: "https://proxy.example" });
+  });
+
   it("does not audit a change that changes nothing", async () => {
     const audit: SettingsAudit[] = [];
     const store = await open(undefined, audit);

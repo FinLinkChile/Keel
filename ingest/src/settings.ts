@@ -126,8 +126,10 @@ export class SettingsStore {
     const parsed = SettingsChange.safeParse(change);
     if (!parsed.success) throw new SettingsError("invalid settings change");
     const next: IngestSettings = { ...this.current.settings, ...parsed.data };
-    // Switching away from openai-compatible drops its URL instead of rejecting the change
-    if (next.provider !== "openai-compatible" && parsed.data.baseURL === undefined) delete next.baseURL;
+    // Switching provider drops the old URL unless the change brings one, so a proxy of one vendor
+    // is never reused for another
+    const switched = parsed.data.provider !== undefined && parsed.data.provider !== this.current.settings.provider;
+    if (switched && parsed.data.baseURL === undefined) delete next.baseURL;
     await this.extractorConfig(next);
 
     const changes: SettingsAudit["changes"] = {};

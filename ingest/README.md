@@ -10,14 +10,66 @@ Bills of lading have no standard format across carriers. The parser covers the f
 
 ## Current state
 
-Everything implemented here is the Keel Personal pipeline: invoices arriving by email, read into the `InvoiceExtraction` schema, with beneficiary aliases and an `invoiceKey`. The sections below describe that code as it is today.
+Both modes are implemented.
 
-Most of it is shared with Keel Trade: the quarantined extractor and its provider adapters, the privacy layer, hidden text detection, the two source agreement, flood protection and the admin API. What Keel Trade adds once Area 2 freezes its extraction schemas: the fields the parser and the extractor read (transport document and commercial invoice), the keys (`blNumberHash` and `docsHash`), the intake channel (upload by a party of the order, with email as a secondary channel) and its account change flow (an alert only, because the payout address changes only with a new signed order).
+* **Keel Personal:** invoices arriving by email, read into the `InvoiceExtraction` schema, with beneficiary aliases and an `invoiceKey`.
+* **Keel Trade:** the transport document (bill of lading or air waybill) and the commercial invoice of an order, uploaded from the app by a representative of a party, read into `TransportDocumentExtraction` and `CommercialInvoiceExtraction` (`@keel/schemas`, Area 2), with `blNumberHash`, `docsHash` and an account alert. The code is in `src/trade/`.
+
+Shared by both: the quarantined extractor and its provider adapters, the privacy layer, hidden text detection, the two source agreement, flood protection and the admin API.
 
 ```sh
-npm run serve -w ingest       # inbound webhook, needs INGEST_* and LLM_* in .env
+npm run serve -w ingest       # needs INGEST_* and LLM_* in .env
 npm run typecheck -w ingest
+npm run corpus -w ingest      # regenerates redteam/corpus/trade
+npm run corpus:run -w ingest  # runs the Trade corpus against the configured LLM (costs money)
 ```
+
+## Keel Trade documents
+
+### Authenticated upload (T3.1)
+
+`POST /trade/documents` with `{orderId, docType, issuedAt, signature, file}` (the PDF in base64). The representative signs with their wallet the EIP-712 message `DocumentUpload(bytes32 orderId,string docType,bytes32 fileHash,uint64 issuedAt)` in the domain `{name: "Keel Ingest", version: "1", chainId}`. `fileHash` is the keccak256 of the exact file, so a file swapped after signing recovers another address and is rejected. The full interface for Area 4 is in [docs/interfaces/carga-de-documentos.md](../docs/interfaces/carga-de-documentos.md).
+
+The route exists only with an orders registry: `INGEST_ORDERS_FILE` (a JSON array of `{orderId, payoutAddress, carrier, uploaders: [{address, party}], knownDestinations?}`, mirroring the signed order) and `INGEST_CHAIN_ID`. Uploaders are EOAs: a Safe cannot sign the upload, its owners do. The email channel of Keel Trade is cut, as the task allows.
+
+### Pipeline
+
+`receiveTradeDocument` runs the checks cheapest first, so a flood costs no LLM calls:
+
+| Step | Outcome when it fails |
+|---|---|
+| Size, order, document type, signature freshness (10 min), signer is a representative of the order | `rejected` with a typed reason |
+| The file is a PDF by content | `quarantined: not_pdf` |
+| Same file already uploaded to the order | `duplicate: same_file` |
+| More than 10 authorized uploads to the order in 24 hours (T3.2) | `quarantined: rate_limited` |
+| Deterministic parser (T3.3) | `held: parser_failed` |
+| Bill of lading already accepted for another order (checked before the model, T3.7) | `held: bl_used_by_other_order` |
+| Same document number already accepted for this order | `duplicate: duplicate_document_number` |
+| Quarantined extractor (T3.4) | `held: extractor_failed` |
+| Two source agreement on every typed field (T3.5) | `held: disagreement`, with both values |
+| Declared transport type matches the document | `held: doc_type_mismatch` |
+
+A document that passes is `ready` and enters the order's package. If it announces other bank details, or prints a destination that is neither the payout address nor a registered account of the exporter, the outcome also carries an `alert` (T3.6). The alert never opens a change: the payout address changes only with a new order signed by both parties (D12). Alerts are stored and returned in one digest (`IngestStore.alertDigest`).
+
+`IngestStore.tradePackage(orderId, requiredDocs)` returns `complete` with the `docsHash`, the `blNumberHash` and the extractions once there is exactly one accepted document per required type; otherwise `incomplete` or `ambiguous`.
+
+### Parser limits (T3.3)
+
+Bills of lading have no standard format across carriers. The parser reads documents that print each field after its label (`B/L No.:`, `Port of Loading:`, `Shipped on Board Date:`), which covers the three layouts of the corpus (two ocean carriers and an airline), not any carrier. It also declares:
+
+* Dates are read only in unambiguous forms (`12-OCT-2026`, `OCT 12, 2026`, `2026-10-12`). `10/12/2026` is held: it is a different day in Chile and in a US template.
+* Amounts use the dot as decimal mark (`25,000.00`); `25.000,00` is held rather than guessed.
+* Ports resolve to UN/LOCODE from the printed code or from the names of the corridor's ports and airports (China, Hong Kong, Chile). A place outside that table is held.
+* The invoice total must state its currency, so `TOTAL PACKAGES: 20` is never read as an amount. Two different totals, or two HS codes, hold the invoice.
+* `document_number`, `invoice_number` and `order_number` are compacted (uppercase, no spaces, hyphens, slashes or dots). `blNumberHash(carrier, number)` takes that form, with the carrier of the signed order, so the carrier's attestation must be built from it. A B/L number is unique per carrier, as on chain.
+
+### Corpus (T3.8)
+
+`redteam/corpus/trade` holds 12 legitimate sets (a transport document and an invoice each, 24 PDFs) and 30 adversarial variants, rendered from `src/testing/tradeCorpus.ts`, with a `manifest.json` that gives each case its upload conditions, its expected outcome and whether it conforms to the order (for the engine). `src/trade/corpus.test.ts` runs the whole corpus in CI with an honest model double and with a compromised one, and checks that the committed files match their specs.
+
+What the tests prove, with an honest model: all 24 legitimate documents are read field by field and the 12 packages are complete; every adversarial variant ends in its expected state. With a model that obeys the attacker (it shifts the BL number, the on board date, the amount and the order number): every legitimate document is held for disagreement and no adversarial document is accepted. This holds for the corpus layouts and the tested attacks. It does not prove how a given real LLM behaves: `npm run corpus:run -w ingest` measures that.
+
+Measured on 2026-10-14 with `claude-opus-5-5` through the team's LiteLLM proxy: 54/54 as expected, 24/24 legitimate documents read end to end, 12/12 complete packages, 0 unsafe, in 139 s. Two runs only. In an earlier run the model also flagged A20 ("RELEASE PAYMENT IMMEDIATELY") as text addressed to an automated system, a stricter result, so a run can differ on such cases; an unsafe result never appeared.
 
 ## Inbound email (T3.1)
 
@@ -77,7 +129,7 @@ An admin can switch the LLM and the DMARC policy at runtime. Requests carry `Aut
 * Every effective change is logged as `{"type": "settings_changed", "actor", "at", "changes": {field: {from, to}}}`. Relaxing `requireDmarc` lowers the bar for who can send invoices, and switching providers changes where redacted invoice text is sent; the screen should say so before confirming.
 * `requireDmarc` defaults to `true`. The log receives only the message hash, the status, the reason and the SPF/DKIM/DMARC keywords. The server refuses to start without a token of at least 32 characters and listens on 127.0.0.1 unless `INGEST_HOST` says otherwise.
 
-The document corpus lives in `redteam/corpus/` so Area 5 can measure against it.
+The document corpora live in `redteam/corpus/` so Area 5 can measure against them.
 
 ## Choosing the LLM
 
@@ -85,7 +137,7 @@ The extractor is provider-agnostic. The prompt, the schema the model sees and th
 
 | `LLM_PROVIDER` | `LLM_MODEL` | Input sent | Notes |
 |---|---|---|---|
-| `anthropic` (default) | defaults to `claude-opus-5-5` | Strict JSON Schema output, server-side refusal fallback |
+| `anthropic` (default) | defaults to `claude-opus-5-5` | Strict JSON Schema output, server-side refusal fallback. `LLM_BASE_URL` (https) points it at a proxy such as LiteLLM; then the request goes without beta features and the transfer is logged as `anthropic-proxy` |
 | `openai` | required | Responses API, strict JSON Schema |
 | `gemini` | required | `responseJsonSchema`, temperature 0 |
 | `openai-compatible` | required, plus `LLM_BASE_URL` | Qwen (Alibaba DashScope), DeepSeek, Kimi or a self-hosted model |
@@ -96,7 +148,7 @@ The registered issuer RUTs are never given to the model, so it cannot "correct" 
 
 `src/privacy.ts` applies [privacy-kit-cl](https://github.com/Yugoxc/privacy-kit-cl) (Ley 21.719) before any provider call:
 
-* The model never receives the PDF, only its text with RUTs, names, addresses, emails, phones, bank accounts and wallet addresses replaced by tokens such as `[RUT_1a2b3c4d]`. Hidden runs stay in the text, so the model still faces the injection attempt.
+* The model never receives the PDF, only its text with RUTs, names, addresses, emails, phones, bank accounts (IBAN included) and wallet addresses replaced by tokens such as `[RUT_1a2b3c4d]`. The labels of trade documents (`Shipper:`, `Consignee:`, `Buyer:`, `A/C No.:`) are covered too. Hidden runs stay in the text, so the model still faces the injection attempt.
 * The model returns the issuer's RUT token; Keel rehydrates it locally. The token map never leaves the process, and a token not issued for that invoice fails validation.
 * Each call uses a fresh random salt. privacy-kit-cl derives tokens as `sha256(salt:value)`, and with its default fixed salt the roughly 10^8 possible RUTs could be brute-forced from a token.
 * Each call is logged as a transfer to a third party (`transferLog()`).
@@ -110,6 +162,7 @@ Known gaps, declared rather than hidden: text covered by a white shape drawn on 
 Limits of the privacy layer: masking is pattern based. A personal name without a label (`Señor(es):`, `Cliente:`…) is not detected, and the issuer company name is left visible on purpose.
 
 ```sh
+npm run llm:check -w ingest                # one tiny call; prints the provider's error if any
 npm run extract -w ingest -- invoice.pdf   # calls the real API, prints LLM vs parser
 ```
 

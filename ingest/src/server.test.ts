@@ -2,11 +2,15 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ALIAS_IDS } from "@keel/schemas";
-import { createHandler, ServerConfigError, type LogEntry } from "./server";
+import { createHandler, ServerConfigError, type LogEntry, type TradeLogEntry } from "./server";
 import { SettingsStore, type SettingsAudit } from "./settings";
 import { IngestStore } from "./store";
 import { composeEmail, fakeDns, makeDomain, signEmail } from "./testing/renderEmail";
 import { renderInvoice, sampleSpec } from "./testing/renderInvoice";
+import { renderCommercialInvoice } from "./testing/renderTrade";
+import { LEGIT_SETS, testAccount } from "./testing/tradeCorpus";
+import { CORPUS_CHAIN_ID, corpusOrders } from "./testing/tradeCorpusRunner";
+import { fileHash, uploadDomain, UPLOAD_TYPES } from "./trade/upload";
 
 const WEBHOOK = "w".repeat(40);
 const ADMIN = "a".repeat(40);
@@ -14,7 +18,7 @@ const ADMIN = "a".repeat(40);
 let server: Server;
 let url: string;
 let settings: SettingsStore;
-const logs: (LogEntry | SettingsAudit)[] = [];
+const logs: (LogEntry | SettingsAudit | TradeLogEntry)[] = [];
 
 const newStore = () =>
   SettingsStore.open({
@@ -128,5 +132,63 @@ describe("/admin/settings", () => {
     expect(bad.status).toBe(400);
     expect((await json(bad)).message).toMatch(/GEMINI_API_KEY/);
     expect((await call("PUT", "/admin/settings", { token: ADMIN, actor: "dani", body: "not json" })).status).toBe(400);
+  });
+});
+
+describe("POST /trade/documents", () => {
+  const set = LEGIT_SETS[0]!;
+  let tradeUrl: string;
+  let tradeServer: Server;
+
+  beforeAll(async () => {
+    const handler = createHandler({
+      webhookToken: WEBHOOK,
+      aliases: [],
+      settings: await newStore(),
+      store: new IngestStore(":memory:"),
+      trade: { orders: corpusOrders, chainId: CORPUS_CHAIN_ID },
+      log: (e) => logs.push(e),
+    });
+    tradeServer = createServer(handler);
+    await new Promise<void>((r) => tradeServer.listen(0, "127.0.0.1", r));
+    tradeUrl = `http://127.0.0.1:${(tradeServer.address() as AddressInfo).port}/trade/documents`;
+  });
+
+  afterAll(() => new Promise<void>((r) => tradeServer.close(() => r())));
+
+  const body = async (bytes: Uint8Array, signer = testAccount(`${set.id}:exporter`)) => {
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const signature = await signer.signTypedData({
+      domain: uploadDomain(CORPUS_CHAIN_ID),
+      types: UPLOAD_TYPES,
+      primaryType: "DocumentUpload",
+      message: { orderId: set.order.orderId, docType: "COMMERCIAL_INVOICE", fileHash: fileHash(bytes), issuedAt: BigInt(issuedAt) },
+    });
+    return JSON.stringify({
+      orderId: set.order.orderId,
+      docType: "COMMERCIAL_INVOICE",
+      issuedAt,
+      signature,
+      file: Buffer.from(bytes).toString("base64"),
+    });
+  };
+  const post = (b: string) => fetch(tradeUrl, { method: "POST", body: b });
+
+  it("does not exist without an orders registry", async () => {
+    expect((await call("POST", "/trade/documents", { body: "{}" })).status).toBe(404);
+  });
+
+  it("refuses a malformed request and a signer who is not a party", async () => {
+    expect((await post("{}")).status).toBe(400);
+    const res = await post(await body(await renderCommercialInvoice(set.invoice), testAccount("outsider")));
+    expect(res.status).toBe(403);
+    expect(await json(res)).toEqual({ status: "rejected", reason: "not_a_party" });
+  });
+
+  it("quarantines a signed file that is not a PDF before reading it, and logs typed fields only", async () => {
+    const res = await post(await body(new TextEncoder().encode("PK\u0003\u0004")));
+    expect(res.status).toBe(200);
+    expect(await json(res)).toMatchObject({ status: "quarantined", reason: "not_pdf", party: "exporter" });
+    expect(logs.at(-1)).toMatchObject({ kind: "trade_document", orderId: set.order.orderId, status: "quarantined", reason: "not_pdf" });
   });
 });
