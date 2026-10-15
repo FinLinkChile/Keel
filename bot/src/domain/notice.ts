@@ -122,7 +122,15 @@ const OrderOpened = z.strictObject({ ...order, kind: z.literal("order_opened"), 
 // From OrderFunded, not FundingExecuted: both come from the same deposit and would notify twice.
 const OrderFunded = z.strictObject({ ...order, kind: z.literal("order_funded"), ...amount });
 const AdvanceReleased = z.strictObject({ ...order, kind: z.literal("advance_released"), ...amount });
-const ShipmentAccepted = z.strictObject({ ...order, kind: z.literal("shipment_accepted"), onBoardDate: Timestamp });
+// The balance does not leave here: it leaves when the dispute window closes (releaseBalance) or
+// earlier if the importer approves it (approveBalance). balanceReleasableAt is shippedAt plus the
+// order's disputeWindow, when the producer has it.
+const ShipmentAccepted = z.strictObject({
+  ...order,
+  kind: z.literal("shipment_accepted"),
+  onBoardDate: Timestamp,
+  balanceReleasableAt: Timestamp.optional(),
+});
 const BalanceReleased = z.strictObject({ ...order, kind: z.literal("balance_released"), ...amount });
 const Refunded = z.strictObject({ ...order, kind: z.literal("refunded"), ...amount });
 const OrderCancelled = z.strictObject({ ...order, kind: z.literal("order_cancelled"), ...amount });

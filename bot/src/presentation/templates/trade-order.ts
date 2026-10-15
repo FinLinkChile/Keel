@@ -46,7 +46,7 @@ export const orderFunded: Render<"order_funded"> = (n, r, ctx) => {
     r.side === "exporter"
       ? lines(
           `${imp} deposited ${total} for ${n.orderLabel}. The total is locked for you.`,
-          "You get the advance as the signed order says, and the balance once your proof of shipment is accepted.",
+          "You get the advance as the signed order says, and the balance after your proof of shipment is accepted and the dispute window closes.",
         )
       : lines(
           `Your deposit of ${total} for ${n.orderLabel} is locked in Keel.`,
@@ -63,7 +63,7 @@ export const advanceReleased: Render<"advance_released"> = (n, r, ctx) => {
       ? lines(`You received the ${advance} advance for ${n.orderLabel}.`, "Next step: ship and upload the bill of lading in Keel.")
       : lines(
           `Advance of ${advance} paid to ${exp} for ${n.orderLabel}, as the signed order says.`,
-          "The rest stays locked until proof of shipment.",
+          "The rest stays locked until proof of shipment is accepted and the dispute window closes.",
         );
   return { text, link: orderLink(n) };
 };
@@ -71,15 +71,20 @@ export const advanceReleased: Render<"advance_released"> = (n, r, ctx) => {
 export const shipmentAccepted: Render<"shipment_accepted"> = (n, r, ctx) => {
   const { exp } = names(n, ctx);
   const onBoard = formatDate(n.onBoardDate, ctx.now);
+  const windowCloses =
+    n.balanceReleasableAt === undefined
+      ? "when the dispute window closes"
+      : `when the dispute window closes on ${formatDate(n.balanceReleasableAt, ctx.now)}`;
   const text =
     r.side === "exporter"
       ? lines(
           `Your proof of shipment for ${n.orderLabel} was accepted. On board: ${onBoard}.`,
-          "The balance is paid to you as the signed order says.",
+          `The balance is paid to you ${windowCloses}.`,
         )
       : lines(
           `Proof of shipment for ${n.orderLabel} was accepted. The goods were on board on ${onBoard}.`,
-          `The balance is paid to ${exp} as the signed order says.`,
+          `The balance goes to ${exp} ${windowCloses}, or earlier if you approve it in Keel.`,
+          "If something is wrong with the order, open a dispute in Keel before then.",
         );
   return { text, link: orderLink(n) };
 };

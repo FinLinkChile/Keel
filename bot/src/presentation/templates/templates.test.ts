@@ -23,7 +23,7 @@ describe("templates", () => {
 
   it("tells each side its own version", () => {
     expect(as(SAMPLES.advance_released, "importer").text).toBe(
-      "Advance of 14,400.00 USD paid to Lingnan Hydrocolloids for PO-0142, as the signed order says. The rest stays locked until proof of shipment.",
+      "Advance of 14,400.00 USD paid to Lingnan Hydrocolloids for PO-0142, as the signed order says. The rest stays locked until proof of shipment is accepted and the dispute window closes.",
     );
     expect(as(SAMPLES.advance_released, "exporter").text).toContain("You received the 14,400.00 USD advance for PO-0142.");
     expect(as(SAMPLES.balance_released, "importer").text).toBe(
@@ -38,6 +38,21 @@ describe("templates", () => {
     );
     expect(as(SAMPLES.refunded, "exporter").text).toBe(
       "33,600.00 USD went back to Acme Imports for PO-0142. There was no accepted proof of shipment by the deadline. The order is closed.",
+    );
+  });
+
+  it("pays the balance after the dispute window, not when the shipment is accepted", () => {
+    expect(as(SAMPLES.shipment_accepted, "importer").text).toBe(
+      "Proof of shipment for PO-0142 was accepted. The goods were on board on Nov 12. The balance goes to Lingnan Hydrocolloids when the dispute window closes, or earlier if you approve it in Keel. If something is wrong with the order, open a dispute in Keel before then.",
+    );
+    expect(as(SAMPLES.shipment_accepted, "exporter").text).toBe(
+      "Your proof of shipment for PO-0142 was accepted. On board: Nov 12. The balance is paid to you when the dispute window closes.",
+    );
+    const dated: Notice = { ...SAMPLES.shipment_accepted, balanceReleasableAt: nov(19) };
+    expect(as(dated, "importer").text).toContain("when the dispute window closes on Nov 19, or earlier if you approve it in Keel.");
+    expect(as(dated, "exporter").text).toContain("The balance is paid to you when the dispute window closes on Nov 19.");
+    expect(as(SAMPLES.order_funded, "exporter").text).toContain(
+      "the balance after your proof of shipment is accepted and the dispute window closes.",
     );
   });
 

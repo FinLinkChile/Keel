@@ -142,8 +142,8 @@ In Trade, `orderRef` is opaque and only builds the app URL; `orderLabel` is what
 | `order_opened` | `OrderOpened` | `amountMinor`, `currency`, `shipmentDeadline` |
 | `order_funded` | `OrderFunded` (not `FundingExecuted`: the same deposit would notify twice) | `amountMinor`, `currency` |
 | `advance_released` | `AdvanceReleased` | `amountMinor`, `currency` |
-| `shipment_accepted` | `ShipmentAccepted` | `onBoardDate` |
-| `balance_released` | `BalanceReleased` | `amountMinor`, `currency` |
+| `shipment_accepted` | `ShipmentAccepted`. The order is shipped; the balance does not leave yet | `onBoardDate`, `balanceReleasableAt?` (shipment time plus the order's dispute window, shown as a date when present) |
+| `balance_released` | `BalanceReleased`. Per `area1/trade-escrow`, the balance leaves when the dispute window closes (`releaseBalance`) or earlier if the importer approves it (`approveBalance`) | `amountMinor`, `currency` |
 | `refunded` | `Refunded` | `amountMinor`, `currency` |
 | `order_cancelled` | `OrderCancelled` | `amountMinor`, `currency` |
 | `dispute_raised` | `DisputeRaised` | `raisedBy` |
