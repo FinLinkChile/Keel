@@ -9,6 +9,8 @@
     "start": "tsx src/index.ts"
   },
   "dependencies": {
-    "@keel/schemas": "*"
+    "@keel/schemas": "*",
+    "grammy": "^1.46.0",
+    "zod": "^4.6.6"
   }
 }

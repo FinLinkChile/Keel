@@ -1,0 +1,52 @@
+import { describe, expect, it } from "vitest";
+import { DOCUMENT_REASONS, HELD_REASONS, type Notice } from "../domain/notice";
+import { SAMPLES } from "../testing/fixtures";
+import { route } from "./routing";
+
+const who = (n: Notice) => route(n).map((r) => `${r.side}:${r.role}`);
+const held = (reason: (typeof HELD_REASONS)[number]): Notice => ({ ...SAMPLES.operation_held, reason });
+
+describe("route", () => {
+  it("follows the routing table", () => {
+    expect(who(SAMPLES.order_funded)).toEqual(["importer:owner", "importer:operator", "exporter:owner", "exporter:operator"]);
+    expect(who(SAMPLES.advance_released)).toEqual(["importer:operator", "exporter:owner", "exporter:operator"]);
+    expect(who(SAMPLES.deadline_approaching)).toEqual(["importer:operator", "exporter:owner", "exporter:operator"]);
+    expect(who(held("over_limit_cosign"))).toEqual(["importer:cosigner", "importer:owner"]);
+    expect(who(held("new_supplier_wait"))).toEqual(["importer:owner", "importer:operator"]);
+    expect(who(SAMPLES.account_change_attempt)).toEqual(["importer:owner", "importer:operator", "exporter:owner"]);
+    expect(who(SAMPLES.change_queued)).toEqual(["importer:cosigner", "importer:owner"]);
+    for (const k of ["transfer_blocked", "agent_revoked", "gate_paused"] as const) {
+      expect(who(SAMPLES[k])).toEqual(["importer:owner", "importer:cosigner"]);
+    }
+    expect(who(SAMPLES.dispute_raised)).toEqual([
+      "importer:owner",
+      "importer:operator",
+      "exporter:owner",
+      "exporter:operator",
+      "arbiter:owner",
+    ]);
+  });
+
+  it("sends document holds to the exporter's operator only", () => {
+    for (const reason of DOCUMENT_REASONS) {
+      expect(who(held(reason))).toEqual(["importer:owner", "importer:operator", "exporter:operator"]);
+    }
+  });
+
+  it("gives every Trade recipient a side", () => {
+    for (const n of Object.values(SAMPLES)) for (const r of route(n)) expect(r.side).toBeDefined();
+  });
+
+  it("reaches the arbiter only on disputes", () => {
+    for (const n of Object.values(SAMPLES)) {
+      const toArbiter = route(n).some((r) => r.side === "arbiter");
+      expect(toArbiter).toBe(n.kind === "dispute_raised" || n.kind === "dispute_resolved");
+    }
+  });
+
+  it("maps sides to the parties of the notice", () => {
+    const [imp, , exp, , arb] = route(SAMPLES.dispute_raised);
+    expect([imp?.accountId, exp?.accountId, arb?.accountId]).toEqual(["acme-imports", "lingnan", "hk-arbitration"]);
+    expect(route(SAMPLES.transfer_blocked).every((r) => r.accountId === "acme-imports")).toBe(true);
+  });
+});
