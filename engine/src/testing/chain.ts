@@ -90,6 +90,15 @@ export async function createChain(artifacts: Record<string, Artifact>) {
     return result;
   }
 
+  async function sendRaw(from: Hex, to: Hex, data: Hex) {
+    const result = await run(from, to, data);
+    return (result.execResult.logs ?? []).map(([address, topics, data]) => ({
+      address: bytesToHex(address),
+      topics: topics.map((t) => bytesToHex(t)),
+      data: bytesToHex(data),
+    }));
+  }
+
   return {
     setTime(t: bigint) {
       timestamp = t;
@@ -101,13 +110,19 @@ export async function createChain(artifacts: Record<string, Artifact>) {
     },
     // Returns the logs, in the shape an RPC receipt gives them
     async send(name: string, to: Hex, functionName: string, args: unknown[], from: Hex) {
-      const result = await run(from, to, encodeFunctionData({ abi: artifacts[name]!.abi, functionName, args }));
-      return (result.execResult.logs ?? []).map(([address, topics, data]) => ({
-        address: bytesToHex(address),
-        topics: topics.map((t) => bytesToHex(t)),
-        data: bytesToHex(data),
-      }));
+      return sendRaw(from, to, encodeFunctionData({ abi: artifacts[name]!.abi, functionName, args }));
     },
+    sendRaw,
+    // Like eth_call: runs the call and throws its effects away
+    async simulate(from: Hex, to: Hex, data: Hex): Promise<Hex> {
+      await evm.stateManager.checkpoint();
+      try {
+        return bytesToHex((await run(from, to, data)).execResult.returnValue);
+      } finally {
+        await evm.stateManager.revert();
+      }
+    },
+    time: () => timestamp,
     async read<T = unknown>(name: string, to: Hex, functionName: string, args: unknown[] = []): Promise<T> {
       const abi = artifacts[name]!.abi;
       const result = await run(`0x${"00".repeat(19)}01`, to, encodeFunctionData({ abi, functionName, args }));

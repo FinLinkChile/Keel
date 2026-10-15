@@ -78,11 +78,11 @@ export const isDocumentDecision = (d: PolicyDecision | DocumentDecision): d is D
 // Evidence file: bigints were written as decimal strings, the EIP-712 field types bring them back.
 // ---------------------------------------------------------------------------
 
-type Field = { readonly name: string; readonly type: string };
+export type Field = { readonly name: string; readonly type: string };
 // Raw JSON from the evidence file, before revival
 type Raw = any;
 
-function reviveStruct<T>(fields: readonly Field[], raw: Raw): T {
+export function reviveStruct<T>(fields: readonly Field[], raw: Raw): T {
   const value = (type: string, v: Raw) => {
     const int = /^u?int(\d+)$/.exec(type);
     if (!int) return v;

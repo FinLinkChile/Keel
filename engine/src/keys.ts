@@ -57,3 +57,10 @@ export function loadPolicySigner(env: KeyEnv, registeredAddress?: Hex): PolicySi
   }) as PolicySigner["signTypedData"];
   return { address: account.address, signTypedData };
 }
+
+// The relayer only pays gas and sends: without a valid PDR or signature the gate and the
+// escrow revert, so this key moves no funds by itself.
+export function loadRelayer(env: KeyEnv) {
+  assertSeparateKeys(env);
+  return accountFor("relayer", env);
+}
