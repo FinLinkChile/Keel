@@ -9,12 +9,22 @@ import {
   type KeelDomain,
   type PaymentIntent,
   type PolicyDecision,
+  type PurchaseOrder,
+  type ShipmentAttestation,
   type Tier,
 } from "@keel/schemas";
 import { paymentIntentHash, typedDataDigest } from "@keel/schemas/hash";
 import { encodeFunctionData, erc20Abi, keccak256, type LocalAccount, recoverTypedDataAddress } from "viem";
-import type { DocumentRuleResult } from "./documents";
+import {
+  type DocumentContext,
+  type DocumentEvaluation,
+  type DocumentExtractions,
+  type DocumentRuleResult,
+  evaluateDocuments,
+} from "./documents";
+import type { FundingContext } from "./funding";
 import type { RuleResult } from "./index";
+import { type TradePolicy, tradePolicyHash } from "./policy";
 
 // Anything that signs EIP-712 typed data: a local account in the demo, a KMS or HSM in production.
 export type PolicySigner = Pick<LocalAccount, "address" | "signTypedData">;
@@ -114,6 +124,36 @@ export async function signDocumentDecision(
   return { decision, pdrHash: typedDataDigest(domain, "DocumentDecision", decision), signature, signer: signer.address, domain };
 }
 
+export interface DocumentPdrInput {
+  order: PurchaseOrder;
+  attestation: ShipmentAttestation;
+  extractions: DocumentExtractions;
+  // The policy hash comes from `policy`, never from the caller
+  context: Omit<DocumentContext, "policyHash">;
+  policy: TradePolicy;
+  domain: KeelDomain;
+  signer: PolicySigner;
+}
+
+// Trigger 2, end to end: evaluate the documents and, only when they conform, sign the
+// DocumentDecision and build its evidence with every input the verifier needs.
+export async function issueDocumentPdr(input: DocumentPdrInput): Promise<{ evaluation: DocumentEvaluation; evidence?: PdrEvidence }> {
+  const { order, attestation, extractions, policy } = input;
+  const context: DocumentContext = { ...input.context, policyHash: tradePolicyHash(policy) };
+  const evaluation = evaluateDocuments(order, attestation, extractions, context);
+  if (!evaluation.decision) return { evaluation };
+  const signed = await signDocumentDecision(evaluation.decision, input.domain, input.signer, order.documentVerifier);
+  const evidence: PdrEvidence = {
+    mode: "trade",
+    issuedAt: context.now,
+    ...signed,
+    intent: attestation,
+    rules: evaluation.rules,
+    replay: { kind: "documents", policy, order, attestation, extractions, context },
+  };
+  return { evaluation, evidence };
+}
+
 export interface PaymentPdrInput {
   intent: PaymentIntent;
   tier: Tier;
@@ -152,6 +192,18 @@ export async function issuePaymentPdr(input: PaymentPdrInput): Promise<PaymentPd
 // Evidence: the full PDR goes off-chain to evidence/pdr/<pdrHash>.json; on-chain only its hash.
 // ---------------------------------------------------------------------------
 
+// Everything a decision was made on, so `keel verify` can run the same rules again (T2.9).
+export type ReplayInputs =
+  | { kind: "funding"; policy: TradePolicy; order: PurchaseOrder; context: FundingContext }
+  | {
+      kind: "documents";
+      policy: TradePolicy;
+      order: PurchaseOrder;
+      attestation: ShipmentAttestation;
+      extractions: DocumentExtractions;
+      context: DocumentContext;
+    };
+
 export interface PdrEvidence {
   mode: "personal" | "trade";
   pdrHash: Hex;
@@ -165,6 +217,8 @@ export interface PdrEvidence {
   // Absent for a document decision: the escrow builds the transfer itself
   calldata?: Hex;
   rules: readonly (RuleResult | DocumentRuleResult)[];
+  // Absent in Keel Personal until its engine exists (T2.2): such a PDR is checked but not replayed
+  replay?: ReplayInputs;
 }
 
 // Bigints become decimal strings so the file is plain JSON and byte-stable.

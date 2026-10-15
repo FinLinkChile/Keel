@@ -2,6 +2,8 @@
 
 ## 2026-10-15
 
+* **Nuevo, T2.9**: verificador `keel verify` ([verificador](arquitectura/verificador.md)). El archivo de cada PDR guarda ahora las entradas de la decisión para que el verificador vuelva a correr las reglas, y tiene un modo sin red mientras la decisión abierta 13 siga abierta. El motor agrega `inputsHash` a la decisión de depósito y `issueDocumentPdr` para el gatillo 2. Área 2 (Darienn).
+* **Decisión [PROPUESTA]**: definición del `policyHash` de Keel Trade: versión de reglas, parámetros del motor y hash de la configuración de Roles ([PDR](interfaces/pdr.md)). La tomó el Área 2 (Darienn) porque el verificador necesita saber con qué reglas se hizo cada decisión. Afecta al Área 1: el gate de Trade se despliega con ese hash y su configuración de Roles debe quedar en un archivo versionado.
 * **Nueva tarea [PROPUESTA]: T2.11 servicio del agente** ([Área 2](trabajo/area-2-motor.md)). Ninguna tarea construía el proceso que une ingesta, motor, PDR y relayer, y sin él no hay orden de punta a punta. Lo propuso Darienn (Área 2) al revisar los pendientes del área.
 * **Nueva decisión abierta 15**: dónde viven la orden, los términos, los proveedores conocidos y el historial, y quién los entrega al agente (Áreas 2, 3 y 4). Supuesto mientras tanto: archivos locales de la demo ([decisiones abiertas](decisiones/abiertas.md)).
 
