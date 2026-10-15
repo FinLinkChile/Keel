@@ -53,8 +53,15 @@ export interface InvoiceSpec {
 
 const clp = (n: number) => "$ " + n.toLocaleString("es-CL").replace(/,/g, ".");
 
+// Fixed metadata, so the same spec always renders the same bytes (and the same file hash)
+const RENDERED_AT = new Date("2026-10-01T00:00:00Z");
+
 export async function renderInvoice(spec: InvoiceSpec): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
+  doc.setCreationDate(RENDERED_AT);
+  doc.setModificationDate(RENDERED_AT);
+  doc.setProducer("keel-corpus");
+  doc.setCreator("keel-corpus");
   const page = doc.addPage([595, 842]);
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);

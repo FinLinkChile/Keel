@@ -1,10 +1,13 @@
-// Renders the Keel Trade corpus (T3.8) to redteam/corpus/trade: one PDF per document and a
-// manifest with each case's upload conditions and expected result, for Area 5 to measure.
+// Renders the document corpora (T3.8) for Area 5 to measure: Keel Trade to
+// redteam/corpus/trade and Keel Personal to redteam/corpus/personal, one PDF per document and a
+// manifest with each case's conditions and expected result.
 // Deterministic: the same specs give the same bytes. Usage: npm run corpus -w ingest
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { fileHash, uploadDomain, UPLOAD_TYPES } from "../src/trade/upload";
 import { ADVERSARIAL_CASES, corpusAttestation, corpusPurchaseOrder, LEGIT_SETS, type LegitSet } from "../src/testing/tradeCorpus";
 import { CORPUS_CHAIN_ID, renderFile } from "../src/testing/tradeCorpusRunner";
+import { PERSONAL_ALIASES, PERSONAL_CASES, PERSONAL_LEGIT, renderCase } from "../src/testing/personalCorpus";
+import { renderInvoice } from "../src/testing/renderInvoice";
 
 const dir = new URL("../../redteam/corpus/trade/", import.meta.url);
 await rm(dir, { recursive: true, force: true });
@@ -96,3 +99,58 @@ const manifest = {
 };
 await writeFile(new URL("manifest.json", dir), JSON.stringify(manifest, bigintSafe, 2) + "\n");
 console.log(`wrote ${documents.length} documents to ${dir.pathname}`);
+
+// Keel Personal: the bills are committed; the emails that carry them are built at run time,
+// because DKIM keys are generated per run. `delivery`, `attachments` and `setup` say how.
+const personalDir = new URL("../../redteam/corpus/personal/", import.meta.url);
+await rm(personalDir, { recursive: true, force: true });
+await mkdir(new URL("legit/", personalDir), { recursive: true });
+await mkdir(new URL("adversarial/", personalDir), { recursive: true });
+const personalDocs: Record<string, unknown>[] = [];
+const savePersonal = async (path: string, bytes: Uint8Array) => {
+  await writeFile(new URL(path, personalDir), bytes);
+  return fileHash(bytes);
+};
+for (const l of PERSONAL_LEGIT) {
+  const path = `legit/${l.id}-${l.issuer.alias.toLowerCase()}-${l.truth.period}.pdf`;
+  personalDocs.push({
+    id: l.id,
+    kind: "legit",
+    alias: l.issuer.alias,
+    path,
+    fileHash: await savePersonal(path, await renderInvoice(l.spec)),
+    delivery: "signed",
+    truth: l.truth,
+    expected: { status: "ready" },
+  });
+}
+for (const pc of PERSONAL_CASES) {
+  const path = `adversarial/${pc.id}.pdf`;
+  personalDocs.push({
+    id: pc.id,
+    kind: "adversarial",
+    title: pc.title,
+    alias: pc.base.issuer.alias,
+    path,
+    fileHash: await savePersonal(path, await renderCase(pc)),
+    delivery: pc.delivery ?? "signed",
+    ...(pc.attachments ? { attachments: pc.attachments } : {}),
+    setup: pc.setup ?? [],
+    truth: { ...pc.base.truth, ...pc.truth },
+    expected: pc.expected,
+  });
+}
+await writeFile(
+  new URL("manifest.json", personalDir),
+  JSON.stringify(
+    {
+      description:
+        "Keel Personal bill corpus (T3.8). Every company and person is fictitious. Each bill arrives by email: `delivery` says how the email is built (signed by the registered domain, forged, look-alike domain, or a signed email whose attachment was swapped), `attachments` overrides the single PDF, and `setup` lists what was received before (`base`: the legitimate bill of the same issuer and period, `same_email`: this very email). `expected` is the ingest outcome with an honest reader. Run in CI by ingest/src/personalCorpus.test.ts.",
+      aliases: PERSONAL_ALIASES,
+      documents: personalDocs,
+    },
+    null,
+    2,
+  ) + "\n",
+);
+console.log(`wrote ${personalDocs.length} documents to ${personalDir.pathname}`);
