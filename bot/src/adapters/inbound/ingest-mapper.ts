@@ -1,5 +1,6 @@
 // Maps what ingest produces (Keel Personal) to the bot's Notice. Written against ingest's types,
-// but not wired to ingest: how producers reach the bot is open decision 15 (Area 3's side).
+// but not wired to ingest: how producers reach the bot is not decided yet, and wiring it is
+// Area 3's side.
 // Type-only imports: ingest pulls heavy SDKs that the bot must not load.
 // Ingest knows no accounts, so the personal accountId comes from configuration.
 //

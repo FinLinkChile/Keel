@@ -2,7 +2,7 @@
 // Bearer token compared in constant time, body size limit, listens on BOT_HOST.
 // The body is a Notice or an array of them. 401 without a valid token, 400 if any notice
 // does not validate (nothing is sent), 202 otherwise.
-// How producers reach the bot is open decision 15: this is the current assumption.
+// How producers reach the bot is not decided yet: this endpoint is a proposal.
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type RequestListener, type Server, type ServerResponse } from "node:http";
 import type { NotifyResult } from "../../application/notify";
