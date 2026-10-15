@@ -12,7 +12,8 @@
   ],
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "vitest run"
+    "test": "vitest run",
+    "keel": "tsx engine/src/cli.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
