@@ -41,7 +41,7 @@ const order: PurchaseOrder = {
 
 const attestation: ShipmentAttestation = {
   orderId: order.orderId,
-  blNumberHash: blNumberHash("EGLV123456789"),
+  blNumberHash: blNumberHash(order.carrier, "EGLV123456789"),
   onBoardDate: BigInt(ON_BOARD),
   portOfLoading: bytes32Text("CNSZX"),
   docsHash: docsHash(FILES),
@@ -101,6 +101,7 @@ describe("evaluateDocuments (trigger 2)", () => {
   it.each<[string, PurchaseOrder, ShipmentAttestation, DocumentExtractions, DocumentContext, string]>([
     ["an attestation for another order", order, { ...attestation, orderId: word("other") }, extractions, context, "attestation-order:ATTESTATION_OTHER_ORDER"],
     ["a different BL number", order, attestation, transport({ document_number: "EGLV999999999" }), context, "document-number:DOCUMENT_NUMBER_MISMATCH"],
+    ["the same BL number attested for another carrier", order, { ...attestation, blNumberHash: blNumberHash(address(0xd6), "EGLV123456789") }, extractions, context, "document-number:DOCUMENT_NUMBER_MISMATCH"],
     ["an on board date on another day", order, attestation, transport({ on_board_date: ON_BOARD - DAY }), context, "on-board-date:ON_BOARD_DATE_MISMATCH"],
     ["a different port of loading", order, attestation, transport({ port_of_loading: "CNSHA" }), context, "port-of-loading:PORT_MISMATCH"],
     ["an air waybill when the order requires a bill of lading", order, attestation, transport({ doc_type: "AIR_WAYBILL" }), context, "required-documents:REQUIRED_DOCS_MISMATCH"],

@@ -28,6 +28,7 @@ const order: PurchaseOrder = {
 
 const context: FundingContext = {
   now: NOW,
+  safe: order.importer,
   escrow: address(0xf7),
   escrowOrder: { state: "OPEN", orderHash: structHash("PurchaseOrder", order) },
   registeredParties: [order.importer, order.exporter, order.carrier, order.arbiter, order.documentVerifier],
@@ -46,6 +47,7 @@ describe("evaluateFunding", () => {
     expect(result.tier).toBe(1);
     expect(result.intent).toEqual({
       orderId: order.orderId,
+      orderHash: structHash("PurchaseOrder", order),
       escrow: context.escrow,
       token: order.token,
       amount: order.totalAmount,
@@ -71,6 +73,12 @@ describe("evaluateFunding", () => {
     it("blocks an order that differs from the signed one, for example in the payout address", () => {
       const tampered = { ...order, payoutAddress: address(0x666) };
       expect(ruleOf(context, "order-signed", tampered)).toMatchObject({ tier: 4, reason: "ORDER_HASH_MISMATCH" });
+    });
+  });
+
+  describe("own-order", () => {
+    it("blocks an order whose importer is another Safe", () => {
+      expect(ruleOf({ ...context, safe: address(0x5afe) }, "own-order")).toMatchObject({ tier: 4, reason: "NOT_THIS_SAFE" });
     });
   });
 

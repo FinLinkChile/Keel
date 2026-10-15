@@ -9,7 +9,8 @@ import {
     DisputeResolution,
     FundIntent,
     PolicyDecision,
-    DocumentDecision
+    DocumentDecision,
+    PaymentIntent
 } from "../src/KeelTypes.sol";
 import {KeelHash} from "../src/KeelHash.sol";
 
@@ -49,6 +50,10 @@ contract KeelHashHarness {
 
     function hashFundIntent(FundIntent calldata intent) external pure returns (bytes32) {
         return KeelHash.hash(intent);
+    }
+
+    function hashPaymentIntent(PaymentIntent calldata i) external pure returns (bytes32) {
+        return KeelHash.hash(i);
     }
 
     function hashPolicyDecision(PolicyDecision calldata d) external pure returns (bytes32) {

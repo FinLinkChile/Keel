@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type Hex, keelDomain, type PaymentIntent } from "@keel/schemas";
+import { type Hex, keelDomain, PERSONAL_GATE_ERRORS, PERSONAL_GATE_EVENTS, type PaymentIntent } from "@keel/schemas";
 import { domainSeparator, paymentIntentHash } from "@keel/schemas/hash";
 import { keccak256, toBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -96,6 +96,12 @@ describe("PDR signature against the real PDRGate (T2.4)", () => {
     expect(await chain.read("PDRGate", gate, "digestOf", [pdr.decision])).toBe(pdr.pdrHash);
   });
 
+  it("schemas lists exactly the events and errors PDRGate declares", () => {
+    const names = (type: string) => artifacts.PDRGate!.abi.filter((x) => x.type === type).map((x) => (x as { name: string }).name).sort();
+    expect(names("event")).toEqual([...PERSONAL_GATE_EVENTS].sort());
+    expect(names("error")).toEqual([...PERSONAL_GATE_ERRORS].sort());
+  });
+
   it("builds the same calldata the gate builds: a USDC transfer to the intent recipient", () => {
     const i = intent();
     expect(paymentCalldata(i)).toBe(chain.calldata("MockUSDC", "transfer", [i.recipient, i.amountUsdc]));
@@ -166,6 +172,13 @@ describe("PDR issuance rules", () => {
 
   it("the decision carries the hash of the calldata, never the calldata itself", () => {
     expect(buildPolicyDecision({ ...base, tier: 1 }).calldataHash).toBe(keccak256(base.calldata));
+  });
+
+  it("a signer that returns another key's signature fails before anything reaches the chain", async () => {
+    const lying = { address: policySigner.address, signTypedData: intruder.signTypedData };
+    await expect(signPolicyDecision(buildPolicyDecision({ ...base, tier: 1 }), keelDomain(1, address(1)), lying)).rejects.toThrow(
+      "does not recover to the policy signer",
+    );
   });
 
   it("only tier 3 produces a cosignature request", async () => {

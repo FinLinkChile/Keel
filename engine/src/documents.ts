@@ -132,7 +132,7 @@ export function evaluateDocuments(
   const rules: DocumentRuleResult[] = [
     // Against the carrier attestation
     result("attestation-order", attestation.orderId === order.orderId, "ATTESTATION_OTHER_ORDER"),
-    result("document-number", blNumberHash(transport.document_number) === attestation.blNumberHash, "DOCUMENT_NUMBER_MISMATCH"),
+    result("document-number", blNumberHash(order.carrier, transport.document_number) === attestation.blNumberHash, "DOCUMENT_NUMBER_MISMATCH"),
     // Same calendar day (UTC): a bill of lading states a date, not a second
     result("on-board-date", utcDay(transport.on_board_date) === utcDay(attestation.onBoardDate), "ON_BOARD_DATE_MISMATCH"),
     result("on-board-date", BigInt(transport.on_board_date) <= order.shipmentDeadline, "ON_BOARD_AFTER_DEADLINE"),

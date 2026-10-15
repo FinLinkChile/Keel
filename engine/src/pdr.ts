@@ -12,7 +12,7 @@ import {
   type Tier,
 } from "@keel/schemas";
 import { paymentIntentHash, typedDataDigest } from "@keel/schemas/hash";
-import { encodeFunctionData, erc20Abi, keccak256, type LocalAccount } from "viem";
+import { encodeFunctionData, erc20Abi, keccak256, type LocalAccount, recoverTypedDataAddress } from "viem";
 import type { DocumentRuleResult } from "./documents";
 import type { RuleResult } from "./index";
 
@@ -68,7 +68,11 @@ export async function signPolicyDecision(
   domain: KeelDomain,
   signer: PolicySigner,
 ): Promise<SignedPolicyDecision> {
-  const signature = await signer.signTypedData(policyDecisionTypedData(domain, decision));
+  const typedData = policyDecisionTypedData(domain, decision);
+  const signature = await signer.signTypedData(typedData);
+  // A misbehaving signer (a KMS returning another key's signature) fails here, not on chain
+  const recovered = await recoverTypedDataAddress({ ...typedData, signature });
+  if (recovered.toLowerCase() !== signer.address.toLowerCase()) throw new Error("the signature does not recover to the policy signer");
   return { decision, pdrHash: typedDataDigest(domain, "PolicyDecision", decision), signature, signer: signer.address, domain };
 }
 
@@ -98,12 +102,15 @@ export async function signDocumentDecision(
   if (signer.address.toLowerCase() !== documentVerifier.toLowerCase()) {
     throw new Error("the signer is not the document verifier of this order");
   }
-  const signature = await signer.signTypedData({
+  const typedData = {
     domain,
     types: { DocumentDecision: EIP712_TYPES.DocumentDecision },
-    primaryType: "DocumentDecision",
+    primaryType: "DocumentDecision" as const,
     message: decision,
-  });
+  };
+  const signature = await signer.signTypedData(typedData);
+  const recovered = await recoverTypedDataAddress({ ...typedData, signature });
+  if (recovered.toLowerCase() !== signer.address.toLowerCase()) throw new Error("the signature does not recover to the document verifier");
   return { decision, pdrHash: typedDataDigest(domain, "DocumentDecision", decision), signature, signer: signer.address, domain };
 }
 

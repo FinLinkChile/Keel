@@ -28,7 +28,7 @@ struct PurchaseOrder {
 // Signed by the carrier fixed in the order.
 struct ShipmentAttestation {
     bytes32 orderId;
-    bytes32 blNumberHash; // keccak256 of the document number
+    bytes32 blNumberHash; // keccak256(abi.encode(carrier, documentNumber))
     uint64 onBoardDate;
     bytes32 portOfLoading; // UN/LOCODE as bytes32 text
     bytes32 docsHash; // hash of the document package
@@ -56,6 +56,7 @@ struct DisputeResolution {
 
 struct FundIntent {
     bytes32 orderId;
+    bytes32 orderHash; // EIP-712 struct hash of the signed PurchaseOrder
     address escrow; // the TradeEscrow contract
     address token;
     uint256 amount; // equal to the totalAmount of the order
@@ -64,7 +65,7 @@ struct FundIntent {
 }
 
 struct PolicyDecision {
-    bytes32 intentHash; // EIP-712 hash of FundIntent
+    bytes32 intentHash; // EIP-712 hash of PaymentIntent (Personal) or FundIntent (Trade)
     bytes32 calldataHash; // keccak256 of the exact calldata the Safe executes
     bytes32 policyHash; // current version of the rules
     bytes32 inputsHash; // order, supplier registry, allowance used
@@ -86,7 +87,7 @@ struct PaymentIntent {
     uint8 aliasId; // enum of registered beneficiaries
     address recipient; // resolved from the alias table, never from the document
     uint256 amountUsdc; // 6 decimals
-    bytes32 invoiceKey; // keccak256(issuerTaxId, invoiceNumber, period)
+    bytes32 invoiceKey; // keccak256(abi.encode(rut, folio, period))
     uint64 deadline;
     uint256 nonce;
 }

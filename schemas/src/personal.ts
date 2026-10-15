@@ -34,13 +34,14 @@ export interface PaymentIntent {
   recipient: Hex;
   // 6 decimals
   amountUsdc: bigint;
-  // keccak256(issuerTaxId, invoiceNumber, period)
+  // keccak256(abi.encode(rut, folio, period)), with normalized values
   invoiceKey: Hex;
   deadline: bigint;
   nonce: bigint;
 }
 
-// Mirrors KeelHashing.sol. PolicyDecision, shared by both modes, is in EIP712_TYPES.
+// Mirrors KeelHash.sol (and KeelHashing.sol until PDRGate moves to KeelHash). PolicyDecision,
+// shared by both modes, is in EIP712_TYPES.
 export const PERSONAL_EIP712_TYPES = {
   PaymentIntent: [
     { name: "aliasId", type: "uint8" },
@@ -51,6 +52,43 @@ export const PERSONAL_EIP712_TYPES = {
     { name: "nonce", type: "uint256" },
   ],
 } as const;
+
+// Events and errors of PDRGate, the Personal gate, as its ABI declares them.
+// engine/src/pdr.test.ts checks them against the compiled contract.
+export const PERSONAL_GATE_EVENTS = [
+  "PaymentExecuted",
+  "PaymentHeld",
+  "BeneficiaryChangeQueued",
+  "BeneficiaryChangeVetoed",
+  // Declared by IPDRGate but never emitted: revoking the agent is a Roles event
+  "AgentRoleRevoked",
+  "GatePaused",
+  "GateUnpaused",
+  "PolicySignerSet",
+  "PolicyHashSet",
+  "CosignerSet",
+  // Inherited from OpenZeppelin EIP712 (ERC-5267)
+  "EIP712DomainChanged",
+] as const;
+export type PersonalGateEvent = (typeof PERSONAL_GATE_EVENTS)[number];
+
+export const PERSONAL_GATE_ERRORS = [
+  "IntentMismatch",
+  "CalldataMismatch",
+  "BadPolicySignature",
+  "MissingCosignature",
+  "StalePolicy",
+  "Expired",
+  "NonceUsed",
+  "InvoiceAlreadyPaid",
+  "GateIsPaused",
+  "InvalidTier",
+  "OnlySafe",
+  // Inherited from OpenZeppelin ShortStrings: only possible at deployment
+  "InvalidShortString",
+  "StringTooLong",
+] as const;
+export type PersonalGateError = (typeof PERSONAL_GATE_ERRORS)[number];
 
 export const BASE_SEPOLIA_CHAIN_ID = 84532;
 

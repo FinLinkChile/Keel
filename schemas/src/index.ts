@@ -182,6 +182,9 @@ export interface DisputeResolution {
 
 export interface FundIntent {
   orderId: Hex;
+  // EIP-712 struct hash of the PurchaseOrder both parties signed. The gate checks it
+  // on chain against the order the escrow stored.
+  orderHash: Hex;
   // The TradeEscrow contract
   escrow: Hex;
   token: Hex;
@@ -192,7 +195,8 @@ export interface FundIntent {
 }
 
 export interface PolicyDecision {
-  // EIP-712 hash of FundIntent
+  // EIP-712 hash of the intent of the gate that checks it: PaymentIntent (Personal)
+  // or FundIntent (Trade)
   intentHash: Hex;
   // keccak256 of the exact calldata the Safe executes
   calldataHash: Hex;
@@ -258,6 +262,7 @@ export const EIP712_TYPES = {
   ],
   FundIntent: [
     { name: "orderId", type: "bytes32" },
+    { name: "orderHash", type: "bytes32" },
     { name: "escrow", type: "address" },
     { name: "token", type: "address" },
     { name: "amount", type: "uint256" },
@@ -294,8 +299,9 @@ export interface Eip712Messages {
 }
 export type Eip712Type = keyof Eip712Messages;
 
-// `verifyingContract` is the contract that checks the signature: PDRGate for
-// PolicyDecision, TradeEscrow for everything else. The chain is not fixed here:
+// `verifyingContract` is the contract that checks the signature: the gate of the mode
+// for PolicyDecision (PDRGate in Personal, the Trade gate in Trade), TradeEscrow for
+// everything else. The chain is not fixed here:
 // the closed network is an open decision (docs/decisiones/abiertas.md, #1).
 export const keelDomain = (chainId: number, verifyingContract: Hex) =>
   ({ name: "Keel", version: "1", chainId, verifyingContract }) as const;
@@ -305,7 +311,9 @@ export type KeelDomain = ReturnType<typeof keelDomain>;
 // 2.4 Events and typed errors (fixed names)
 // ---------------------------------------------------------------------------
 
-export const GATE_EVENTS = ["FundingExecuted", "OperationHeld", "AgentRoleRevoked", "GatePaused"] as const;
+// Trade gate. The Personal gate (PDRGate) is in ./personal.ts. AgentRoleRevoked is not
+// here: revoking the agent is a Roles event, not a gate event.
+export const GATE_EVENTS = ["FundingExecuted", "OperationHeld", "GatePaused"] as const;
 export type GateEvent = (typeof GATE_EVENTS)[number];
 
 export const GATE_ERRORS = [
