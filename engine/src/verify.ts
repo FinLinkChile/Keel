@@ -213,6 +213,7 @@ function replayChecks(e: PdrEvidence): Check[] {
 // event not listed here is still found by its hash, only without the extra checks.
 const KNOWN_EVENTS = parseAbi([
   "event PaymentExecuted(bytes32 indexed intentHash, bytes32 pdrHash, uint8 tier, bytes32 indexed invoiceKey)",
+  "event FundingExecuted(bytes32 indexed intentHash, bytes32 pdrHash, uint8 tier, bytes32 indexed orderId)",
   "event BalanceReleased(bytes32 indexed orderId, address indexed to, uint256 amount, bytes32 authorizationDigest)",
 ]);
 
@@ -243,7 +244,7 @@ function chainChecks(e: PdrEvidence, facts: ChainFacts): Check[] {
   const event = decodeKnownEvent(log);
   if (!event) return checks;
   const d = e.decision;
-  if (event.eventName === "PaymentExecuted" && !isDocumentDecision(d)) {
+  if ((event.eventName === "PaymentExecuted" || event.eventName === "FundingExecuted") && !isDocumentDecision(d)) {
     checks.push(compare("event intent hash", d.intentHash, event.args.intentHash), compare("event tier", d.tier, event.args.tier));
   }
   if (event.eventName === "BalanceReleased" && isDocumentDecision(d)) {

@@ -1,7 +1,7 @@
 ---
 type: Decisiones
 title: "Decisiones abiertas"
-description: "Las 15 preguntas que el equipo todavía no cierra. Si un componente toca alguna, se decide con el equipo antes de escribir código."
+description: "Las 16 preguntas que el equipo todavía no cierra. Si un componente toca alguna, se decide con el equipo antes de escribir código."
 tags: [decisiones-abiertas, pendiente]
 modo: ambos
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T16:00:00Z }
@@ -25,7 +25,8 @@ No resolver ninguna por cuenta propia. Cuando el equipo cierra una, se actualiza
 | 12 | ¿Se confirman las tareas, las interfaces y el calendario propuestos tras el cambio de rumbo? | | [Trabajo](../trabajo/index.md), [interfaces](../interfaces/index.md) |
 | 13 | ¿Cómo verifica el jurado las transacciones si la red es cerrada? | | [Entregables](../entrega/entregables.md) |
 | 14 | Keel Personal vuelve al alcance: ¿con qué profundidad entra en la entrega (aplicación, contratos, demo) y en qué red y con qué token corre? | | [Keel Personal](../personal/keel-personal.md), [alcance](../flujo/alcance.md) |
-| 15 | ¿Dónde viven la orden firmada, sus `OrderTerms`, los proveedores conocidos y el historial de montos por proveedor, y quién se los entrega al servicio del agente (T2.11)? Supuesto mientras tanto: archivos locales de la demo | Áreas 2, 3 y 4 | [Área 2](../trabajo/area-2-motor.md), [Área 4](../trabajo/area-4-producto.md) |
+| 15 | ¿Dónde viven la orden firmada, sus `OrderTerms`, los proveedores conocidos y el historial de montos por proveedor, y quién se los entrega al servicio del agente (T2.11)? Supuesto mientras tanto: archivos locales de la demo. Los proveedores conocidos y los terceros de confianza ya viven en el FundingGate y el agente los lee de ahí | Áreas 2, 3 y 4 | [Área 2](../trabajo/area-2-motor.md), [Área 4](../trabajo/area-4-producto.md) |
+| 16 | En un depósito de nivel 3, ¿cómo le llega al agente la firma del cosignatario sobre el `pdrHash` (vista del cosignatario, T4.5) para que envíe `execute` con ella? ¿Quién la envía si el PDR vence antes? Supuesto mientras tanto: el agente se detiene en `en_aprobacion` con el PDR firmado en la evidencia y el acto 1 usa nivel 1 | Áreas 2 y 4 | [Servicio del agente](../arquitectura/servicio-del-agente.md) |
 
 Una celda vacía en "quién decide" significa que las fuentes no lo asignan todavía.
 

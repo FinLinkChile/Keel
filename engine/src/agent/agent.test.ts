@@ -7,11 +7,12 @@ import { encodeAbiParameters, encodeFunctionData, erc20Abi, keccak256, parseSign
 import { privateKeyToAccount } from "viem/accounts";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { DocumentExtractions } from "../documents";
-import { tradePolicy } from "../policy";
+import { tradePolicy, tradePolicyHash } from "../policy";
 import { compile, createChain, RevertError } from "../testing/chain";
 import { type ChainLog, loadEvidence, verdict, verifyEvidence } from "../verify";
 import { Agent, type AgentChain, type AgentConfig, type AgentEvent, CallReverted, type FundingGatePort } from "./agent";
 import { decodeOrderOf, orderOfCall } from "./escrow";
+import { fundingCalldata, fundingGatePort, mockRolesAllowance } from "./gate";
 import { FileStore, writeStoreFile } from "./store";
 
 const word = (label: string): Hex => keccak256(toBytes(label));
@@ -75,20 +76,20 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
   let notices: AgentEvent[];
 
   beforeAll(() => {
-    artifacts = compile(["src/TradeEscrow.sol", "test/mocks/Mocks.sol", "test/mocks/TradeMocks.sol"]);
+    artifacts = compile(["src/TradeEscrow.sol", "src/FundingGate.sol", "test/mocks/Mocks.sol", "test/mocks/TradeMocks.sol"]);
   }, 120_000);
 
   beforeEach(async () => {
     chain = await createChain(artifacts);
     usdc = await chain.deploy("MockUSDC", [], RELAYER);
     escrow = await chain.deploy("TradeEscrow", [usdc, GRACE], RELAYER);
-    safe = await chain.deploy("MockSafe1271", [importerOwner.address], RELAYER);
+    // A Safe that signs with ERC-1271 and runs modules, so Roles can execute the deposit
+    safe = await chain.deploy("MockModuleSafe1271", [importerOwner.address], RELAYER);
     dir = mkdtempSync(join(tmpdir(), "keel-agent-"));
     sent = [];
     notices = [];
     writeStoreFile(dir, ["registry.json"], {
       parties: [{ address: safe, taxId: "76123456K" }, { address: exporter.address }, { address: carrier.address }, { address: ARBITER }, { address: policySigner.address }],
-      knownSuppliers: [{ exporter: exporter.address, payoutAddress: PAYOUT }],
       history: { [exporter.address]: [9_000_000_000n, 11_000_000_000n] },
     });
   });
@@ -123,9 +124,10 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
       { chain: agentChain(), store: new FileStore(dir), signer: policySigner, gate, notify: (e) => notices.push(e) },
     );
 
-  const stateOf = async (orderId: Hex) => decodeOrderOf(await chain.simulate(RELAYER, escrow, orderOfCall(escrow, orderId).data)).state;
+  const recordOf = async (orderId: Hex) => decodeOrderOf(await chain.simulate(RELAYER, escrow, orderOfCall(escrow, orderId).data));
+  const stateOf = async (orderId: Hex) => (await recordOf(orderId)).state;
   const balanceOf = (who: Hex) => chain.read<bigint>("MockUSDC", usdc, "balanceOf", [who]);
-  const asSafe = (to: Hex, data: Hex) => chain.send("MockSafe1271", safe, "exec", [to, data], importerOwner.address);
+  const asSafe = (to: Hex, data: Hex) => chain.send("MockModuleSafe1271", safe, "exec", [to, data], importerOwner.address);
 
   // Both parties sign and open the order; the Safe signs with ERC-1271
   async function openOrder(over: Partial<PurchaseOrder> = {}): Promise<PurchaseOrder> {
@@ -304,33 +306,102 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
     expect((await keel.tick())[0]).toMatchObject({ outcome: "failed", reason: "AGENT_ERROR" });
   });
 
-  describe("funding through a gate port", () => {
-    // A stand-in for the gate of Area 1: the agent only needs its reads and its exact call
-    const gate = (): FundingGatePort => ({
-      address: address(0x6a7e),
-      allowance: async () => ({ token: usdc, remaining: 50_000_000_000n }),
-      nonce: async () => 1n,
-      safeCalldata: (intent) => encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [intent.escrow, intent.amount] }),
-      executeCall: () => ({ to: address(0x6a7e), data: "0x" }),
-    });
+  describe("funding through the FundingGate of Area 1", () => {
+    const AGENT = word("AGENT");
+    const AGENT_COSIGNED = word("AGENT_COSIGNED");
+    const CONFIG_DELAY = 120n;
+    const cosigner = privateKeyToAccount(word("cosigner"));
+    let gate: Hex;
+    let roles: Hex;
 
-    it("a known supplier within limits gets a signed funding PDR that replays", async () => {
-      await openOrder();
-      const [funded] = await agent({}, gate()).tick();
-      expect(funded).toMatchObject({ outcome: "sent", action: "fund" });
+    // The Safe enables Roles, gives the AGENT role to the gate with a weekly allowance and queues
+    // its trusted supplier and third parties, which count once the config delay passes
+    async function deployGate({ supplier = true, carrierTrusted = true, allowance = 50_000_000_000n } = {}) {
+      roles = await chain.deploy("MockTradeRoles", [safe, usdc, escrow], RELAYER);
+      const policyHash = tradePolicyHash(tradePolicy(word("roles-config-v1")));
+      gate = await chain.deploy(
+        "FundingGate",
+        [safe, roles, escrow, AGENT, AGENT_COSIGNED, policySigner.address, cosigner.address, policyHash, CONFIG_DELAY],
+        RELAYER,
+      );
+      await chain.send("MockModuleSafe1271", safe, "enableModule", [roles], importerOwner.address);
+      await asSafe(roles, chain.calldata("MockTradeRoles", "assignRole", [AGENT, gate, true]));
+      await asSafe(roles, chain.calldata("MockTradeRoles", "setAllowance", [AGENT, allowance, 7n * DAY]));
+      if (supplier) await asSafe(gate, chain.calldata("FundingGate", "queueSupplier", [exporter.address, PAYOUT]));
+      if (carrierTrusted) await asSafe(gate, chain.calldata("FundingGate", "queueThirdParty", [carrier.address, 1]));
+      await asSafe(gate, chain.calldata("FundingGate", "queueThirdParty", [ARBITER, 2]));
+      await asSafe(gate, chain.calldata("FundingGate", "queueThirdParty", [policySigner.address, 4]));
+      await chain.send("MockUSDC", usdc, "mint", [safe, TOTAL], RELAYER);
+      chain.setTime(chain.time() + CONFIG_DELAY);
+    }
+
+    const port = (): FundingGatePort => fundingGatePort(agentChain(), gate, mockRolesAllowance(agentChain(), roles, AGENT));
+
+    it("takes an order from the deposit to the balance with no manual step, and the deposit PDR verifies", async () => {
+      await deployGate();
+      const order = await openOrder();
+      const keel = agent({}, port());
+
+      const [funded] = await keel.tick();
+      expect(funded).toMatchObject({ outcome: "sent", action: "fund", status: "success" });
+      expect(await stateOf(order.orderId)).toBe("ADVANCE_PAID");
+      expect(await balanceOf(PAYOUT)).toBe(TOTAL / 2n);
+
       const evidence = loadEvidence(join(dir, "evidence"), funded!.pdrHash!)!;
-      expect(verdict(await verifyEvidence(evidence))).toBe("MATCH");
+      expect(verdict(await verifyEvidence(evidence, { chainId: 1, status: "success", logs: sent[0]!.logs }))).toBe("MATCH");
+      // One nonce per order version, marked used by the gate: a retry can never fund twice
+      const nonce = BigInt((await recordOf(order.orderId)).orderHash);
+      expect(evidence.intent).toMatchObject({ nonce });
+      expect(await chain.read("FundingGate", gate, "nonceUsed", [nonce])).toBe(true);
+
+      await storeShipment(order);
+      chain.setTime(ON_BOARD + DAY);
+      expect((await keel.tick())[0]).toMatchObject({ outcome: "sent", action: "submitShipment", status: "success" });
+      storeDocuments(order);
+      expect((await keel.tick())[0]).toMatchObject({ outcome: "sent", action: "releaseBalance", status: "success" });
+      expect(await stateOf(order.orderId)).toBe("SETTLED");
+      expect(await balanceOf(PAYOUT)).toBe(TOTAL);
     });
 
-    it("a new payout address is queued for verification and nothing is sent", async () => {
-      writeStoreFile(dir, ["registry.json"], {
-        parties: [{ address: safe }, { address: exporter.address }, { address: carrier.address }, { address: ARBITER }, { address: policySigner.address }],
-        knownSuppliers: [],
-        history: {},
-      });
+    it("the deposit calldata the PDR binds is the one the gate executes", async () => {
+      await deployGate();
+      const intent = { orderId: word("order"), orderHash: word("order hash"), escrow, token: usdc, amount: TOTAL, deadline: T0 + 900n, nonce: 1n };
+      const [, , hash] = await chain.read<[Hex, Hex, Hex]>("FundingGate", gate, "fundingCalldataOf", [intent]);
+      expect(keccak256(fundingCalldata(intent))).toBe(hash);
+    });
+
+    it("a payout pair the Safe did not approve is a new supplier: queued, nothing sent", async () => {
+      await deployGate({ supplier: false });
       await openOrder();
-      const [held] = await agent({}, gate()).tick();
-      expect(held).toMatchObject({ outcome: "held", hold: "cambio_en_cola", reason: "SUPPLIER_NEW" });
+      expect((await agent({}, port()).tick())[0]).toMatchObject({ outcome: "held", hold: "cambio_en_cola", reason: "SUPPLIER_NEW" });
+      expect(sent).toHaveLength(0);
+    });
+
+    it("an approved supplier still inside its config delay is not known yet", async () => {
+      await deployGate({ supplier: false });
+      await asSafe(gate, chain.calldata("FundingGate", "queueSupplier", [exporter.address, PAYOUT]));
+      await openOrder();
+      expect((await agent({}, port()).tick())[0]).toMatchObject({ outcome: "held", reason: "SUPPLIER_NEW" });
+      expect(sent).toHaveLength(0);
+      chain.setTime(chain.time() + CONFIG_DELAY);
+      expect((await agent({}, port()).tick())[0]).toMatchObject({ outcome: "sent", action: "fund", status: "success" });
+    });
+
+    it("a carrier the Safe does not trust blocks the deposit before the gate would revert", async () => {
+      await deployGate({ carrierTrusted: false });
+      await openOrder();
+      const [held] = await agent({}, port()).tick();
+      expect(held).toMatchObject({ outcome: "held", hold: "bloqueada", reason: "FUNDING_BLOCKED" });
+      expect(held!.rules).toContainEqual({ rule: "known-supplier", tier: 4, reason: "PARTY_NOT_REGISTERED" });
+      expect(sent).toHaveLength(0);
+    });
+
+    it("an order over the agent allowance waits for the cosigner with its PDR ready", async () => {
+      await deployGate({ allowance: TOTAL - 1n });
+      await openOrder();
+      const [held] = await agent({}, port()).tick();
+      expect(held).toMatchObject({ outcome: "held", hold: "en_aprobacion", reason: "COSIGNATURE_NEEDED" });
+      expect(loadEvidence(join(dir, "evidence"), held!.cosign!.pdrHash)).not.toBeNull();
       expect(sent).toHaveLength(0);
     });
   });

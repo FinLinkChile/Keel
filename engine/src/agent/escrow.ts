@@ -16,6 +16,7 @@ export const ESCROW_ABI = parseAbi([
   "struct OrderRecord { PurchaseOrder po; uint8 state; uint64 stateVersion; bytes32 orderHash; uint256 paidOut; bytes32 attestationHash; bytes32 docsHash; uint64 shippedAt; bool funded; }",
   "function orderOf(bytes32 orderId) view returns (OrderRecord)",
   "function refundGrace() view returns (uint64)",
+  "function fund(bytes32 orderId)",
   "function submitShipment(bytes32 orderId, ShipmentAttestation att, bytes sigCarrier)",
   "function releaseBalance(bytes32 orderId, DocumentDecision d, bytes sigVerifier)",
   "function refundAfterDeadline(bytes32 orderId)",

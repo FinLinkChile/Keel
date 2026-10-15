@@ -8,6 +8,7 @@ import { parseArgs } from "node:util";
 import type { Hex } from "@keel/schemas";
 import { createPublicClient, http, isAddress, isHash } from "viem";
 import { Agent } from "./agent/agent";
+import { fundingGatePort, gateDeployment, mockRolesAllowance } from "./agent/gate";
 import { botNotifier } from "./agent/notices";
 import { rpcChain } from "./agent/rpc";
 import { FileStore } from "./agent/store";
@@ -99,13 +100,23 @@ async function agent(args: string[]): Promise<number> {
 
   const chain = rpcChain(rpc, loadRelayer(env));
   const store = new FileStore(data);
+  // The Trade gate (Area 1). Without it, funding waits with GATE_NOT_DEPLOYED. The allowance is
+  // read from MockTradeRoles, the Roles of the demo; the real Zodiac reader goes with T1.7.
+  const gateAddress = env.KEEL_FUNDING_GATE as Hex | undefined;
+  if (gateAddress && !isAddress(gateAddress)) throw new UsageError("KEEL_FUNDING_GATE is not an address");
+  let gate: ReturnType<typeof fundingGatePort> | undefined;
+  if (gateAddress) {
+    const { roles, agentRoleKey } = await gateDeployment(chain, gateAddress);
+    gate = fundingGatePort(chain, gateAddress, mockRolesAllowance(chain, roles, agentRoleKey));
+  }
   const keel = new Agent(
     { chainId: await chain.chainId(), escrow, safe, policy: tradePolicy(rolesConfigHash), decisionTtlSeconds: 3600, evidenceDir: values.evidence ?? DEFAULT_EVIDENCE },
-    // The Trade gate is not deployed yet: funding waits with GATE_NOT_DEPLOYED. Each sent step,
-    // hold and notice is printed once as a JSON line and, with the bot configured, posted to it.
+    // Each sent step, hold and notice is printed once as a JSON line and, with the bot
+    // configured, posted to it.
     {
       chain,
       store,
+      gate,
       signer: loadPolicySigner(env),
       notify: botNotifier({ store, endpoint: botUrl && botToken ? { url: botUrl, token: botToken } : undefined }),
     },

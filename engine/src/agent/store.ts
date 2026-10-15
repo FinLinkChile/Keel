@@ -2,7 +2,7 @@
 // carrier attestation, the documents read by ingest and the registry. Where these live and
 // who delivers them is open decision 15; until it closes they are JSON files of the demo:
 //
-//   <dir>/registry.json                     parties, known suppliers, amount history
+//   <dir>/registry.json                     parties, amount history
 //   <dir>/orders/<orderId>/order.json       { order, terms, label } (app, Area 4)
 //   <dir>/orders/<orderId>/shipment.json    { attestation, sigCarrier } (carrier)
 //   <dir>/orders/<orderId>/documents.json   { extractions, fileHashes } (ingest, Area 3)
@@ -11,7 +11,6 @@ import { dirname, join } from "node:path";
 import { EIP712_TYPES, type Hex, OrderTerms, type PurchaseOrder, type ShipmentAttestation } from "@keel/schemas";
 import { canonical } from "../canonical";
 import type { DocumentExtractions } from "../documents";
-import type { KnownSupplier } from "../funding";
 import { reviveStruct } from "../verify";
 
 export interface StoredOrder {
@@ -36,7 +35,6 @@ export interface Registry {
   // Registered parties; the importer's RUT is what the invoice is checked against. `account` is
   // the party's account in the bot directory (Area 4), so notices name accounts, never addresses.
   parties: { address: Hex; taxId?: string; account?: string }[];
-  knownSuppliers: KnownSupplier[];
   // Total amounts of earlier orders, by exporter address (lowercase)
   history: Record<string, bigint[]>;
 }
@@ -89,7 +87,7 @@ export class FileStore implements AgentStore {
     const history = Object.fromEntries(
       Object.entries((raw.history ?? {}) as Record<string, string[]>).map(([k, v]) => [k.toLowerCase(), v.map((a) => BigInt(a))]),
     );
-    return { parties: raw.parties ?? [], knownSuppliers: raw.knownSuppliers ?? [], history };
+    return { parties: raw.parties ?? [], history };
   }
 }
 

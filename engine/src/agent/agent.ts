@@ -40,13 +40,15 @@ export class CallReverted extends Error {
   }
 }
 
-// The Trade gate of Area 1 does not exist yet. When it does, this port gives the agent what
-// it reads from the gate and the exact calls. Until then funding waits with GATE_NOT_DEPLOYED.
+// What the agent reads from the Trade gate (FundingGate, Area 1) and the exact call it sends
+// (./gate.ts). Without a gate, funding waits with GATE_NOT_DEPLOYED.
 export interface FundingGatePort {
   address: Hex;
   // Remaining allowance of the agent role in the current period (Roles Modifier)
   allowance(): Promise<{ token: Hex; remaining: bigint }>;
-  nonce(): Promise<bigint>;
+  // The trust registries of this Safe, which the gate enforces on chain
+  isKnownSupplier(exporter: Hex, payout: Hex): Promise<boolean>;
+  hasRole(party: Hex, role: "carrier" | "arbiter" | "verifier"): Promise<boolean>;
   // The exact calldata the Safe executes (approve exact, then fund): its hash goes in the PDR
   safeCalldata(intent: FundIntent): Hex;
   executeCall(intent: FundIntent, signed: SignedPolicyDecision): Call;
@@ -197,17 +199,27 @@ export class Agent {
     if (!gate) return { orderId, state, outcome: "waiting", reason: "GATE_NOT_DEPLOYED" };
 
     const { po } = record;
-    const registry = this.deps.store.registry();
+    // The registries are read from the gate, which enforces them: the engine never approves a
+    // supplier or a third party the gate would reject. The exporter is listed so that one without
+    // an active payout pair is a new supplier (tier 2), not an unknown party.
+    const [known, ...thirds] = await Promise.all([
+      gate.isKnownSupplier(po.exporter, po.payoutAddress),
+      gate.hasRole(po.carrier, "carrier"),
+      gate.hasRole(po.arbiter, "arbiter"),
+      gate.hasRole(po.documentVerifier, "verifier"),
+    ]);
+    const trusted = [po.carrier, po.arbiter, po.documentVerifier].filter((_, i) => thirds[i]);
     const context: FundingContext = {
       now: Number(now),
       safe: this.config.safe,
       escrow: this.config.escrow,
       escrowOrder: { state, orderHash: record.orderHash },
-      registeredParties: registry.parties.map((p) => p.address),
-      knownSuppliers: registry.knownSuppliers,
+      registeredParties: [po.importer, po.exporter, ...trusted],
+      knownSuppliers: known ? [{ exporter: po.exporter, payoutAddress: po.payoutAddress }] : [],
       allowance: await gate.allowance(),
-      history: registry.history[po.exporter.toLowerCase()] ?? [],
-      nonce: await gate.nonce(),
+      history: this.deps.store.registry().history[po.exporter.toLowerCase()] ?? [],
+      // One nonce per order version: a retry after a crash can never fund twice (the gate marks it used)
+      nonce: BigInt(record.orderHash),
     };
     const out = evaluateFunding(po, context, this.config.policy.funding);
     const failing = out.rules.filter((r) => r.tier === out.tier);

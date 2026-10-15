@@ -30,7 +30,7 @@ description: Cómo encontrar, leer y actualizar la documentación de Keel (bundl
 | Amenazas y riesgo residual | `docs/flujo/amenazas.md`, `docs/personal/amenazas.md` |
 | Alcance, trabajo futuro, lo que no se promete | `docs/flujo/alcance.md` |
 | Decisiones ya tomadas (D1 a D14) | `docs/decisiones/transversales.md` |
-| Decisiones abiertas (1 a 15) | `docs/decisiones/abiertas.md` |
+| Decisiones abiertas (1 a 16) | `docs/decisiones/abiertas.md` |
 | Keel Personal (pago de cuentas) | `docs/personal/keel-personal.md` |
 | Token, red, fiat, bancos, regulación | `docs/pagos/` |
 | Tareas `Tn.m`, entregables y recortes de un área | `docs/trabajo/area-n-*.md` |
