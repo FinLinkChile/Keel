@@ -5,13 +5,15 @@
 //   POST /trade/documents a Keel Trade document from the app       EIP-712 signature of a party
 // Without a webhook token the server does not start; without an admin token the admin
 // routes do not exist. The two tokens must differ: the forwarder cannot administer.
-// Without an orders file the trade route does not exist.
+// Without an orders file the trade route does not exist. With INGEST_APP_ORIGIN, the trade route
+// answers CORS for that one origin, so the app can upload from the browser; no other route does.
 import { createHash, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type RequestListener, type Server, type ServerResponse } from "node:http";
 import type { DNSResolver } from "mailauth";
 import { z } from "zod";
 import { ALIAS_IDS } from "@keel/schemas";
+import { botNotifierFromEnv, scheduleChangeDigest, type BotLogEntry, type BotNotifier } from "./botNotifier";
 import { MAX_EMAIL_BYTES } from "./email/mime";
 import { receiveEmail, type EmailOutcome } from "./email/receive";
 import type { AliasTable } from "./parser";
@@ -93,6 +95,20 @@ export class ServerConfigError extends Error {
   override name = "ServerConfigError";
 }
 
+// An exact origin: scheme, host and optional port, https except for localhost
+function checkOrigin(origin: string): void {
+  let url: URL;
+  try {
+    url = new URL(origin);
+  } catch {
+    throw new ServerConfigError("INGEST_APP_ORIGIN is not a valid origin");
+  }
+  const local = url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname);
+  if (url.origin !== origin || (url.protocol !== "https:" && !local)) {
+    throw new ServerConfigError("INGEST_APP_ORIGIN must be an exact https origin, e.g. https://app.example (http only for localhost)");
+  }
+}
+
 export interface LogEntry {
   at: string;
   messageHash: string;
@@ -119,6 +135,10 @@ export interface ServerDeps {
   resolver?: DNSResolver;
   // Keel Trade uploads. Without it the route does not exist.
   trade?: { orders: OrderRegistry; chainId: number };
+  // The Telegram bot (Area 4). Told after every outcome, without waiting for it.
+  bot?: BotNotifier;
+  // The app's origin (Area 4), e.g. https://app.keel.example. Only the trade route answers CORS.
+  appOrigin?: string;
   // The activity log. Receives typed fields only, never message content.
   log?: (entry: LogEntry | SettingsAudit | TradeLogEntry) => void;
 }
@@ -164,6 +184,16 @@ export function createHandler(deps: ServerDeps): RequestListener {
     }
   }
   const log = deps.log ?? ((entry) => console.log(JSON.stringify(entry)));
+  if (deps.appOrigin !== undefined) checkOrigin(deps.appOrigin);
+
+  // CORS for the trade route only, and only for the configured origin. The signature is the
+  // authentication, so the browser sends no cookies and none are allowed.
+  const cors = (req: IncomingMessage, res: ServerResponse) => {
+    if (deps.appOrigin && req.headers.origin === deps.appOrigin) {
+      res.setHeader("access-control-allow-origin", deps.appOrigin);
+      res.setHeader("vary", "origin");
+    }
+  };
 
   const inbound = async (req: IncomingMessage, res: ServerResponse) => {
     if (!bearer(req, deps.webhookToken)) return reply(res, 401, { error: "unauthorized" });
@@ -179,6 +209,7 @@ export function createHandler(deps: ServerDeps): RequestListener {
     );
     const reason = "reason" in outcome ? String(outcome.reason) : undefined;
     log({ at: new Date().toISOString(), messageHash: outcome.messageHash, status: outcome.status, reason, auth: outcome.auth });
+    deps.bot?.send({ source: "email", outcome });
     reply(res, 200, { status: outcome.status, ...(reason ? { reason } : {}) });
   };
 
@@ -207,6 +238,7 @@ export function createHandler(deps: ServerDeps): RequestListener {
     const reason = "reason" in outcome ? String(outcome.reason) : undefined;
     const fileHash = "fileHash" in outcome ? outcome.fileHash : undefined;
     log({ at: new Date().toISOString(), kind: "trade_document", orderId: body.orderId, fileHash, status: outcome.status, reason });
+    deps.bot?.send({ source: "trade_upload", outcome });
     if (outcome.status === "rejected") {
       const code = { too_large: 413, unknown_order: 404, unknown_doc_type: 400, bad_signature: 401, stale_signature: 401, not_a_party: 403 }[outcome.reason];
       return reply(res, code, { status: "rejected", reason: outcome.reason });
@@ -250,7 +282,18 @@ export function createHandler(deps: ServerDeps): RequestListener {
     try {
       if (req.url === "/inbound" && req.method === "POST") return await inbound(req, res);
       if (req.url === "/admin/settings" && deps.adminToken) return await admin(req, res, deps.adminToken);
-      if (req.url === "/trade/documents" && req.method === "POST" && deps.trade) return await tradeUpload(req, res, deps.trade);
+      if (req.url === "/trade/documents" && deps.trade) {
+        cors(req, res);
+        if (req.method === "OPTIONS" && deps.appOrigin) {
+          res.writeHead(204, {
+            "access-control-allow-methods": "POST",
+            "access-control-allow-headers": "content-type",
+            "access-control-max-age": "600",
+          });
+          return res.end();
+        }
+        if (req.method === "POST") return await tradeUpload(req, res, deps.trade);
+      }
       reply(res, 404, { error: "not_found" });
     } catch (e) {
       console.error("request failed", e instanceof Error ? e.name : "unknown");
@@ -262,6 +305,7 @@ export function createHandler(deps: ServerDeps): RequestListener {
 // INGEST_WEBHOOK_TOKEN, INGEST_ADMIN_TOKEN (optional), INGEST_ALIASES_FILE (Keel Personal),
 // INGEST_ORDERS_FILE and INGEST_CHAIN_ID (Keel Trade), INGEST_DB_FILE (default ingest.db),
 // INGEST_SETTINGS_FILE (optional), INGEST_HOST (default 127.0.0.1), INGEST_PORT (default 8788),
+// INGEST_APP_ORIGIN (optional, CORS for the trade route), BOT_URL and BOT_INGEST_TOKEN (optional),
 // the per-provider API keys and the initial LLM_* settings.
 export async function startServer(env: Record<string, string | undefined> = process.env): Promise<Server> {
   if (!env.INGEST_ALIASES_FILE && !env.INGEST_ORDERS_FILE) {
@@ -277,7 +321,8 @@ export async function startServer(env: Record<string, string | undefined> = proc
     const orders: TradeOrderEntry[] = OrdersSchema.parse(JSON.parse(await readFile(env.INGEST_ORDERS_FILE, "utf8")));
     trade = { orders: staticOrders(orders), chainId };
   }
-  const log = (entry: LogEntry | SettingsAudit | TradeLogEntry) => console.log(JSON.stringify(entry));
+  const log = (entry: LogEntry | SettingsAudit | TradeLogEntry | BotLogEntry) => console.log(JSON.stringify(entry));
+  const bot = botNotifierFromEnv(env, log);
   const settings = await SettingsStore.open({
     fallback: initialSettings(env),
     keys: keysFromEnv(env),
@@ -285,15 +330,20 @@ export async function startServer(env: Record<string, string | undefined> = proc
     file: env.INGEST_SETTINGS_FILE || undefined,
     audit: log,
   });
+  const store = new IngestStore(env.INGEST_DB_FILE || "ingest.db");
   const handler = createHandler({
     webhookToken: env.INGEST_WEBHOOK_TOKEN ?? "",
     adminToken: env.INGEST_ADMIN_TOKEN || undefined,
     aliases,
     settings,
-    store: new IngestStore(env.INGEST_DB_FILE || "ingest.db"),
+    store,
     trade,
+    bot,
+    appOrigin: env.INGEST_APP_ORIGIN || undefined,
     log,
   });
+  // Keel Personal: one daily summary of beneficiary change requests (T3.2)
+  if (bot && aliases.length > 0) scheduleChangeDigest(bot, (since) => store.changeDigest(since));
   const host = env.INGEST_HOST || "127.0.0.1";
   const port = Number(env.INGEST_PORT || 8788);
   return new Promise((resolve) => {

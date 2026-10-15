@@ -201,3 +201,62 @@ describe("POST /trade/documents", () => {
     expect(logs.at(-1)).toMatchObject({ kind: "trade_document", orderId: set.order.orderId, status: "quarantined", reason: "not_pdf" });
   });
 });
+
+describe("bot notifications and CORS", () => {
+  const set = LEGIT_SETS[0]!;
+  const APP = "https://app.keel.example";
+  let base: string;
+  let srv: Server;
+  const sent: unknown[] = [];
+
+  beforeAll(async () => {
+    const handler = createHandler({
+      webhookToken: WEBHOOK,
+      aliases: [{ alias: ALIAS_IDS[0], rut: "761234560", emailDomain: "aduanasperez.cl" }],
+      settings: await newStore(),
+      store: new IngestStore(":memory:"),
+      resolver: fakeDns([{ domain: makeDomain("aduanasperez.cl") }]),
+      trade: { orders: corpusOrders, chainId: CORPUS_CHAIN_ID },
+      bot: { send: (p) => sent.push(p), idle: async () => {} },
+      appOrigin: APP,
+      log: () => {},
+    });
+    srv = createServer(handler);
+    await new Promise<void>((r) => srv.listen(0, "127.0.0.1", r));
+    base = `http://127.0.0.1:${(srv.address() as AddressInfo).port}`;
+  });
+
+  afterAll(() => new Promise<void>((r) => srv.close(() => r())));
+
+  it("tells the bot every email and trade outcome, as is", async () => {
+    const raw = composeEmail({ from: "facturas@aduanasperez.cl", pdfs: [await renderInvoice(sampleSpec())] });
+    await fetch(`${base}/inbound`, { method: "POST", body: raw, headers: { authorization: `Bearer ${WEBHOOK}` } });
+    await fetch(`${base}/trade/documents`, {
+      method: "POST",
+      body: JSON.stringify({ orderId: set.order.orderId, docType: "COMMERCIAL_INVOICE", issuedAt: 1, signature: `0x${"00".repeat(65)}`, file: "" }),
+    });
+    expect(sent).toMatchObject([
+      { source: "email", outcome: { status: "quarantined" } },
+      { source: "trade_upload", outcome: { status: "rejected" } },
+    ]);
+  });
+
+  it("answers CORS on the trade route for the app's origin only", async () => {
+    const pre = await fetch(`${base}/trade/documents`, { method: "OPTIONS", headers: { origin: APP } });
+    expect(pre.status).toBe(204);
+    expect(pre.headers.get("access-control-allow-origin")).toBe(APP);
+    expect(pre.headers.get("access-control-allow-methods")).toBe("POST");
+    const other = await fetch(`${base}/trade/documents`, { method: "OPTIONS", headers: { origin: "https://evil.example" } });
+    expect(other.headers.get("access-control-allow-origin")).toBeNull();
+    const inbound = await fetch(`${base}/inbound`, { method: "POST", headers: { origin: APP } });
+    expect(inbound.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("refuses an origin that is not exact or not https", async () => {
+    const base = { webhookToken: WEBHOOK, aliases: [], settings: await newStore(), store: new IngestStore(":memory:") };
+    for (const bad of ["http://app.example", "https://app.example/path", "*", "app.example"]) {
+      expect(() => createHandler({ ...base, appOrigin: bad }), bad).toThrow(ServerConfigError);
+    }
+  });
+});
+

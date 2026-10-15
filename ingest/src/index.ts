@@ -26,6 +26,15 @@ export { MIME_FAILURES, type MimeFailure } from "./email/mime";
 export { receiveEmail, type EmailOutcome, type QuarantineReason } from "./email/receive";
 export { createHandler, ServerConfigError, startServer, type LogEntry, type TradeLogEntry } from "./server";
 export {
+  BotConfigError,
+  botNotifierFromEnv,
+  createBotNotifier,
+  scheduleChangeDigest,
+  type BotLogEntry,
+  type BotNotifier,
+  type BotPayload,
+} from "./botNotifier";
+export {
   IngestSettings,
   KEY_ENV,
   SettingsError,
