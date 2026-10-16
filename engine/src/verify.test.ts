@@ -1,9 +1,9 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type Hex, keelDomain, type PaymentIntent } from "@keel/schemas";
+import { type FundIntent, type Hex, keelDomain, type PaymentIntent, type PolicyDecision } from "@keel/schemas";
 import { structHash } from "@keel/schemas/hash";
-import { encodeAbiParameters, encodeEventTopics, parseAbi } from "viem";
+import { encodeAbiParameters, encodeEventTopics, encodeFunctionData, erc20Abi, parseAbi } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { evaluateFunding } from "./funding";
@@ -11,49 +11,105 @@ import { buildPolicyDecision, issueDocumentPdr, issuePaymentPdr, type PdrEvidenc
 import { TRADE_RULES_VERSION, tradePolicy, tradePolicyHash } from "./policy";
 import { compile, createChain } from "./testing/chain";
 import { address, attestation, documentContext, extractions, fundingContext, order, word } from "./testing/fixtures";
-import { type ChainFacts, type Check, candidateHashes, loadEvidence, parseEvidence, verdict, verifyEvidence } from "./verify";
+import {
+  type ChainFacts,
+  type ChainLog,
+  type ChainReader,
+  type Check,
+  candidateHashes,
+  loadDeployment,
+  loadEvidence,
+  parseEvidence,
+  verdict,
+  verifyEvidence,
+} from "./verify";
 
 const ESCROW = address(0xe5c0);
 const GATE = address(0x6a7e);
+const OTHER = address(0xbad);
 const verifierKey = privateKeyToAccount(word("test document verifier"));
 const policySigner = privateKeyToAccount(word("test policy signer"));
+const forger = privateKeyToAccount(word("not a key Keel trusts"));
 const policy = tradePolicy(word("roles-config-v1"));
+const verifiedOrder = { ...order, documentVerifier: verifierKey.address };
+
+const EVENTS = parseAbi([
+  "event BalanceReleased(bytes32 indexed orderId, address indexed to, uint256 amount, bytes32 authorizationDigest)",
+  "event FundingExecuted(bytes32 indexed intentHash, bytes32 pdrHash, uint8 tier, bytes32 indexed orderId)",
+]);
 
 // The verifier always reads the evidence back from its file, as `keel verify` does
 const roundTrip = (e: PdrEvidence) => parseEvidence(serializeEvidence(e));
 const outcomes = (checks: readonly Check[]) => Object.fromEntries(checks.map((c) => [c.check, c.outcome]));
 const failed = (checks: readonly Check[]) => checks.filter((c) => c.outcome === "mismatch").map((c) => c.check);
 
-async function documentEvidence(): Promise<PdrEvidence> {
+// What the chain says at the block of the transaction: the gate's policy signer and the order
+const reader = (over: Partial<{ policySigner: Hex; documentVerifier: Hex }> = {}): ChainReader => ({
+  policySigner: async () => over.policySigner ?? policySigner.address,
+  order: async () => ({ orderHash: structHash("PurchaseOrder", verifiedOrder), documentVerifier: over.documentVerifier ?? verifierKey.address }),
+});
+
+const trade = (logs: ChainLog[], read = reader()): ChainFacts => ({
+  chainId: 1,
+  status: "success",
+  blockNumber: 7n,
+  logs,
+  deployment: { chainId: 1, fundingGate: GATE, tradeEscrow: ESCROW },
+  read,
+});
+
+function balanceReleased(digest: Hex, emitter = ESCROW): ChainLog {
+  const topics = encodeEventTopics({ abi: EVENTS, eventName: "BalanceReleased", args: { orderId: order.orderId, to: order.payoutAddress } });
+  const data = encodeAbiParameters([{ type: "uint256" }, { type: "bytes32" }], [5_000_000_000n, digest]);
+  return { address: emitter, topics: topics as Hex[], data };
+}
+
+function fundingExecuted(e: PdrEvidence, emitter = GATE): ChainLog {
+  const intent = e.intent as FundIntent;
+  const topics = encodeEventTopics({ abi: EVENTS, eventName: "FundingExecuted", args: { intentHash: (e.decision as PolicyDecision).intentHash, orderId: intent.orderId } });
+  const data = encodeAbiParameters([{ type: "bytes32" }, { type: "uint8" }], [e.pdrHash, 1]);
+  return { address: emitter, topics: topics as Hex[], data };
+}
+
+async function documentEvidence(signer = verifierKey): Promise<PdrEvidence> {
   const { evidence } = await issueDocumentPdr({
-    order: { ...order, documentVerifier: verifierKey.address },
+    // A forger also writes an order that names it as the verifier: the engine signs nothing else
+    order: { ...order, documentVerifier: signer.address },
     attestation,
     extractions,
     context: documentContext,
     policy,
     domain: keelDomain(1, ESCROW),
-    signer: verifierKey,
+    signer,
   });
   return evidence!;
 }
 
-async function fundingEvidence(): Promise<PdrEvidence> {
+async function fundingEvidence(signer = policySigner): Promise<PdrEvidence> {
   const out = evaluateFunding(order, fundingContext, policy.funding);
-  const calldata = "0x8ca0c7b3" as Hex; // stands in for the Trade gate call until Area 1 defines it
+  const intent = out.intent!;
+  // What FundingGate executes and binds: abi.encode(approveData, fundData)
+  const calldata = encodeAbiParameters(
+    [{ type: "bytes" }, { type: "bytes" }],
+    [
+      encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [intent.escrow, intent.amount] }),
+      encodeFunctionData({ abi: parseAbi(["function fund(bytes32 orderId)"]), functionName: "fund", args: [intent.orderId] }),
+    ],
+  );
   const decision = buildPolicyDecision({
-    intentHash: structHash("FundIntent", out.intent!),
+    intentHash: structHash("FundIntent", intent),
     calldata,
     policyHash: tradePolicyHash(policy),
     inputsHash: out.inputsHash,
     tier: 1,
-    expiresAt: out.intent!.deadline,
+    expiresAt: intent.deadline,
   });
-  const signed = await signPolicyDecision(decision, keelDomain(1, GATE), policySigner);
+  const signed = await signPolicyDecision(decision, keelDomain(1, GATE), signer);
   return {
     mode: "trade",
     issuedAt: fundingContext.now,
     ...signed,
-    intent: out.intent,
+    intent,
     calldata,
     rules: out.rules,
     replay: { kind: "funding", policy, order, context: fundingContext },
@@ -61,9 +117,9 @@ async function fundingEvidence(): Promise<PdrEvidence> {
 }
 
 describe("keel verify: document decision of trigger 2", () => {
-  it("an untouched evidence file replays to the same decision", async () => {
+  it("an untouched evidence file replays to the same decision, but alone it is evidence only", async () => {
     const checks = await verifyEvidence(roundTrip(await documentEvidence()));
-    expect(verdict(checks)).toBe("MATCH");
+    expect(verdict(checks)).toBe("EVIDENCE ONLY");
     expect(checks.filter((c) => c.outcome !== "match")).toEqual([]);
     expect(outcomes(checks)).toMatchObject({ "pdr hash": "match", signature: "match", rules: "match", "inputs hash": "match", decision: "match" });
   });
@@ -96,9 +152,7 @@ describe("keel verify: document decision of trigger 2", () => {
   it("a decision edited after signing breaks the PDR hash and the signature", async () => {
     const e = await documentEvidence();
     const decision = { ...e.decision, expiresAt: e.decision.expiresAt + 3600n };
-    expect(failed(await verifyEvidence(roundTrip({ ...e, decision })))).toEqual(
-      expect.arrayContaining(["pdr hash", "signature", "decision"]),
-    );
+    expect(failed(await verifyEvidence(roundTrip({ ...e, decision })))).toEqual(expect.arrayContaining(["pdr hash", "signature", "decision"]));
   });
 
   it("a decision made with another version of the rules is not replayed with this one", async () => {
@@ -109,27 +163,52 @@ describe("keel verify: document decision of trigger 2", () => {
     expect(checks.find((c) => c.check === "replay")!.note).toContain(TRADE_RULES_VERSION);
   });
 
-  it("finds the balance release by its authorization digest and checks the order", async () => {
+  it("anchored: the deployed escrow released the balance on this decision, signed by the order's verifier", async () => {
     const e = await documentEvidence();
-    const abi = parseAbi(["event BalanceReleased(bytes32 indexed orderId, address indexed to, uint256 amount, bytes32 authorizationDigest)"]);
-    const topics = encodeEventTopics({ abi, eventName: "BalanceReleased", args: { orderId: order.orderId, to: order.payoutAddress } });
-    const data = encodeAbiParameters([{ type: "uint256" }, { type: "bytes32" }], [5_000_000_000n, e.pdrHash]);
-    const facts: ChainFacts = { chainId: 1, status: "success", logs: [{ address: ESCROW, topics: topics as Hex[], data }] };
-
-    expect(candidateHashes(facts)).toContain(e.pdrHash);
+    const facts = trade([balanceReleased(e.pdrHash)]);
+    expect(candidateHashes(facts)).toEqual([e.pdrHash.toLowerCase()]);
     const checks = await verifyEvidence(roundTrip(e), facts);
     expect(verdict(checks)).toBe("MATCH");
-    expect(outcomes(checks)).toMatchObject({ "event contract": "match", "event order": "match" });
+    expect(outcomes(checks)).toMatchObject({ "verifying contract": "match", event: "match", "event order": "match", "signer on chain": "match", "order on chain": "match" });
+  });
 
-    const elsewhere = await verifyEvidence(roundTrip(e), { ...facts, logs: [{ ...facts.logs[0]!, address: GATE }] });
-    expect(failed(elsewhere)).toEqual(["event contract"]);
+  it("a forged file signed by any key, emitted by any contract, is not a MATCH", async () => {
+    // The review's attack: arbitrary key, a contract of its own that emits the hash
+    const forged = await documentEvidence(forger);
+    const own = await verifyEvidence(roundTrip(forged), trade([balanceReleased(forged.pdrHash, OTHER)]));
+    expect(verdict(own)).toBe("MISMATCH");
+    expect(failed(own)).toEqual(["event"]);
+    expect(candidateHashes(trade([balanceReleased(forged.pdrHash, OTHER)]))).toEqual([]);
+
+    // Even through the real escrow, the order it holds names another verifier
+    const viaEscrow = await verifyEvidence(roundTrip(forged), trade([balanceReleased(forged.pdrHash)]));
+    expect(failed(viaEscrow)).toEqual(["signer on chain", "order on chain"]);
+  });
+
+  it("selects the log by emitter and event, not by any word that carries the hash", async () => {
+    const e = await documentEvidence();
+    const decoy: ChainLog = { address: OTHER, topics: [word("Unrelated(bytes32)"), e.pdrHash], data: "0x" };
+    const checks = await verifyEvidence(roundTrip(e), trade([decoy, balanceReleased(e.pdrHash)]));
+    expect(verdict(checks)).toBe("MATCH");
+  });
+
+  it("without the deployment file of the chain nothing is anchored", async () => {
+    const e = await documentEvidence();
+    const checks = await verifyEvidence(roundTrip(e), { ...trade([balanceReleased(e.pdrHash)]), deployment: null });
+    expect(failed(checks)).toEqual(["deployment"]);
+  });
+
+  it("the replayed order must be the one the escrow holds", async () => {
+    const e = await documentEvidence();
+    const facts = trade([balanceReleased(e.pdrHash)], { ...reader(), order: async () => ({ orderHash: word("other order"), documentVerifier: verifierKey.address }) });
+    expect(failed(await verifyEvidence(roundTrip(e), facts))).toEqual(["order on chain"]);
   });
 });
 
 describe("keel verify: funding decision", () => {
   it("an untouched evidence file replays to the same tier, intent and inputs", async () => {
     const checks = await verifyEvidence(roundTrip(await fundingEvidence()));
-    expect(verdict(checks)).toBe("MATCH");
+    expect(verdict(checks)).toBe("EVIDENCE ONLY");
     expect(outcomes(checks)).toMatchObject({ "intent hash": "match", "calldata hash": "match", tier: "match", intent: "match", "inputs hash": "match" });
   });
 
@@ -149,6 +228,28 @@ describe("keel verify: funding decision", () => {
     const e = await fundingEvidence();
     const replay = { ...e.replay!, policy: tradePolicy(word("roles-config-v1"), { ...policy.funding, amountToleranceBps: 5000 }) };
     expect(failed(await verifyEvidence(roundTrip({ ...e, replay })))).toContain("policy hash");
+  });
+
+  it("anchored: FundingExecuted of the deployed gate, signed by the gate's policy signer at that block", async () => {
+    const e = await fundingEvidence();
+    const checks = await verifyEvidence(roundTrip(e), trade([fundingExecuted(e)]));
+    expect(verdict(checks)).toBe("MATCH");
+    expect(outcomes(checks)).toMatchObject({ event: "match", "event intent hash": "match", "event tier": "match", "event order": "match", "signer on chain": "match" });
+  });
+
+  it("a signer the gate did not hold at that block is not a MATCH", async () => {
+    const e = await fundingEvidence();
+    const rotated = await verifyEvidence(roundTrip(e), trade([fundingExecuted(e)], reader({ policySigner: OTHER })));
+    expect(failed(rotated)).toEqual(["signer on chain"]);
+  });
+});
+
+describe("keel verify: the deployment file", () => {
+  it("reads the official addresses of a chain, and nothing when the file is missing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "keel-deployments-"));
+    writeFileSync(join(dir, "84532.json"), JSON.stringify({ pdrGate: GATE, fundingGate: GATE.toUpperCase().replace("0X", "0x"), safe: OTHER, tradeEscrow: "not an address" }));
+    expect(loadDeployment(dir, 84532)).toEqual({ chainId: 84532, pdrGate: GATE, fundingGate: GATE, tradeEscrow: undefined });
+    expect(loadDeployment(dir, 1)).toBeNull();
   });
 });
 
@@ -179,6 +280,12 @@ describe("keel verify: a Keel Personal payment executed by the real PDRGate", ()
     await chain.send("MockUSDC", usdc, "mint", [safe, 1_000_000_000n], OWNER);
   });
 
+  // The policy signer read from the real gate, as the CLI reads it at the block of the transaction
+  const gateReader = (): ChainReader => ({
+    policySigner: (g) => chain.read<Hex>("PDRGate", g, "policySigner"),
+    order: () => Promise.reject(new Error("no escrow in Personal")),
+  });
+
   async function pay(): Promise<{ evidence: PdrEvidence; facts: ChainFacts }> {
     const intent: PaymentIntent = {
       aliasId: 2,
@@ -201,10 +308,11 @@ describe("keel verify: a Keel Personal payment executed by the real PDRGate", ()
     const logs = await chain.send("PDRGate", gate, "execute", [pdr.intent, pdr.decision, pdr.signature, "0x"], address(0x7e));
     const { intent: i, calldata, ...signed } = pdr;
     const evidence: PdrEvidence = { mode: "personal", issuedAt: NOW, ...signed, intent: i, calldata, rules: [] };
-    return { evidence, facts: { chainId: 1, status: "success", logs } };
+    const facts: ChainFacts = { chainId: 1, status: "success", blockNumber: 1n, logs, deployment: { chainId: 1, pdrGate: gate.toLowerCase() as Hex }, read: gateReader() };
+    return { evidence, facts };
   }
 
-  it("goes from the transaction logs to the evidence file and checks the event against the decision", async () => {
+  it("goes from the transaction logs to the evidence file and anchors it to the gate's signer", async () => {
     const { evidence, facts } = await pay();
     const dir = mkdtempSync(join(tmpdir(), "keel-verify-"));
     saveEvidence(dir, evidence);
@@ -217,9 +325,11 @@ describe("keel verify: a Keel Personal payment executed by the real PDRGate", ()
     expect(outcomes(checks)).toMatchObject({
       "intent hash": "match",
       "calldata hash": "match",
-      "event contract": "match",
+      "verifying contract": "match",
+      event: "match",
       "event intent hash": "match",
       "event tier": "match",
+      "signer on chain": "match",
       replay: "skipped",
     });
   });
@@ -230,6 +340,7 @@ describe("keel verify: a Keel Personal payment executed by the real PDRGate", ()
     expect(failed(await verifyEvidence(e, { ...facts, chainId: 84532 }))).toEqual(["chain id"]);
     expect(failed(await verifyEvidence(e, { ...facts, logs: [] }))).toEqual(["event"]);
     expect(failed(await verifyEvidence(e, { ...facts, status: "reverted" }))).toEqual(["transaction"]);
+    expect(failed(await verifyEvidence(e, { ...facts, deployment: { chainId: 1, pdrGate: OTHER } }))).toEqual(["verifying contract", "event"]);
   });
 
   it("there is no evidence for a hash that was never issued", () => {
