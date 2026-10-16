@@ -161,3 +161,37 @@ export async function renderCommercialInvoice(spec: CommercialInvoiceSpec): Prom
     spec.seed,
   );
 }
+
+// A proforma invoice as an exporter sends it before the order (T3.9). Fictitious companies.
+export interface ProformaSpec {
+  number: string;
+  date: string;
+  currency: string;
+  terms: string;
+  items: { description: string; hs: string; qty: number; unitPrice: string; amount: string }[];
+  total: string;
+  shipment: string;
+  payment: string;
+  bankLines?: string[];
+  notes?: string[];
+  extra?: ExtraText[];
+}
+
+export async function renderProforma(spec: ProformaSpec): Promise<Uint8Array> {
+  return render(
+    { company: "NINGBO LINGNAN HYDROCOLLOIDS CO., LTD.", title: "PROFORMA INVOICE" },
+    [
+      `Proforma No.: ${spec.number}`,
+      `Date: ${spec.date}`,
+      "Buyer: ACME IMPORTS SPA, SANTIAGO, CHILE",
+      `Terms of Delivery: ${spec.terms}`,
+      ...spec.items.map((i) => `${i.description}  ${i.qty} PCS  ${spec.currency} ${i.unitPrice}  ${spec.currency} ${i.amount}  HS Code: ${i.hs}`),
+      `TOTAL AMOUNT: ${spec.currency} ${spec.total}`,
+      `Latest Shipment: ${spec.shipment}`,
+      `Payment: ${spec.payment}`,
+      ...(spec.bankLines ?? []),
+      ...(spec.notes ?? []),
+    ],
+    spec.extra,
+  );
+}
