@@ -83,7 +83,8 @@ export type ProformaFields = {
 
 export type ProformaField = keyof ProformaFields;
 
-const FIELDS: readonly ProformaField[] = [
+// The fields of a reading, to count how many the agent read
+export const PROFORMA_FIELDS: readonly ProformaField[] = [
   'proforma_number',
   'issue_date',
   'currency',
@@ -133,14 +134,14 @@ const MAX_HS_CODES = 20;
 
 const isCurrency = (v: unknown): v is Currency => (CURRENCIES as readonly unknown[]).includes(v);
 const isIncoterm = (v: unknown): v is Incoterm => (INCOTERMS as readonly unknown[]).includes(v);
-const isField = (v: unknown): v is ProformaField => (FIELDS as readonly unknown[]).includes(v);
+const isField = (v: unknown): v is ProformaField => (PROFORMA_FIELDS as readonly unknown[]).includes(v);
 const isReference = (v: unknown): v is string => isText(v, REFERENCE);
 const isLocode = (v: unknown): v is string => isText(v, LOCODE);
 const isBps = (v: unknown): v is number => isUnix(v) && v <= 10_000;
 
 // Strict: any missing, extra or mistyped field makes the whole reading unusable.
 function readFields(p: unknown): ProformaFields | undefined {
-  if (!isObj(p) || !hasOnly(p, [...FIELDS, 'mentions_account_change', 'hidden_text_detected'])) return undefined;
+  if (!isObj(p) || !hasOnly(p, [...PROFORMA_FIELDS, 'mentions_account_change', 'hidden_text_detected'])) return undefined;
   if (typeof p.mentions_account_change !== 'boolean' || typeof p.hidden_text_detected !== 'boolean') return undefined;
   const hs = p.hs_codes;
   if (!Array.isArray(hs) || hs.length > MAX_HS_CODES || !hs.every((c) => isText(c, HS_CODE))) return undefined;

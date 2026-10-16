@@ -86,6 +86,22 @@ export type NeedsYou =
   | { kind: 'verify_supplier'; party: PartyId }
   | { kind: 'upload_documents'; orderId: Hex };
 
+// A supplier that went through the supplier check, with the payout account registered then. The
+// payout address is the only place an order takes its payee from.
+export type SupplierRecord = {
+  party: Party;
+  payoutAddress: Hex;
+};
+
+// The fixed third parties and the token of the corridor (carrier, arbiter and document verifier
+// are test keys in the prototype)
+export type TradeSetup = {
+  token: Hex;
+  carrier: Party;
+  arbiter: Party;
+  documentVerifier: Party;
+};
+
 // Read side of the app. The mock implementation lives in ./mock.ts; a real one reads the
 // contract events and the agent service.
 export interface KeelData {
@@ -97,4 +113,7 @@ export interface KeelData {
   orders(): Promise<Order[]>;
   order(orderId: Hex): Promise<Order | undefined>;
   needsYou(role: Role): Promise<NeedsYou[]>;
+  // Suppliers the importer can open an order with: only those that passed the supplier check
+  verifiedSuppliers(): Promise<SupplierRecord[]>;
+  tradeRegistry(): Promise<TradeSetup>;
 }

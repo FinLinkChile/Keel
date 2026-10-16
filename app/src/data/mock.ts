@@ -4,7 +4,7 @@ import { getAddress, keccak256, stringToBytes } from 'viem';
 
 import { centsToToken } from './amounts';
 import { orderIdOf } from './orderRules';
-import type { Account, KeelData, NeedsYou, Order, OrderStage, Party, PartyId, Role, Wallet } from './types';
+import type { Account, KeelData, NeedsYou, Order, OrderStage, Party, PartyId, Role, SupplierRecord, Wallet } from './types';
 
 // Test data for the screens and the single source of the demo data files (scripts/demo-data.ts).
 // Order ids, labels and party slugs match bot/examples so the app, the bot, ingest and the agent
@@ -165,6 +165,15 @@ const NEEDS_YOU: Record<Role, Pending[]> = {
   exporter: [{ kind: 'upload_documents', label: 'PO-0142' }],
 };
 
+// A supplier is verified once its payout account is registered and no supplier check is pending
+// for it: Kowloon's check is open (PO-0151 waits on it), so it cannot receive a new order yet.
+const verifiedSuppliers = (): SupplierRecord[] => {
+  const pending = new Set(NEEDS_YOU.importer.flatMap((n) => (n.kind === 'verify_supplier' ? [n.party] : [])));
+  return parties()
+    .filter((p) => PAYOUT[p.id] && !pending.has(p.id))
+    .map((party) => ({ party, payoutAddress: PAYOUT[party.id] }));
+};
+
 const idOf = (label: string) => ORDERS().find((o) => o.label === label)!.po.orderId;
 
 export const mockData: KeelData = {
@@ -176,4 +185,11 @@ export const mockData: KeelData = {
   order: async (orderId) => ORDERS().find((o) => o.po.orderId === orderId),
   needsYou: async (role) =>
     NEEDS_YOU[role].map((n): NeedsYou => (n.kind === 'verify_supplier' ? n : { kind: n.kind, orderId: idOf(n.label) })),
+  verifiedSuppliers: async () => verifiedSuppliers(),
+  tradeRegistry: async () => ({
+    token: USDC,
+    carrier: parties().find((p) => p.id === 'harbor-line')!,
+    arbiter: parties().find((p) => p.id === 'hk-arbitration')!,
+    documentVerifier: parties().find((p) => p.id === 'keel-verifier')!,
+  }),
 };

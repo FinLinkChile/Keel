@@ -1,13 +1,13 @@
-import { pickImage } from './pickImage';
-import type { PickedImage } from './pickImage.types';
-import { pickPdf } from './pickPdf';
+import { pickFile } from './pickFile';
+import { takePhoto } from './takePhoto';
+import type { PickedPhoto } from './takePhoto.types';
 
-// The three ways to give the app a proforma. The new order screen shows them as buttons; each
-// call has to start from a tap on the web.
-export type ProformaSource = 'camera' | 'gallery' | 'pdf';
+// The two ways to give the app a proforma. The new order screen offers them in a sheet; each call
+// has to start from a tap on the web.
+export type ProformaSource = 'camera' | 'file';
 
-// The chosen file's exact bytes: a JPEG photo (never HEIC) or a PDF. ingest reads the type from
-// the bytes, so nothing here declares it.
-export async function pickProforma(source: ProformaSource): Promise<PickedImage> {
-  return source === 'pdf' ? pickPdf() : pickImage(source);
+// The chosen file's exact bytes: a JPEG photo (never HEIC), or a PDF or image from the file
+// picker. ingest reads the type from the bytes, so nothing here declares it.
+export async function pickProforma(source: ProformaSource): Promise<PickedPhoto> {
+  return source === 'file' ? pickFile() : takePhoto();
 }
