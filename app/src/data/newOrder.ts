@@ -5,6 +5,7 @@ import { getRandomValues } from 'expo-crypto';
 
 import type { ProformaReading } from '../ingest/proforma';
 
+import { centsToToken } from './amounts';
 import { checkOrderShape, orderIdOf, type OrderProblem } from './orderRules';
 
 // New order from the proforma, up to the point where it can be signed (step 0 of the flow, the
@@ -70,9 +71,6 @@ export const REQUIRED_DOCS: readonly RequiredDocType[] = ['BILL_OF_LADING', 'COM
 // The token is USDC. The amount of a USD invoice is the token amount; another currency would
 // need an exchange rate nobody has agreed on, so it is blocked instead of converted.
 const TOKEN_CURRENCY: Currency = 'USD';
-const CURRENCY_DECIMALS = 2;
-const TOKEN_DECIMALS = 6;
-const CENTS_TO_TOKEN_UNITS = 10n ** BigInt(TOKEN_DECIMALS - CURRENCY_DECIMALS);
 
 // ASSUMPTION (open point 3 of PR #66, undecided): documentHash is the hash of the proforma file,
 // as ingest returns it, until the team decides what "the full order document" is.
@@ -147,7 +145,7 @@ export function buildOrder(form: OrderForm, registry: TradeRegistry, { now, nonc
     payoutAddress: supplier!.payoutAddress,
     token: registry.token,
     // Cents to token units
-    totalAmount: BigInt(amount!) * CENTS_TO_TOKEN_UNITS,
+    totalAmount: centsToToken(BigInt(amount!)),
     advanceBps: advance!,
     shipmentDeadline: BigInt(deadline!),
     disputeWindow: BigInt(Math.round((form.disputeDays ?? DEFAULT_DISPUTE_DAYS) * 24 * 3600)),
