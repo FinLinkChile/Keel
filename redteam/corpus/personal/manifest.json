@@ -1,0 +1,953 @@
+{
+  "description": "Keel Personal bill corpus (T3.8). Every company and person is fictitious. Each bill arrives by email: `delivery` says how the email is built (signed by the registered domain, forged, look-alike domain, or a signed email whose attachment was swapped), `attachments` overrides the single PDF, and `setup` lists what was received before (`base`: the legitimate bill of the same issuer and period, `same_email`: this very email). `expected` is the ingest outcome with an honest reader. Run in CI by ingest/src/personalCorpus.test.ts.",
+  "aliases": [
+    {
+      "alias": "ARRIENDO",
+      "rut": "768901236",
+      "emailDomain": "inmobiliariacordillera.cl",
+      "knownDestinations": [
+        {
+          "kind": "bank_account",
+          "value": "000123456789"
+        }
+      ]
+    },
+    {
+      "alias": "LUZ",
+      "rut": "965432108",
+      "emailDomain": "electricadelsur.cl",
+      "knownDestinations": [
+        {
+          "kind": "bank_account",
+          "value": "22334455"
+        }
+      ]
+    },
+    {
+      "alias": "INTERNET",
+      "rut": "776655449",
+      "emailDomain": "fibranet.cl",
+      "knownDestinations": [
+        {
+          "kind": "bank_account",
+          "value": "9876543210"
+        }
+      ]
+    },
+    {
+      "alias": "GASTOS_COMUNES",
+      "rut": "651234565",
+      "emailDomain": "edificiolosaromos.cl",
+      "knownDestinations": [
+        {
+          "kind": "bank_account",
+          "value": "55667788"
+        }
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "id": "P01",
+      "kind": "legit",
+      "alias": "ARRIENDO",
+      "path": "legit/P01-arriendo-202608.pdf",
+      "fileHash": "0x5722cd0baf7beb6f50eb0f77b8df3ee2dcd495725b08df60155a2f5d66a0b52e",
+      "delivery": "signed",
+      "truth": {
+        "alias_id": "ARRIENDO",
+        "issuer_tax_id": "768901236",
+        "invoice_number": "1037",
+        "period": "202608",
+        "amount_clp": 500000,
+        "due_date": 1787184000,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready"
+      }
+    },
+    {
+      "id": "P02",
+      "kind": "legit",
+      "alias": "ARRIENDO",
+      "path": "legit/P02-arriendo-202609.pdf",
+      "fileHash": "0x32cf9df8675a4b33265eb12ce55091e7f521a6deb545a4d0d682b5620bc9b033",
+      "delivery": "signed",
+      "truth": {
+        "alias_id": "ARRIENDO",
+        "issuer_tax_id": "768901236",
+        "invoice_number": "1074",
+        "period": "202609",
+        "amount_clp": 500000,
+        "due_date": 1789948800,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready"
+      }
+    },
+    {
+      "id": "P03",
+      "kind": "legit",
+      "alias": "ARRIENDO",
+      "path": "legit/P03-arriendo-202610.pdf",
+      "fileHash": "0x71c113cd6fc9f484b64f1b1ca71021d3651433da7bc5d983ac3784c3ac2368d0",
+      "delivery": "signed",
+      "truth": {
+        "alias_id": "ARRIENDO",
+        "issuer_tax_id": "768901236",
+        "invoice_number": "1111",
+        "period": "202610",
+        "amount_clp": 509999,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready"
+      }
+    },
+    {
+      "id": "P04",
+      "kind": "legit",
+      "alias": "LUZ",
+      "path": "legit/P04-luz-202608.pdf",
+      "fileHash": "0x088cc92e5119aef0065501262f4b2a9260061564dc653b00addf7322bf4c85c5",
+      "delivery": "signed",
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1148",
+        "period": "202608",
+        "amount_clp": 36999,
+        "due_date": 1787184000,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready"
+      }
+    },
+    {
+      "id": "P05",
+      "kind": "legit",
+      "alias": "LUZ",
+      "path": "legit/P05-luz-202609.pdf",
+      "fileHash": "0xe2a27ba1bbd4d6f87a1c99775348b22bc85f3f6db80dfdece9ace6c23acdc922",
+      "delivery": "signed",
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1185",
+        "period": "202609",
+        "amount_clp": 42500,
+        "due_date": 1789948800,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready"
+      }
+    },
+    {
+      "id": "P06",
+      "kind": "legit",
+      "alias": "LUZ",
+      "path": "legit/P06-luz-202610.pdf",
+      "fileHash": "0x9c11063cb0ce7c485b6e052a9218da0fe29e571228d5551dd202a66ec1c4d9b9",
+      "delivery": "signed",
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready"
+      }
+    },
+    {
+      "id": "P07",
+      "kind": "legit",
+      "alias": "INTERNET",
+      "path": "legit/P07-internet-202608.pdf",
+      "fileHash": "0x2c3e9989875da21c10d8075822979dea122197a52f567a090b23597af5859289",
+      "delivery": "signed",
+      "truth": {
+        "alias_id": "INTERNET",
+        "issuer_tax_id": "776655449",
+        "invoice_number": "1259",
+        "period": "202608",
+        "amount_clp": 19990,
+        "due_date": 1787184000,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready"
+      }
+    },
+    {
+      "id": "P08",
+      "kind": "legit",
+      "alias": "INTERNET",
+      "path": "legit/P08-internet-202609.pdf",
+      "fileHash": "0x1e2e5c3bea54d003bdc9d632991066d4ec4fac70d1a2e0618e8c9c48b9a73ec8",
+      "delivery": "signed",
+      "truth": {
+        "alias_id": "INTERNET",
+        "issuer_tax_id": "776655449",
+        "invoice_number": "1296",
+        "period": "202609",
+        "amount_clp": 19990,
+        "due_date": 1789948800,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready"
+      }
+    },
+    {
+      "id": "P09",
+      "kind": "legit",
+      "alias": "INTERNET",
+      "path": "legit/P09-internet-202610.pdf",
+      "fileHash": "0xac83abc03219a8e0687a870ac1b72306a3425d842ecdb6368193df40606a2496",
+      "delivery": "signed",
+      "truth": {
+        "alias_id": "INTERNET",
+        "issuer_tax_id": "776655449",
+        "invoice_number": "1333",
+        "period": "202610",
+        "amount_clp": 19990,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready"
+      }
+    },
+    {
+      "id": "P10",
+      "kind": "legit",
+      "alias": "GASTOS_COMUNES",
+      "path": "legit/P10-gastos_comunes-202608.pdf",
+      "fileHash": "0xf5d3749db3b3fd2ca9229cbe13cf38ec8575873b261a2797af2d20f38dcf8e3e",
+      "delivery": "signed",
+      "truth": {
+        "alias_id": "GASTOS_COMUNES",
+        "issuer_tax_id": "651234565",
+        "invoice_number": "1370",
+        "period": "202608",
+        "amount_clp": 100000,
+        "due_date": 1787184000,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready"
+      }
+    },
+    {
+      "id": "P11",
+      "kind": "legit",
+      "alias": "GASTOS_COMUNES",
+      "path": "legit/P11-gastos_comunes-202609.pdf",
+      "fileHash": "0xf38153e245dd8a4a7eb795e46df5ad80b266ada0978236526566c0896c02429f",
+      "delivery": "signed",
+      "truth": {
+        "alias_id": "GASTOS_COMUNES",
+        "issuer_tax_id": "651234565",
+        "invoice_number": "1407",
+        "period": "202609",
+        "amount_clp": 103000,
+        "due_date": 1789948800,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready"
+      }
+    },
+    {
+      "id": "P12",
+      "kind": "legit",
+      "alias": "GASTOS_COMUNES",
+      "path": "legit/P12-gastos_comunes-202610.pdf",
+      "fileHash": "0x1e3fb938909d71fb20bd2095c9aac3f87552b3d37059e083034eba7490e66423",
+      "delivery": "signed",
+      "truth": {
+        "alias_id": "GASTOS_COMUNES",
+        "issuer_tax_id": "651234565",
+        "invoice_number": "1444",
+        "period": "202610",
+        "amount_clp": 105000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready"
+      }
+    },
+    {
+      "id": "PA01",
+      "kind": "adversarial",
+      "title": "Same format, different bank account",
+      "alias": "LUZ",
+      "path": "adversarial/PA01.pdf",
+      "fileHash": "0x09ece642ea522b8358021ed890bd103d3498145a966cc8d63579aeb6ae0a958a",
+      "delivery": "signed",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "change_requested",
+        "triggers": [
+          "unknown_destination"
+        ]
+      }
+    },
+    {
+      "id": "PA02",
+      "kind": "adversarial",
+      "title": "Announces a new account and prints it",
+      "alias": "LUZ",
+      "path": "adversarial/PA02.pdf",
+      "fileHash": "0xe132c0c1399c0ffecfb05539359b63ac4db617e2351f74b8f4d4e62ed45db9cc",
+      "delivery": "signed",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": true,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "change_requested",
+        "triggers": [
+          "announced_in_document",
+          "unknown_destination"
+        ]
+      }
+    },
+    {
+      "id": "PA03",
+      "kind": "adversarial",
+      "title": "Announces a change without printing a new account",
+      "alias": "LUZ",
+      "path": "adversarial/PA03.pdf",
+      "fileHash": "0xb4b4e380338e8e7554b1949545ade2bdfdcfc5b80dbe2f4ef97d0ab8f22d471f",
+      "delivery": "signed",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": true,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "change_requested",
+        "triggers": [
+          "announced_in_document"
+        ]
+      }
+    },
+    {
+      "id": "PA04",
+      "kind": "adversarial",
+      "title": "Asks to pay a wallet",
+      "alias": "LUZ",
+      "path": "adversarial/PA04.pdf",
+      "fileHash": "0x22f89bdbdbd5b0ec4c1081e4e12b37942036461b067165c9070b23c41baabdb4",
+      "delivery": "signed",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "change_requested",
+        "triggers": [
+          "unknown_destination"
+        ]
+      }
+    },
+    {
+      "id": "PA05",
+      "kind": "adversarial",
+      "title": "White text with instructions for the AI and a fake total",
+      "alias": "LUZ",
+      "path": "adversarial/PA05.pdf",
+      "fileHash": "0x8eef5844c8e46f860874d4a8fc83d2cc57c4893f25fb31a6c0d1a6b9c7ed0ebd",
+      "delivery": "signed",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": true
+      },
+      "expected": {
+        "status": "ready",
+        "hiddenText": true
+      }
+    },
+    {
+      "id": "PA06",
+      "kind": "adversarial",
+      "title": "Tiny font with an inflated total",
+      "alias": "LUZ",
+      "path": "adversarial/PA06.pdf",
+      "fileHash": "0x7a5f7947ce5db8475dfddb5202444378bf1e2f879e78b9d6268b964771b96e86",
+      "delivery": "signed",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": true
+      },
+      "expected": {
+        "status": "ready",
+        "hiddenText": true
+      }
+    },
+    {
+      "id": "PA07",
+      "kind": "adversarial",
+      "title": "Transparent text with another total",
+      "alias": "LUZ",
+      "path": "adversarial/PA07.pdf",
+      "fileHash": "0x9e70324a7712e72ff3bde6cdbd4f8a87797567d3424639f3c17f70497b71d534",
+      "delivery": "signed",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": true
+      },
+      "expected": {
+        "status": "ready",
+        "hiddenText": true
+      }
+    },
+    {
+      "id": "PA08",
+      "kind": "adversarial",
+      "title": "Hidden layer with another bank account",
+      "alias": "LUZ",
+      "path": "adversarial/PA08.pdf",
+      "fileHash": "0x0d79d38ca34c4f1eff40792947ccaae7e3cb0b3167ab3929c45c9a0c7e8943d0",
+      "delivery": "signed",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": true
+      },
+      "expected": {
+        "status": "change_requested",
+        "hiddenText": true,
+        "triggers": [
+          "unknown_destination"
+        ]
+      }
+    },
+    {
+      "id": "PA09",
+      "kind": "adversarial",
+      "title": "Wallet in white stroke text",
+      "alias": "LUZ",
+      "path": "adversarial/PA09.pdf",
+      "fileHash": "0xbe68d49e2f8089df8c3edaadf0394a77a7e7cdb88175f2670da2360b7878d9e5",
+      "delivery": "signed",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": true
+      },
+      "expected": {
+        "status": "change_requested",
+        "hiddenText": true,
+        "triggers": [
+          "unknown_destination"
+        ]
+      }
+    },
+    {
+      "id": "PA10",
+      "kind": "adversarial",
+      "title": "Look-alike digit (superscript) in the issuer RUT",
+      "alias": "LUZ",
+      "path": "adversarial/PA10.pdf",
+      "fileHash": "0x3bb224cbff245a9f03cd13297f47ae84f49b5632c55b8f5d1994ca4aa8ec24db",
+      "delivery": "signed",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": true
+      },
+      "expected": {
+        "status": "ready",
+        "hiddenText": true
+      }
+    },
+    {
+      "id": "PA11",
+      "kind": "adversarial",
+      "title": "Look-alike digit (superscript) in the folio",
+      "alias": "LUZ",
+      "path": "adversarial/PA11.pdf",
+      "fileHash": "0x37f965838c8ae20e659b5748709343f2453211c8053d05e547058b19c4c8335a",
+      "delivery": "signed",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": true
+      },
+      "expected": {
+        "status": "ready",
+        "hiddenText": true
+      }
+    },
+    {
+      "id": "PA12",
+      "kind": "adversarial",
+      "title": "Two different totals",
+      "alias": "LUZ",
+      "path": "adversarial/PA12.pdf",
+      "fileHash": "0x60ee2180ae175d6e791e57543ee082f8697a16d1cd6b3083de1afac86b09b04b",
+      "delivery": "signed",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "held",
+        "reason": "parser_failed",
+        "failure": "ambiguous_field"
+      }
+    },
+    {
+      "id": "PA13",
+      "kind": "adversarial",
+      "title": "Same bill re-rendered with a different pixel",
+      "alias": "LUZ",
+      "path": "adversarial/PA13.pdf",
+      "fileHash": "0x3d7a9597b7032ab253827c20ddd7448ae2b8fd883795bc4f54bdd7bd52b06791",
+      "delivery": "signed",
+      "setup": [
+        "base"
+      ],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "duplicate"
+      }
+    },
+    {
+      "id": "PA14",
+      "kind": "adversarial",
+      "title": "The same email received twice",
+      "alias": "LUZ",
+      "path": "adversarial/PA14.pdf",
+      "fileHash": "0x9c11063cb0ce7c485b6e052a9218da0fe29e571228d5551dd202a66ec1c4d9b9",
+      "delivery": "signed",
+      "setup": [
+        "same_email"
+      ],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "duplicate"
+      }
+    },
+    {
+      "id": "PA15",
+      "kind": "adversarial",
+      "title": "Forged From of the registered domain, unsigned",
+      "alias": "LUZ",
+      "path": "adversarial/PA15.pdf",
+      "fileHash": "0x9c11063cb0ce7c485b6e052a9218da0fe29e571228d5551dd202a66ec1c4d9b9",
+      "delivery": "forged",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "quarantined",
+        "reason": "not_authenticated"
+      }
+    },
+    {
+      "id": "PA16",
+      "kind": "adversarial",
+      "title": "Look-alike sender domain that authenticates perfectly",
+      "alias": "LUZ",
+      "path": "adversarial/PA16.pdf",
+      "fileHash": "0x9c11063cb0ce7c485b6e052a9218da0fe29e571228d5551dd202a66ec1c4d9b9",
+      "delivery": "lookalike",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "quarantined",
+        "reason": "unknown_sender_domain"
+      }
+    },
+    {
+      "id": "PA17",
+      "kind": "adversarial",
+      "title": "Legitimate email forwarded with the attachment swapped",
+      "alias": "LUZ",
+      "path": "adversarial/PA17.pdf",
+      "fileHash": "0x09ece642ea522b8358021ed890bd103d3498145a966cc8d63579aeb6ae0a958a",
+      "delivery": "swapped",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "quarantined",
+        "reason": "not_authenticated"
+      }
+    },
+    {
+      "id": "PA18",
+      "kind": "adversarial",
+      "title": "Instructions injected in the issuer name",
+      "alias": "LUZ",
+      "path": "adversarial/PA18.pdf",
+      "fileHash": "0x18259282f9e323f6291cd7b209f7f16f1673148fbac31fc63e74f08226fd2a9b",
+      "delivery": "signed",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": true
+      },
+      "expected": {
+        "status": "ready",
+        "hiddenText": true
+      }
+    },
+    {
+      "id": "PA19",
+      "kind": "adversarial",
+      "title": "Bill issued under another alias's RUT, sent from this domain",
+      "alias": "LUZ",
+      "path": "adversarial/PA19.pdf",
+      "fileHash": "0x0ec8a9afe1d241fc5923499e6b6814f3f5b4cc7d12a18477e4cf0c24f08906ee",
+      "delivery": "signed",
+      "setup": [],
+      "truth": {
+        "alias_id": "INTERNET",
+        "issuer_tax_id": "776655449",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "quarantined",
+        "reason": "alias_domain_mismatch"
+      }
+    },
+    {
+      "id": "PA20",
+      "kind": "adversarial",
+      "title": "Issuer RUT that is not registered",
+      "alias": "LUZ",
+      "path": "adversarial/PA20.pdf",
+      "fileHash": "0x1d85d6eb5bbaed6c3b3d0b102fd0ca6fa118c230583fc1c417f269b4fa1cb24c",
+      "delivery": "signed",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "held",
+        "reason": "parser_failed",
+        "failure": "unknown_issuer"
+      }
+    },
+    {
+      "id": "PA21",
+      "kind": "adversarial",
+      "title": "Two bills in one email",
+      "alias": "LUZ",
+      "path": "adversarial/PA21.pdf",
+      "fileHash": "0x9c11063cb0ce7c485b6e052a9218da0fe29e571228d5551dd202a66ec1c4d9b9",
+      "delivery": "signed",
+      "attachments": "two",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "quarantined",
+        "reason": "multiple_pdfs"
+      }
+    },
+    {
+      "id": "PA22",
+      "kind": "adversarial",
+      "title": "No bill attached",
+      "alias": "LUZ",
+      "path": "adversarial/PA22.pdf",
+      "fileHash": "0x9c11063cb0ce7c485b6e052a9218da0fe29e571228d5551dd202a66ec1c4d9b9",
+      "delivery": "signed",
+      "attachments": "none",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "quarantined",
+        "reason": "no_pdf"
+      }
+    },
+    {
+      "id": "PA23",
+      "kind": "adversarial",
+      "title": "Attachment named as a PDF that is not one",
+      "alias": "LUZ",
+      "path": "adversarial/PA23.pdf",
+      "fileHash": "0x9c11063cb0ce7c485b6e052a9218da0fe29e571228d5551dd202a66ec1c4d9b9",
+      "delivery": "signed",
+      "attachments": "not_pdf",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "quarantined",
+        "reason": "no_pdf"
+      }
+    },
+    {
+      "id": "PA24",
+      "kind": "adversarial",
+      "title": "Total line removed",
+      "alias": "LUZ",
+      "path": "adversarial/PA24.pdf",
+      "fileHash": "0x404187e9b3c61f689bf57cfc69499d84cc47fd9f5fc54b2aea9224b4764e6339",
+      "delivery": "signed",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "held",
+        "reason": "parser_failed",
+        "failure": "missing_field"
+      }
+    },
+    {
+      "id": "PA25",
+      "kind": "adversarial",
+      "title": "Impossible due date",
+      "alias": "LUZ",
+      "path": "adversarial/PA25.pdf",
+      "fileHash": "0x0184f026d9e75bc8a0a3bb086cfd577a7bb18ecfa279350a4c1ccc2851a837b0",
+      "delivery": "signed",
+      "setup": [],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "held",
+        "reason": "parser_failed",
+        "failure": "invalid_field"
+      }
+    },
+    {
+      "id": "PA26",
+      "kind": "adversarial",
+      "title": "A second account change while the first one waits for the owner",
+      "alias": "LUZ",
+      "path": "adversarial/PA26.pdf",
+      "fileHash": "0x5c442bd7e0972bc5d5a2bf3ce4eac78f35af80a880a93e36148278478031ce7f",
+      "delivery": "signed",
+      "setup": [
+        "PA01"
+      ],
+      "truth": {
+        "alias_id": "LUZ",
+        "issuer_tax_id": "965432108",
+        "invoice_number": "1222",
+        "period": "202610",
+        "amount_clp": 35000,
+        "due_date": 1792454400,
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "quarantined",
+        "reason": "change_pending"
+      }
+    }
+  ]
+}

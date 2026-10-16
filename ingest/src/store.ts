@@ -2,10 +2,14 @@
 // node:sqlite, so there is no extra dependency. Stores hashes, domains, aliases and change
 // requests; never email bodies or invoice text.
 import { DatabaseSync } from "node:sqlite";
-import type { AliasId } from "@keel/schemas";
+import type { AliasId, Hex, RequiredDocType } from "@keel/schemas";
+import { docsHash } from "@keel/schemas/hash";
 import type { ChangeRequest } from "./beneficiaryChange";
+import type { AccountAlert } from "./trade/accountAlert";
 
 export const MAX_EMAILS_PER_SENDER_PER_DAY = 20;
+// Keel Trade: authorized uploads per order in 24 hours. A legitimate order needs two or three.
+export const MAX_DOCUMENTS_PER_ORDER_PER_DAY = 10;
 export const CHANGE_COOLDOWN_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -50,6 +54,36 @@ export class IngestStore {
       -- At most one pending request per alias, enforced by the database itself
       CREATE UNIQUE INDEX IF NOT EXISTS one_pending_per_alias
         ON change_requests (alias_id) WHERE status = 'pending';
+
+      -- Keel Trade. Every authorized upload, read or not: who uploaded which file to which order
+      CREATE TABLE IF NOT EXISTS trade_uploads (
+        order_id    TEXT NOT NULL,
+        file_hash   TEXT NOT NULL,
+        doc_type    TEXT NOT NULL,
+        uploader    TEXT NOT NULL,
+        party       TEXT NOT NULL,
+        received_at INTEGER NOT NULL,
+        PRIMARY KEY (order_id, file_hash)
+      );
+      CREATE INDEX IF NOT EXISTS trade_uploads_by_order ON trade_uploads (order_id, received_at);
+      -- Documents both readers agreed on: the package the engine compares with the order
+      CREATE TABLE IF NOT EXISTS trade_documents (
+        order_id    TEXT NOT NULL,
+        file_hash   TEXT NOT NULL,
+        doc_type    TEXT NOT NULL,
+        bl_hash     TEXT,
+        extraction  TEXT NOT NULL,
+        accepted_at INTEGER NOT NULL,
+        PRIMARY KEY (order_id, file_hash)
+      );
+      -- One bill of lading settles one order (T1.9 enforces it again on chain)
+      CREATE UNIQUE INDEX IF NOT EXISTS one_order_per_bl ON trade_documents (bl_hash) WHERE bl_hash IS NOT NULL;
+      CREATE TABLE IF NOT EXISTS trade_alerts (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id   TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        body       TEXT NOT NULL
+      );
     `);
   }
 
@@ -124,7 +158,89 @@ export class IngestStore {
       .all(since.getTime()) as unknown as ChangeRow[];
     return rows.map(fromRow);
   }
+
+  // Keel Trade ---------------------------------------------------------------------------
+
+  // false if this exact file was already uploaded to this order
+  recordUpload(u: { orderId: Hex; fileHash: Hex; docType: RequiredDocType; uploader: Hex; party: string }): boolean {
+    const r = this.db
+      .prepare(
+        "INSERT OR IGNORE INTO trade_uploads (order_id, file_hash, doc_type, uploader, party, received_at) VALUES (?, ?, ?, ?, ?, ?)",
+      )
+      .run(u.orderId.toLowerCase(), u.fileHash, u.docType, u.uploader.toLowerCase(), u.party, this.now().getTime());
+    return r.changes === 1;
+  }
+
+  // Authorized uploads to this order in the last 24 hours
+  uploadsForOrder(orderId: Hex): number {
+    const row = this.db
+      .prepare("SELECT count(*) AS n FROM trade_uploads WHERE order_id = ? AND received_at > ?")
+      .get(orderId.toLowerCase(), this.now().getTime() - DAY_MS) as { n: number };
+    return row.n;
+  }
+
+  // The order a bill of lading was accepted for, if any
+  orderForBl(blHash: Hex): Hex | undefined {
+    const row = this.db.prepare("SELECT order_id FROM trade_documents WHERE bl_hash = ?").get(blHash) as
+      | { order_id: Hex }
+      | undefined;
+    return row?.order_id;
+  }
+
+  // false if the bill of lading was accepted for another order in the meantime
+  acceptDocument(d: { orderId: Hex; fileHash: Hex; docType: RequiredDocType; blHash?: Hex; extraction: object }): boolean {
+    try {
+      const r = this.db
+        .prepare(
+          "INSERT OR IGNORE INTO trade_documents (order_id, file_hash, doc_type, bl_hash, extraction, accepted_at) VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .run(d.orderId.toLowerCase(), d.fileHash, d.docType, d.blHash ?? null, JSON.stringify(d.extraction), this.now().getTime());
+      return r.changes === 1;
+    } catch (e) {
+      if (e instanceof Error && /UNIQUE/.test(e.message)) return false;
+      throw e;
+    }
+  }
+
+  // The document package of an order: one accepted document per required type, and the
+  // docsHash the carrier's attestation and the engine's DocumentDecision must carry.
+  tradePackage(orderId: Hex, required: readonly RequiredDocType[]): TradePackage {
+    const rows = this.db
+      .prepare("SELECT doc_type, file_hash, bl_hash, extraction FROM trade_documents WHERE order_id = ? ORDER BY accepted_at")
+      .all(orderId.toLowerCase()) as unknown as { doc_type: RequiredDocType; file_hash: Hex; bl_hash: Hex | null; extraction: string }[];
+    const missing = required.filter((t) => !rows.some((r) => r.doc_type === t));
+    if (missing.length > 0) return { status: "incomplete", missing };
+    const repeated = required.find((t) => rows.filter((r) => r.doc_type === t).length > 1);
+    if (repeated) return { status: "ambiguous", docType: repeated };
+    const documents = required.map((t) => {
+      const r = rows.find((row) => row.doc_type === t)!;
+      return { docType: t, fileHash: r.file_hash, extraction: JSON.parse(r.extraction) as object };
+    });
+    const bl = rows.find((r) => required.includes(r.doc_type) && r.bl_hash)?.bl_hash ?? undefined;
+    return { status: "complete", docsHash: docsHash(documents.map((d) => d.fileHash)), blNumberHash: bl, documents };
+  }
+
+  addAlert(alert: AccountAlert): number {
+    const r = this.db
+      .prepare("INSERT INTO trade_alerts (order_id, created_at, body) VALUES (?, ?, ?)")
+      .run(alert.orderId.toLowerCase(), this.now().getTime(), JSON.stringify(alert));
+    return Number(r.lastInsertRowid);
+  }
+
+  // Alerts created since `since`, for one summary instead of a notification each
+  alertDigest(since: Date): (AccountAlert & { id: number })[] {
+    const rows = this.db
+      .prepare("SELECT id, body FROM trade_alerts WHERE created_at >= ? ORDER BY created_at")
+      .all(since.getTime()) as unknown as { id: number; body: string }[];
+    return rows.map((r) => ({ ...(JSON.parse(r.body) as AccountAlert), id: r.id }));
+  }
 }
+
+export type TradePackage =
+  | { status: "complete"; docsHash: Hex; blNumberHash?: Hex; documents: { docType: RequiredDocType; fileHash: Hex; extraction: object }[] }
+  | { status: "incomplete"; missing: RequiredDocType[] }
+  // Two accepted documents of the same type: a person decides which one counts
+  | { status: "ambiguous"; docType: RequiredDocType };
 
 interface ChangeRow {
   id: number;

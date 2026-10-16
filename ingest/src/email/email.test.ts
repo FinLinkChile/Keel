@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { ALIAS_IDS } from "@keel/schemas";
-import type { ExtractorProvider, InvoiceDocument } from "../extractor";
+import type { ExtractorProvider, ExtractionRequest } from "../extractor";
 import type { AliasTable } from "../parser";
 import { renderInvoice, sampleSpec } from "../testing/renderInvoice";
 import { composeEmail, dkimSignatureFor, fakeDns, makeDomain, signEmail, type Domain } from "../testing/renderEmail";
@@ -28,7 +28,7 @@ const aliases: AliasTable = [
 const honestModel: ExtractorProvider = {
   provider: "fake",
   model: "fake-1",
-  complete: async (doc: InvoiceDocument) =>
+  complete: async (doc: ExtractionRequest) =>
     JSON.stringify({
       alias_id: ADUANA,
       issuer_tax_id: /\[RUT_[0-9a-f]{8}\]/.exec(doc.text)![0],

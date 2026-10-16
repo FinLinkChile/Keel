@@ -6,24 +6,29 @@ import { PrivacyKit, type RedactionResult } from "privacy-kit-cl";
 
 // Applied in order. Label-based patterns go first so a whole line is masked once.
 // Destinations (accounts, wallets) are masked too: the model never sees an attacker's address.
+// The English labels and the IBAN cover the trade documents (bill of lading, commercial invoice).
 export const PII_PATTERNS: Record<string, string> = {
-  nombre: String.raw`(?<=(?i:se[ñn]or(?:\(es\))?|raz[oó]n\s+social|cliente|receptor)\s*:\s*)\S[^\n]*`,
-  direccion: String.raw`(?<=(?i:direcci[oó]n|domicilio)\s*:\s*)\S[^\n]*`,
+  nombre: String.raw`(?<=(?i:se[ñn]or(?:\(es\))?|raz[oó]n\s+social|cliente|receptor|shipper|consignee|notify\s+party|buyer|seller|sold\s+to|bill\s+to|messrs\.?)\s*:\s*)\S[^\n]*`,
+  direccion: String.raw`(?<=(?i:direcci[oó]n|domicilio|address)\s*:\s*)\S[^\n]*`,
   email: String.raw`\b[\w.+-]+@[\w-]+\.[\w.-]+\b`,
   wallet: String.raw`\b0[xX][0-9a-fA-F]{40}\b`,
-  cuenta: String.raw`(?<=(?i:cuenta\s+(?:corriente|vista|rut|de\s+ahorro)|cta\.?\s*(?:cte|vista)\.?|n[°º]?\s*(?:de\s+)?cuenta)\s*:?\s*(?:(?i:n)[°º]\s*)?)[0-9][0-9\- ]{4,22}[0-9]`,
+  cuenta: String.raw`(?<=(?i:cuenta\s+(?:corriente|vista|rut|de\s+ahorro)|cta\.?\s*(?:cte|vista)\.?|n[°º]?\s*(?:de\s+)?cuenta|account\s*(?:no\.?|number)?|a\/c\s*(?:no\.?)?)\s*:?\s*(?:(?i:n)[°º]\s*)?)[0-9][0-9\- ]{4,22}[0-9]`,
+  iban: String.raw`\b[A-Z]{2}[0-9]{2}(?: ?[A-Z0-9]{4}){3,7}(?: ?[A-Z0-9]{1,4})?\b`,
   rut: String.raw`\b\d{1,2}\.?\d{3}\.?\d{3}\s*-\s*[\dkK]\b`,
   telefono: String.raw`(?:\+?56)?\s?9\s?\d{4}\s?\d{4}\b`,
   tarjeta: String.raw`\b(?:\d[ -]?){13,19}\b`,
 };
 
-export const LLM_PURPOSE = "extraccion_factura";
+export const LLM_PURPOSES = ["extraccion_factura", "extraccion_documento_comercio"] as const;
+export type LlmPurpose = (typeof LLM_PURPOSES)[number];
 
 const kit = PrivacyKit.fromObject({
   piiPatterns: PII_PATTERNS,
-  purposes: { [LLM_PURPOSE]: { legalBasis: "contrato" } },
+  purposes: Object.fromEntries(LLM_PURPOSES.map((p) => [p, { legalBasis: "contrato" }])),
   thirdParties: {
     anthropic: { pais: "US", rol: "encargado", base: "contrato" },
+    // Claude through a third-party proxy (LiteLLM): its operator receives the redacted text too
+    "anthropic-proxy": { pais: "?", rol: "encargado", base: "contrato" },
     openai: { pais: "US", rol: "encargado", base: "contrato" },
     gemini: { pais: "US", rol: "encargado", base: "contrato" },
     "openai-compatible": { pais: "?", rol: "encargado", base: "contrato" },
@@ -41,8 +46,13 @@ export function rehydrate(value: string, tokenMap: Record<string, string>): stri
 }
 
 // Sending a document to an LLM vendor is a transfer to a third party (Ley 21.719).
-export function logTransfer(provider: string, categories: string[], subjectId = "owner"): void {
-  kit.transfers.log(subjectId, provider, LLM_PURPOSE, categories);
+export function logTransfer(
+  provider: string,
+  categories: string[],
+  purpose: LlmPurpose = "extraccion_factura",
+  subjectId = "owner",
+): void {
+  kit.transfers.log(subjectId, provider, purpose, categories);
 }
 
 export function transferLog(): Record<string, unknown>[] {

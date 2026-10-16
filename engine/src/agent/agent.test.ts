@@ -9,12 +9,13 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { DocumentExtractions } from "../documents";
 import { tradePolicy, tradePolicyHash } from "../policy";
 import { compile, createChain, RevertError } from "../testing/chain";
-import { type ChainLog, loadEvidence, verdict, verifyEvidence } from "../verify";
+import { type ChainFacts, type ChainLog, loadEvidence, verdict, verifyEvidence } from "../verify";
 import { Agent, type AgentChain, type AgentConfig, type AgentEvent, CallReverted, type FundingGatePort, SHIPMENT_MARGIN_SECONDS } from "./agent";
 import { decodeOrderOf, orderFundedTopics, orderOfCall, submitShipmentCall } from "./escrow";
 import { fundingCalldata, fundingGatePort, mockRolesAllowance } from "./gate";
 import { FileStore, writeStoreFile } from "./store";
 
+const low = (hex: Hex) => hex.toLowerCase() as Hex;
 const word = (label: string): Hex => keccak256(toBytes(label));
 const address = (n: number): Hex => `0x${n.toString(16).padStart(40, "0")}`;
 const DAY = 24n * 3600n;
@@ -130,6 +131,23 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
       { chain: agentChain(), store: new FileStore(dir), signer: policySigner, gate, notify: (e) => notices.push(e) },
     );
 
+  // What `keel verify` reads from the chain, taken from the test chain: the signer the gate
+  // trusts and the order record of the escrow (the block does not matter on a single test chain)
+  const factsOf = (logs: ChainLog[], gate?: Hex): ChainFacts => ({
+    chainId: 1,
+    status: "success",
+    blockNumber: 1n,
+    logs,
+    deployment: { chainId: 1, ...(gate ? { fundingGate: low(gate) } : {}), tradeEscrow: low(escrow) },
+    read: {
+      policySigner: (g) => chain.read<Hex>("FundingGate", g, "policySigner"),
+      order: async (_escrow, orderId) => {
+        const r = await recordOf(orderId);
+        return { orderHash: r.orderHash, documentVerifier: r.po.documentVerifier };
+      },
+    },
+  });
+
   const recordOf = async (orderId: Hex) => decodeOrderOf(await chain.simulate(RELAYER, escrow, orderOfCall(escrow, orderId).data));
   const stateOf = async (orderId: Hex) => (await recordOf(orderId)).state;
   const balanceOf = (who: Hex) => chain.read<bigint>("MockUSDC", usdc, "balanceOf", [who]);
@@ -214,7 +232,7 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
 
     // The evidence the agent saved verifies against the logs of the release
     const evidence = loadEvidence(join(dir, "evidence"), released!.pdrHash!)!;
-    const checks = await verifyEvidence(evidence, { chainId: 1, status: "success", logs: sent.at(-1)!.logs });
+    const checks = await verifyEvidence(evidence, factsOf(sent.at(-1)!.logs));
     expect(verdict(checks)).toBe("MATCH");
     expect(checks.find((c) => c.check === "event order")).toMatchObject({ outcome: "match" });
 
@@ -413,7 +431,7 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
       expect(await balanceOf(PAYOUT)).toBe(TOTAL / 2n);
 
       const evidence = loadEvidence(join(dir, "evidence"), funded!.pdrHash!)!;
-      expect(verdict(await verifyEvidence(evidence, { chainId: 1, status: "success", logs: sent[0]!.logs }))).toBe("MATCH");
+      expect(verdict(await verifyEvidence(evidence, factsOf(sent[0]!.logs, gate)))).toBe("MATCH");
       // One nonce per order version, marked used by the gate: a retry can never fund twice
       const nonce = BigInt((await recordOf(order.orderId)).orderHash);
       expect(evidence.intent).toMatchObject({ nonce });
