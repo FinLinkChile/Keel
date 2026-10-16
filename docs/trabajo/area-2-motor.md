@@ -5,7 +5,7 @@ description: "Objetivo, entregables y tareas T2.1 a T2.11: interfaces, reglas de
 tags: [area-2, motor, pdr, llaves, t2]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T16:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T02:20:00Z }
 ---
 
 **Perfil sugerido:** backend en TypeScript con interés en criptografía.
@@ -109,6 +109,7 @@ Para la demo, las llaves viven en archivos `.env` fuera del repositorio. En el d
 **T2.8 Monitor de uso fuera del sistema (crítica 13).**
 * Un vigía escucha los eventos del Roles Modifier y del gate; en Trade, también los del escrow.
 * Si aparece una ejecución con el rol AGENTE que no corresponde a ningún PDR emitido por el motor, llama automáticamente al botón de pánico: revoca el rol (T1.3) usando la llave del cosignatario automático, o avisa al cosignatario humano.
+* **Decisión del Área 2 (16 de octubre):** en Trade, el monitor pausa el FundingGate con una llave que solo puede pausar (un rol propio en el gate, pedido al Área 1), nunca con la del cosignatario, que también cofirma el nivel 3. Mientras ese rol no exista, el monitor solo avisa al cosignatario humano, que pausa desde la app. Detecta: un `FundingExecuted` cuyo PDR no está en la evidencia del motor, y un `BalanceReleased` autorizado por un `DocumentDecision` que el motor no emitió. Además avisa, sin actuar, de cambios en cola en los registros del gate y de cambios de firmante, versión de reglas o cosignatario.
 * Es el cierre del acto 4.
 
 **T2.9 Verificador reproducible.**
