@@ -47,6 +47,7 @@ describe("trade normalization", () => {
     expect(normalizeDocumentNumber("olsu-2610 4471")).toBe("OLSU26104471");
     expect(normalizeDocumentNumber("176-1234 5675")).toBe("17612345675");
     expect(() => normalizeDocumentNumber("AB-1")).toThrow(NormalizationError);
+    expect(() => normalizeDocumentNumber("REFERENCE NO")).toThrow(NormalizationError);
   });
 
   it("reads only unambiguous dates, and rejects impossible ones", () => {

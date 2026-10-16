@@ -9,7 +9,8 @@ const SEPARATORS = /[\s\-/.]/g;
 // so the carrier's attestation must be built from the same form (schemas/src/hash.ts).
 export function normalizeDocumentNumber(raw: string): string {
   const compact = raw.replace(SEPARATORS, "").toUpperCase();
-  if (!/^[A-Z0-9]{6,20}$/.test(compact)) throw new NormalizationError("document_number", raw);
+  // Carriers' numbers always carry digits; letters only is a label read as a value ("REFERENCE NO.")
+  if (!/^[A-Z0-9]{6,20}$/.test(compact) || !/\d/.test(compact)) throw new NormalizationError("document_number", raw);
   return compact;
 }
 
