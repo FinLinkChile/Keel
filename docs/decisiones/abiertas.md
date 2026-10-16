@@ -31,4 +31,5 @@ Una celda vacía en "quién decide" significa que las fuentes no lo asignan toda
 # Otras cuestiones abiertas, registradas en su concepto
 
 - Qué actos de Keel Personal entran en el deck y en el video: [demo](../entrega/demo.md). Depende de la decisión 14.
+- Quién mantiene el registro de órdenes de ingesta (quién puede subir documentos a cada orden y cuáles son las cuentas registradas del exportador) y si debería leerse de los eventos `OrderOpened` del escrow. Supuesto actual del Área 3: un archivo que entrega el Área 4. Ver [carga de documentos](../interfaces/carga-de-documentos.md).
 - Dónde entra Keel Personal en el orden de recorte: [recortes](../trabajo/recortes.md). Depende de la decisión 14.

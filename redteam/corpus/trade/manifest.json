@@ -1,0 +1,2661 @@
+{
+  "description": "Keel Trade document corpus (T3.8). Every company, person and key is fictitious. `expected.status` is the ingest outcome with an honest reader. `expected.conforms` says whether the document's data match the signed order and the carrier's attestation. `expected.engine` is what evaluateDocuments should decide on `enginePackage` (this document with the set's other legitimate one), given the document's `truth` and an attestation of that package: it also holds on fraud signals such as hidden text or a mentioned account change. Regenerate with `npm run corpus -w ingest`; ingest/src/trade/corpus.test.ts checks these files.",
+  "uploadSignature": {
+    "domain": {
+      "name": "Keel Ingest",
+      "version": "1",
+      "chainId": 31337
+    },
+    "types": {
+      "DocumentUpload": [
+        {
+          "name": "orderId",
+          "type": "bytes32"
+        },
+        {
+          "name": "docType",
+          "type": "string"
+        },
+        {
+          "name": "fileHash",
+          "type": "bytes32"
+        },
+        {
+          "name": "issuedAt",
+          "type": "uint64"
+        }
+      ]
+    },
+    "keys": "ingest/src/testing/tradeCorpus.ts (testKey)"
+  },
+  "orders": [
+    {
+      "id": "T01",
+      "orderId": "0x17bd5015878a35e39b8b48b9d4a4cfd714ad2a7095883c39b7db1bfec06b2886",
+      "orderNumber": "PO4410",
+      "importerTaxId": "765432103",
+      "totalAmountMinor": 2000000,
+      "currency": "USD",
+      "incoterm": "FOB",
+      "shipmentDeadline": 1792454400,
+      "requiredDocs": [
+        "BILL_OF_LADING",
+        "COMMERCIAL_INVOICE"
+      ],
+      "attestation": {
+        "orderId": "0x17bd5015878a35e39b8b48b9d4a4cfd714ad2a7095883c39b7db1bfec06b2886",
+        "blNumberHash": "0x82a0255d17100170adb018e469b48f9688a60a0ea91b71060f32d8631e1a9d95",
+        "onBoardDate": "1791763200",
+        "portOfLoading": "0x434e4e4742000000000000000000000000000000000000000000000000000000",
+        "docsHash": "0x35ab9ec8f93d731104f20a164f41c2e9a1413407c776df3e4dc8cd91af4cb090"
+      },
+      "documentVerifier": "0x51fa3fa0ef8d4f1155f1f6cc3bf5d880e4118622",
+      "terms": {
+        "orderNumber": "PO4410",
+        "currency": "USD",
+        "invoiceAmountMinor": "2000000",
+        "hsCodes": [
+          "846721"
+        ],
+        "documentHash": "0x7a4da7711364eff6f08d717bcb1b6a088aa7c998eed9e2df779aea8cbaea949a"
+      },
+      "entry": {
+        "orderId": "0x17bd5015878a35e39b8b48b9d4a4cfd714ad2a7095883c39b7db1bfec06b2886",
+        "payoutAddress": "0xaa40abf4c86fe26d4cc74f6765a15f70b4112811",
+        "carrier": "0xd13cfbd8e27eba1b7b0027ad3fbf54431149bfa1",
+        "uploaders": [
+          {
+            "address": "0xaa40abf4c86fe26d4cc74f6765a15f70b4112811",
+            "party": "exporter"
+          },
+          {
+            "address": "0xbc2e7f8f608ea36bb328a30c9abbf6ed5d1c10f5",
+            "party": "importer"
+          }
+        ],
+        "knownDestinations": [
+          {
+            "kind": "bank_account",
+            "value": "6228480122334455"
+          }
+        ]
+      },
+      "purchaseOrder": {
+        "orderId": "0x17bd5015878a35e39b8b48b9d4a4cfd714ad2a7095883c39b7db1bfec06b2886",
+        "importer": "0xbc2e7f8f608ea36bb328a30c9abbf6ed5d1c10f5",
+        "exporter": "0xaa40abf4c86fe26d4cc74f6765a15f70b4112811",
+        "payoutAddress": "0xaa40abf4c86fe26d4cc74f6765a15f70b4112811",
+        "token": "0x081cbaafb0bf5f3520ef51c6b3bb8b135d44c401",
+        "totalAmount": "2000000",
+        "advanceBps": 3000,
+        "shipmentDeadline": "1792454400",
+        "disputeWindow": "0",
+        "carrier": "0xd13cfbd8e27eba1b7b0027ad3fbf54431149bfa1",
+        "arbiter": "0x220efc8ec311a3738d73445a5fd1176ba711274c",
+        "documentVerifier": "0x51fa3fa0ef8d4f1155f1f6cc3bf5d880e4118622",
+        "incoterm": "0x464f420000000000000000000000000000000000000000000000000000000000",
+        "termsHash": "0xec1f29c37e9bd3a91c8cad92c03f44c78eb62338f425464c231157e99a5603a2",
+        "requiredDocsHash": "0xd33457b2584e3567f80a223a25527a62adf6808ef54c7b442f954ca9a01b5fe4",
+        "nonce": "1"
+      },
+      "attestationFields": {
+        "blNumber": "OLSU26104471",
+        "onBoardDate": 1791763200,
+        "portOfLoading": "CNNGB"
+      }
+    },
+    {
+      "id": "T02",
+      "orderId": "0x728ebbb025cc2ee4e834356ce5162892d7aab6ce7c9db57df4020fb26ced1c44",
+      "orderNumber": "PO4415",
+      "importerTaxId": "771239870",
+      "totalAmountMinor": 1300000,
+      "currency": "USD",
+      "incoterm": "CIF",
+      "shipmentDeadline": 1792022400,
+      "requiredDocs": [
+        "BILL_OF_LADING",
+        "COMMERCIAL_INVOICE"
+      ],
+      "attestation": {
+        "orderId": "0x728ebbb025cc2ee4e834356ce5162892d7aab6ce7c9db57df4020fb26ced1c44",
+        "blNumberHash": "0x3735befbfb42329e47f85a21c905bcf74db0d8c2c284a085b23470a08bcfc3ce",
+        "onBoardDate": "1791158400",
+        "portOfLoading": "0x434e534841000000000000000000000000000000000000000000000000000000",
+        "docsHash": "0xed0ed1abe19291101e1f06f446e451c5369fb372a5e667a4ba2e6da9af11a5c4"
+      },
+      "documentVerifier": "0x94e04deb5d8286e671bf9830870dd2dcfc9370db",
+      "terms": {
+        "orderNumber": "PO4415",
+        "currency": "USD",
+        "invoiceAmountMinor": "1300000",
+        "hsCodes": [
+          "520832"
+        ],
+        "documentHash": "0xc2267c3089012431809db94354bb6d4719a22e5aa38f7e5fbdea6fba0d87a2b3"
+      },
+      "entry": {
+        "orderId": "0x728ebbb025cc2ee4e834356ce5162892d7aab6ce7c9db57df4020fb26ced1c44",
+        "payoutAddress": "0x545ed055ccb4a78cdf8be8406067997644c221ab",
+        "carrier": "0xd13cfbd8e27eba1b7b0027ad3fbf54431149bfa1",
+        "uploaders": [
+          {
+            "address": "0x545ed055ccb4a78cdf8be8406067997644c221ab",
+            "party": "exporter"
+          },
+          {
+            "address": "0x182ac523ba52561745a041d4e1c97def86f4f5b8",
+            "party": "importer"
+          }
+        ],
+        "knownDestinations": [
+          {
+            "kind": "bank_account",
+            "value": "3100224588901123"
+          }
+        ]
+      },
+      "purchaseOrder": {
+        "orderId": "0x728ebbb025cc2ee4e834356ce5162892d7aab6ce7c9db57df4020fb26ced1c44",
+        "importer": "0x182ac523ba52561745a041d4e1c97def86f4f5b8",
+        "exporter": "0x545ed055ccb4a78cdf8be8406067997644c221ab",
+        "payoutAddress": "0x545ed055ccb4a78cdf8be8406067997644c221ab",
+        "token": "0x081cbaafb0bf5f3520ef51c6b3bb8b135d44c401",
+        "totalAmount": "1300000",
+        "advanceBps": 3000,
+        "shipmentDeadline": "1792022400",
+        "disputeWindow": "0",
+        "carrier": "0xd13cfbd8e27eba1b7b0027ad3fbf54431149bfa1",
+        "arbiter": "0x220efc8ec311a3738d73445a5fd1176ba711274c",
+        "documentVerifier": "0x94e04deb5d8286e671bf9830870dd2dcfc9370db",
+        "incoterm": "0x4349460000000000000000000000000000000000000000000000000000000000",
+        "termsHash": "0x1f109cbb57ff45df7e3a859cf73c69cba462fbdf857dd82c58e4740dc3279e8a",
+        "requiredDocsHash": "0xd33457b2584e3567f80a223a25527a62adf6808ef54c7b442f954ca9a01b5fe4",
+        "nonce": "1"
+      },
+      "attestationFields": {
+        "blNumber": "OLSU26105120",
+        "onBoardDate": 1791158400,
+        "portOfLoading": "CNSHA"
+      }
+    },
+    {
+      "id": "T03",
+      "orderId": "0xf16ce6ea1a95cb509194df9ce7265871f81e23b1d51e3608721963ad41edc5bf",
+      "orderNumber": "PO4421",
+      "importerTaxId": "765432103",
+      "totalAmountMinor": 2250000,
+      "currency": "USD",
+      "incoterm": "FOB",
+      "shipmentDeadline": 1792886400,
+      "requiredDocs": [
+        "BILL_OF_LADING",
+        "COMMERCIAL_INVOICE"
+      ],
+      "attestation": {
+        "orderId": "0xf16ce6ea1a95cb509194df9ce7265871f81e23b1d51e3608721963ad41edc5bf",
+        "blNumberHash": "0xb9ddab716c1f4f748252677d57ec50f66cabf4c3b38c7c41a5ce348543be813a",
+        "onBoardDate": "1792022400",
+        "portOfLoading": "0x434e59544e000000000000000000000000000000000000000000000000000000",
+        "docsHash": "0x7e40de257c5250bff92608fe863fd7f96be3a19b6eda552c25ff63e7a0ead460"
+      },
+      "documentVerifier": "0x09f5c58ccb40224a6d7754c74e8e18474e901613",
+      "terms": {
+        "orderNumber": "PO4421",
+        "currency": "USD",
+        "invoiceAmountMinor": "2250000",
+        "hsCodes": [
+          "940542"
+        ],
+        "documentHash": "0xa12ed6dd520d407a2f2351dc9d2983b8b06c1fc4465389499952211a59256f36"
+      },
+      "entry": {
+        "orderId": "0xf16ce6ea1a95cb509194df9ce7265871f81e23b1d51e3608721963ad41edc5bf",
+        "payoutAddress": "0x2d05ad8ad5a2b83f6ef076789d1931f91c5692dc",
+        "carrier": "0x97f8595722e8d7b85a16d8322ebfa5c54367d37e",
+        "uploaders": [
+          {
+            "address": "0x2d05ad8ad5a2b83f6ef076789d1931f91c5692dc",
+            "party": "exporter"
+          },
+          {
+            "address": "0xa4b0e20777a36686f013dca56df79db25c05e3f7",
+            "party": "importer"
+          }
+        ],
+        "knownDestinations": [
+          {
+            "kind": "bank_account",
+            "value": "7550118822993300"
+          }
+        ]
+      },
+      "purchaseOrder": {
+        "orderId": "0xf16ce6ea1a95cb509194df9ce7265871f81e23b1d51e3608721963ad41edc5bf",
+        "importer": "0xa4b0e20777a36686f013dca56df79db25c05e3f7",
+        "exporter": "0x2d05ad8ad5a2b83f6ef076789d1931f91c5692dc",
+        "payoutAddress": "0x2d05ad8ad5a2b83f6ef076789d1931f91c5692dc",
+        "token": "0x081cbaafb0bf5f3520ef51c6b3bb8b135d44c401",
+        "totalAmount": "2250000",
+        "advanceBps": 3000,
+        "shipmentDeadline": "1792886400",
+        "disputeWindow": "0",
+        "carrier": "0x97f8595722e8d7b85a16d8322ebfa5c54367d37e",
+        "arbiter": "0x220efc8ec311a3738d73445a5fd1176ba711274c",
+        "documentVerifier": "0x09f5c58ccb40224a6d7754c74e8e18474e901613",
+        "incoterm": "0x464f420000000000000000000000000000000000000000000000000000000000",
+        "termsHash": "0x13ce341162351b9636fc179e70636acb9a106510d7a828fe5ee93d4662e0cd4b",
+        "requiredDocsHash": "0xd33457b2584e3567f80a223a25527a62adf6808ef54c7b442f954ca9a01b5fe4",
+        "nonce": "1"
+      },
+      "attestationFields": {
+        "blNumber": "PSLU2610150123",
+        "onBoardDate": 1792022400,
+        "portOfLoading": "CNYTN"
+      }
+    },
+    {
+      "id": "T04",
+      "orderId": "0x6d10bf0f5f9854fb71b7c7a27387b3e9ea3ee4162b70e74a58c54d63a0ca9723",
+      "orderNumber": "PO4398",
+      "importerTaxId": "768890013",
+      "totalAmountMinor": 4160000,
+      "currency": "USD",
+      "incoterm": "CFR",
+      "shipmentDeadline": 1791158400,
+      "requiredDocs": [
+        "BILL_OF_LADING",
+        "COMMERCIAL_INVOICE"
+      ],
+      "attestation": {
+        "orderId": "0x6d10bf0f5f9854fb71b7c7a27387b3e9ea3ee4162b70e74a58c54d63a0ca9723",
+        "blNumberHash": "0xad30a4ae2ef6245be525869f0f1780e8836a061ab3188186419a86503e84db81",
+        "onBoardDate": "1790553600",
+        "portOfLoading": "0x434e54414f000000000000000000000000000000000000000000000000000000",
+        "docsHash": "0x4a108c047950da3e6857c107e979d8c484a7fdd82a98c3307ece6b0001d88e2e"
+      },
+      "documentVerifier": "0x092e9361c27249dd980567f3c4f92fa4782766ae",
+      "terms": {
+        "orderNumber": "PO4398",
+        "currency": "USD",
+        "invoiceAmountMinor": "4160000",
+        "hsCodes": [
+          "401110"
+        ],
+        "documentHash": "0x6d721e29a91cb2cf40973cf88c492f70f216d3553180c0d5c4db14a28d821233"
+      },
+      "entry": {
+        "orderId": "0x6d10bf0f5f9854fb71b7c7a27387b3e9ea3ee4162b70e74a58c54d63a0ca9723",
+        "payoutAddress": "0x400650067426203eeafd95177a0ad5d14132f960",
+        "carrier": "0x97f8595722e8d7b85a16d8322ebfa5c54367d37e",
+        "uploaders": [
+          {
+            "address": "0x400650067426203eeafd95177a0ad5d14132f960",
+            "party": "exporter"
+          },
+          {
+            "address": "0x6b9f709a4cee20a5a531f2b2347b45b3f362da4c",
+            "party": "importer"
+          }
+        ],
+        "knownDestinations": [
+          {
+            "kind": "bank_account",
+            "value": "5320778144102290"
+          }
+        ]
+      },
+      "purchaseOrder": {
+        "orderId": "0x6d10bf0f5f9854fb71b7c7a27387b3e9ea3ee4162b70e74a58c54d63a0ca9723",
+        "importer": "0x6b9f709a4cee20a5a531f2b2347b45b3f362da4c",
+        "exporter": "0x400650067426203eeafd95177a0ad5d14132f960",
+        "payoutAddress": "0x400650067426203eeafd95177a0ad5d14132f960",
+        "token": "0x081cbaafb0bf5f3520ef51c6b3bb8b135d44c401",
+        "totalAmount": "4160000",
+        "advanceBps": 3000,
+        "shipmentDeadline": "1791158400",
+        "disputeWindow": "0",
+        "carrier": "0x97f8595722e8d7b85a16d8322ebfa5c54367d37e",
+        "arbiter": "0x220efc8ec311a3738d73445a5fd1176ba711274c",
+        "documentVerifier": "0x092e9361c27249dd980567f3c4f92fa4782766ae",
+        "incoterm": "0x4346520000000000000000000000000000000000000000000000000000000000",
+        "termsHash": "0xdce2ad07c9b087d1306c1f9a251d7af27fa8a5743b97cb70ce14b00aa192a407",
+        "requiredDocsHash": "0xd33457b2584e3567f80a223a25527a62adf6808ef54c7b442f954ca9a01b5fe4",
+        "nonce": "1"
+      },
+      "attestationFields": {
+        "blNumber": "PSLU2609280077",
+        "onBoardDate": 1790553600,
+        "portOfLoading": "CNTAO"
+      }
+    },
+    {
+      "id": "T05",
+      "orderId": "0xaf7432c9c31445d94b860b230e61e7ae04d137e6211a603fe5f06d1ff3d58337",
+      "orderNumber": "PO4430",
+      "importerTaxId": "784561232",
+      "totalAmountMinor": 2850000,
+      "currency": "USD",
+      "incoterm": "EXW",
+      "shipmentDeadline": 1792281600,
+      "requiredDocs": [
+        "AIR_WAYBILL",
+        "COMMERCIAL_INVOICE"
+      ],
+      "attestation": {
+        "orderId": "0xaf7432c9c31445d94b860b230e61e7ae04d137e6211a603fe5f06d1ff3d58337",
+        "blNumberHash": "0x293df1c24fe6084aa5e56585522c1a5cdc1f8ddd366b310d99b11239da1fb919",
+        "onBoardDate": "1791936000",
+        "portOfLoading": "0x434e505647000000000000000000000000000000000000000000000000000000",
+        "docsHash": "0x8da85dbb6245822b5d508af7b6c3797b303e7782ca4229c6f0d57f66a82a1234"
+      },
+      "documentVerifier": "0xd3bc9f99ec117094783fe1ce9decf55778371763",
+      "terms": {
+        "orderNumber": "PO4430",
+        "currency": "USD",
+        "invoiceAmountMinor": "2850000",
+        "hsCodes": [
+          "900211"
+        ],
+        "documentHash": "0xcd3e15a15708fe958e5234d34fd98dd3aad43f75aa593c893c78a416577fc998"
+      },
+      "entry": {
+        "orderId": "0xaf7432c9c31445d94b860b230e61e7ae04d137e6211a603fe5f06d1ff3d58337",
+        "payoutAddress": "0xd1000b5c46eccdd8e3c5bf1f39d4a3aa722e7871",
+        "carrier": "0xd6f39ccacdab6488483acfa345f4cc9d528ccba4",
+        "uploaders": [
+          {
+            "address": "0xd1000b5c46eccdd8e3c5bf1f39d4a3aa722e7871",
+            "party": "exporter"
+          },
+          {
+            "address": "0xa69c63a0184797c834bd50c5cdf462e3571d779f",
+            "party": "importer"
+          }
+        ],
+        "knownDestinations": [
+          {
+            "kind": "bank_account",
+            "value": "5120334499810072"
+          }
+        ]
+      },
+      "purchaseOrder": {
+        "orderId": "0xaf7432c9c31445d94b860b230e61e7ae04d137e6211a603fe5f06d1ff3d58337",
+        "importer": "0xa69c63a0184797c834bd50c5cdf462e3571d779f",
+        "exporter": "0xd1000b5c46eccdd8e3c5bf1f39d4a3aa722e7871",
+        "payoutAddress": "0xd1000b5c46eccdd8e3c5bf1f39d4a3aa722e7871",
+        "token": "0x081cbaafb0bf5f3520ef51c6b3bb8b135d44c401",
+        "totalAmount": "2850000",
+        "advanceBps": 3000,
+        "shipmentDeadline": "1792281600",
+        "disputeWindow": "0",
+        "carrier": "0xd6f39ccacdab6488483acfa345f4cc9d528ccba4",
+        "arbiter": "0x220efc8ec311a3738d73445a5fd1176ba711274c",
+        "documentVerifier": "0xd3bc9f99ec117094783fe1ce9decf55778371763",
+        "incoterm": "0x4558570000000000000000000000000000000000000000000000000000000000",
+        "termsHash": "0x3e5bfddd8477541e1d328ac7149289b2423e2f3ad56a17f30eab08d410d8897e",
+        "requiredDocsHash": "0x18fbd22f6b3aea6119b135faaaa4b064b25801f0789a16d3a23cae15f7f718e1",
+        "nonce": "1"
+      },
+      "attestationFields": {
+        "blNumber": "17612345675",
+        "onBoardDate": 1791936000,
+        "portOfLoading": "CNPVG"
+      }
+    },
+    {
+      "id": "T06",
+      "orderId": "0xae9979876685eb5dfd5c18e972146d61c3be87e91b0fccb4680510d5eb5b72d4",
+      "orderNumber": "PO4417",
+      "importerTaxId": "965123407",
+      "totalAmountMinor": 22200000,
+      "currency": "CNY",
+      "incoterm": "FOB",
+      "shipmentDeadline": 1792627200,
+      "requiredDocs": [
+        "BILL_OF_LADING",
+        "COMMERCIAL_INVOICE"
+      ],
+      "attestation": {
+        "orderId": "0xae9979876685eb5dfd5c18e972146d61c3be87e91b0fccb4680510d5eb5b72d4",
+        "blNumberHash": "0x02c325b83a282a12610dfc69c04fc874d24c5b4e871f7b337b8fb1b5d70cdedc",
+        "onBoardDate": "1791417600",
+        "portOfLoading": "0x434e584d4e000000000000000000000000000000000000000000000000000000",
+        "docsHash": "0x0b9e64defb6971db6106fca9212f40e9ea3904af25bcc49174e7965eef6d8fc3"
+      },
+      "documentVerifier": "0xeb5105001eb825731b8d20e7d34be33b04e6acdb",
+      "terms": {
+        "orderNumber": "PO4417",
+        "currency": "CNY",
+        "invoiceAmountMinor": "22200000",
+        "hsCodes": [
+          "680293"
+        ],
+        "documentHash": "0x9223223f0d514e79f0847cde3b55d35892f0f84f42511069d79c9342123c7c3d"
+      },
+      "entry": {
+        "orderId": "0xae9979876685eb5dfd5c18e972146d61c3be87e91b0fccb4680510d5eb5b72d4",
+        "payoutAddress": "0xe0cb98540aa9ce4d791dce31a453c17cf5a4ef6b",
+        "carrier": "0xd13cfbd8e27eba1b7b0027ad3fbf54431149bfa1",
+        "uploaders": [
+          {
+            "address": "0xe0cb98540aa9ce4d791dce31a453c17cf5a4ef6b",
+            "party": "exporter"
+          },
+          {
+            "address": "0x1cc3559db7186683355e2a9324714fb9617cf4bd",
+            "party": "importer"
+          }
+        ],
+        "knownDestinations": [
+          {
+            "kind": "bank_account",
+            "value": "5920665510308841"
+          }
+        ]
+      },
+      "purchaseOrder": {
+        "orderId": "0xae9979876685eb5dfd5c18e972146d61c3be87e91b0fccb4680510d5eb5b72d4",
+        "importer": "0x1cc3559db7186683355e2a9324714fb9617cf4bd",
+        "exporter": "0xe0cb98540aa9ce4d791dce31a453c17cf5a4ef6b",
+        "payoutAddress": "0xe0cb98540aa9ce4d791dce31a453c17cf5a4ef6b",
+        "token": "0x081cbaafb0bf5f3520ef51c6b3bb8b135d44c401",
+        "totalAmount": "22200000",
+        "advanceBps": 3000,
+        "shipmentDeadline": "1792627200",
+        "disputeWindow": "0",
+        "carrier": "0xd13cfbd8e27eba1b7b0027ad3fbf54431149bfa1",
+        "arbiter": "0x220efc8ec311a3738d73445a5fd1176ba711274c",
+        "documentVerifier": "0xeb5105001eb825731b8d20e7d34be33b04e6acdb",
+        "incoterm": "0x464f420000000000000000000000000000000000000000000000000000000000",
+        "termsHash": "0x4eddf05872841c47593b5cc9adcb69bb3e20752452e37d6adc65beb03c3716f6",
+        "requiredDocsHash": "0xd33457b2584e3567f80a223a25527a62adf6808ef54c7b442f954ca9a01b5fe4",
+        "nonce": "1"
+      },
+      "attestationFields": {
+        "blNumber": "OLSU26106034",
+        "onBoardDate": 1791417600,
+        "portOfLoading": "CNXMN"
+      }
+    },
+    {
+      "id": "T07",
+      "orderId": "0x096621600e30e3bd2cc0bfdc5a387490282b5a4376dabb8da4c8993c1299c897",
+      "orderNumber": "PO4402",
+      "importerTaxId": "771239870",
+      "totalAmountMinor": 4960000,
+      "currency": "HKD",
+      "incoterm": "CIF",
+      "shipmentDeadline": 1791590400,
+      "requiredDocs": [
+        "BILL_OF_LADING",
+        "COMMERCIAL_INVOICE"
+      ],
+      "attestation": {
+        "orderId": "0x096621600e30e3bd2cc0bfdc5a387490282b5a4376dabb8da4c8993c1299c897",
+        "blNumberHash": "0x6bc4335132a61a60ab1dc9059a3cb403e73bf4f3f9282cc7bbd58084624f25ec",
+        "onBoardDate": "1790985600",
+        "portOfLoading": "0x484b484b47000000000000000000000000000000000000000000000000000000",
+        "docsHash": "0x0c71364a1505d2824f1438f007673bb796cac7ef828bb9ca1779285629a89029"
+      },
+      "documentVerifier": "0x66bc7f63a278b50dfc7f5e62c8c5f0753e52e28b",
+      "terms": {
+        "orderNumber": "PO4402",
+        "currency": "HKD",
+        "invoiceAmountMinor": "4960000",
+        "hsCodes": [
+          "851762"
+        ],
+        "documentHash": "0xeb8414d4cabdee6f36da1065c4940bfabcf730a235fe803c1db6194877f998aa"
+      },
+      "entry": {
+        "orderId": "0x096621600e30e3bd2cc0bfdc5a387490282b5a4376dabb8da4c8993c1299c897",
+        "payoutAddress": "0x2425ab116b63a87850affd09aea0b4e0bf30a9ad",
+        "carrier": "0x97f8595722e8d7b85a16d8322ebfa5c54367d37e",
+        "uploaders": [
+          {
+            "address": "0x2425ab116b63a87850affd09aea0b4e0bf30a9ad",
+            "party": "exporter"
+          },
+          {
+            "address": "0x967cbf48f38e901368958f418cc89d1792bf6e38",
+            "party": "importer"
+          }
+        ],
+        "knownDestinations": [
+          {
+            "kind": "bank_account",
+            "value": "0042887766100301"
+          }
+        ]
+      },
+      "purchaseOrder": {
+        "orderId": "0x096621600e30e3bd2cc0bfdc5a387490282b5a4376dabb8da4c8993c1299c897",
+        "importer": "0x967cbf48f38e901368958f418cc89d1792bf6e38",
+        "exporter": "0x2425ab116b63a87850affd09aea0b4e0bf30a9ad",
+        "payoutAddress": "0x2425ab116b63a87850affd09aea0b4e0bf30a9ad",
+        "token": "0x081cbaafb0bf5f3520ef51c6b3bb8b135d44c401",
+        "totalAmount": "4960000",
+        "advanceBps": 3000,
+        "shipmentDeadline": "1791590400",
+        "disputeWindow": "0",
+        "carrier": "0x97f8595722e8d7b85a16d8322ebfa5c54367d37e",
+        "arbiter": "0x220efc8ec311a3738d73445a5fd1176ba711274c",
+        "documentVerifier": "0x66bc7f63a278b50dfc7f5e62c8c5f0753e52e28b",
+        "incoterm": "0x4349460000000000000000000000000000000000000000000000000000000000",
+        "termsHash": "0xbacbbdb32e99c6d91ac89bdb1776a9aaae863676f078f0c48f2800fc07480759",
+        "requiredDocsHash": "0xd33457b2584e3567f80a223a25527a62adf6808ef54c7b442f954ca9a01b5fe4",
+        "nonce": "1"
+      },
+      "attestationFields": {
+        "blNumber": "PSLU2610030555",
+        "onBoardDate": 1790985600,
+        "portOfLoading": "HKHKG"
+      }
+    },
+    {
+      "id": "T08",
+      "orderId": "0x72dee5ee8e2fa9ae692804cfedfcfb54f67adcf60016e7e8cad3506aa5a696cd",
+      "orderNumber": "PO4419",
+      "importerTaxId": "760012343",
+      "totalAmountMinor": 1990000,
+      "currency": "USD",
+      "incoterm": "EXW",
+      "shipmentDeadline": 1791763200,
+      "requiredDocs": [
+        "AIR_WAYBILL",
+        "COMMERCIAL_INVOICE"
+      ],
+      "attestation": {
+        "orderId": "0x72dee5ee8e2fa9ae692804cfedfcfb54f67adcf60016e7e8cad3506aa5a696cd",
+        "blNumberHash": "0x2509932cb24ea1a844c9f900bef2111fd1bc0c3d55674c3ed9b24f0a2dcb8f80",
+        "onBoardDate": "1791504000",
+        "portOfLoading": "0x484b484b47000000000000000000000000000000000000000000000000000000",
+        "docsHash": "0xfc4a10e41374beec9eefab02edcca504f013d60be8b1f06e0569be344d492cb3"
+      },
+      "documentVerifier": "0xb73105647a143cfd2955e8cf197fe0a155477563",
+      "terms": {
+        "orderNumber": "PO4419",
+        "currency": "USD",
+        "invoiceAmountMinor": "1990000",
+        "hsCodes": [
+          "847330"
+        ],
+        "documentHash": "0xc7966a4449ee5f7f4785aff5040bcdaf3562becf5cc980db796a331514a581b4"
+      },
+      "entry": {
+        "orderId": "0x72dee5ee8e2fa9ae692804cfedfcfb54f67adcf60016e7e8cad3506aa5a696cd",
+        "payoutAddress": "0x9e54956d19deb5c93d5e5cd1c178bd8bc0da4758",
+        "carrier": "0xd6f39ccacdab6488483acfa345f4cc9d528ccba4",
+        "uploaders": [
+          {
+            "address": "0x9e54956d19deb5c93d5e5cd1c178bd8bc0da4758",
+            "party": "exporter"
+          },
+          {
+            "address": "0x557007bdb6fcded66d583d683449776cfe02bae2",
+            "party": "importer"
+          }
+        ],
+        "knownDestinations": [
+          {
+            "kind": "bank_account",
+            "value": "0042887766100301"
+          }
+        ]
+      },
+      "purchaseOrder": {
+        "orderId": "0x72dee5ee8e2fa9ae692804cfedfcfb54f67adcf60016e7e8cad3506aa5a696cd",
+        "importer": "0x557007bdb6fcded66d583d683449776cfe02bae2",
+        "exporter": "0x9e54956d19deb5c93d5e5cd1c178bd8bc0da4758",
+        "payoutAddress": "0x9e54956d19deb5c93d5e5cd1c178bd8bc0da4758",
+        "token": "0x081cbaafb0bf5f3520ef51c6b3bb8b135d44c401",
+        "totalAmount": "1990000",
+        "advanceBps": 3000,
+        "shipmentDeadline": "1791763200",
+        "disputeWindow": "0",
+        "carrier": "0xd6f39ccacdab6488483acfa345f4cc9d528ccba4",
+        "arbiter": "0x220efc8ec311a3738d73445a5fd1176ba711274c",
+        "documentVerifier": "0xb73105647a143cfd2955e8cf197fe0a155477563",
+        "incoterm": "0x4558570000000000000000000000000000000000000000000000000000000000",
+        "termsHash": "0xa7f378d8baef6031d4846d8477a74a757c1a97220bc16ef4d89cfa1a4da76845",
+        "requiredDocsHash": "0x18fbd22f6b3aea6119b135faaaa4b064b25801f0789a16d3a23cae15f7f718e1",
+        "nonce": "1"
+      },
+      "attestationFields": {
+        "blNumber": "17623456786",
+        "onBoardDate": 1791504000,
+        "portOfLoading": "HKHKG"
+      }
+    },
+    {
+      "id": "T09",
+      "orderId": "0x8a236ee9970b69f063e47cc9ee2137b8b07caad1d8d3e095559771d314fb0c4b",
+      "orderNumber": "PO4433",
+      "importerTaxId": "765432103",
+      "totalAmountMinor": 2730000,
+      "currency": "USD",
+      "incoterm": "FOB",
+      "shipmentDeadline": 1793318400,
+      "requiredDocs": [
+        "BILL_OF_LADING",
+        "COMMERCIAL_INVOICE"
+      ],
+      "attestation": {
+        "orderId": "0x8a236ee9970b69f063e47cc9ee2137b8b07caad1d8d3e095559771d314fb0c4b",
+        "blNumberHash": "0x422a2a20369de6ef04e8ed847b56619178a71afbac47e5b165c3bd2e176cc313",
+        "onBoardDate": "1792108800",
+        "portOfLoading": "0x434e43414e000000000000000000000000000000000000000000000000000000",
+        "docsHash": "0xa3e75e7ed4515c6bce8502475b3e0cdda78360c37fb7ffd07956e45297b0586a"
+      },
+      "documentVerifier": "0x7e496bd08fce33254ba48ff36d4651513781be7f",
+      "terms": {
+        "orderNumber": "PO4433",
+        "currency": "USD",
+        "invoiceAmountMinor": "2730000",
+        "hsCodes": [
+          "940130"
+        ],
+        "documentHash": "0x6fcb543aebff2151c1b6bf3734299a81ebe4164312dfd1551bfa6f25439ebb26"
+      },
+      "entry": {
+        "orderId": "0x8a236ee9970b69f063e47cc9ee2137b8b07caad1d8d3e095559771d314fb0c4b",
+        "payoutAddress": "0xdf4f9690e1b428cff3ba84c5b037983d478c66fc",
+        "carrier": "0xd13cfbd8e27eba1b7b0027ad3fbf54431149bfa1",
+        "uploaders": [
+          {
+            "address": "0xdf4f9690e1b428cff3ba84c5b037983d478c66fc",
+            "party": "exporter"
+          },
+          {
+            "address": "0x3030016bbb24f1c21d141f3211208a7d06f3296b",
+            "party": "importer"
+          }
+        ],
+        "knownDestinations": [
+          {
+            "kind": "bank_account",
+            "value": "3602447199081156"
+          }
+        ]
+      },
+      "purchaseOrder": {
+        "orderId": "0x8a236ee9970b69f063e47cc9ee2137b8b07caad1d8d3e095559771d314fb0c4b",
+        "importer": "0x3030016bbb24f1c21d141f3211208a7d06f3296b",
+        "exporter": "0xdf4f9690e1b428cff3ba84c5b037983d478c66fc",
+        "payoutAddress": "0xdf4f9690e1b428cff3ba84c5b037983d478c66fc",
+        "token": "0x081cbaafb0bf5f3520ef51c6b3bb8b135d44c401",
+        "totalAmount": "2730000",
+        "advanceBps": 3000,
+        "shipmentDeadline": "1793318400",
+        "disputeWindow": "0",
+        "carrier": "0xd13cfbd8e27eba1b7b0027ad3fbf54431149bfa1",
+        "arbiter": "0x220efc8ec311a3738d73445a5fd1176ba711274c",
+        "documentVerifier": "0x7e496bd08fce33254ba48ff36d4651513781be7f",
+        "incoterm": "0x464f420000000000000000000000000000000000000000000000000000000000",
+        "termsHash": "0xe9a0b558597b08e088260f4e78bf2311095ee985ca2ebc0de66b81b4ca9c7690",
+        "requiredDocsHash": "0xd33457b2584e3567f80a223a25527a62adf6808ef54c7b442f954ca9a01b5fe4",
+        "nonce": "1"
+      },
+      "attestationFields": {
+        "blNumber": "OLSU26107781",
+        "onBoardDate": 1792108800,
+        "portOfLoading": "CNCAN"
+      }
+    },
+    {
+      "id": "T10",
+      "orderId": "0xe6b03a78dbbfd10c6e2a066475c7e43ec6ea11c023cdd1baa6a134b78b38c6a6",
+      "orderNumber": "PO4425",
+      "importerTaxId": "965123407",
+      "totalAmountMinor": 7750000,
+      "currency": "USD",
+      "incoterm": "CFR",
+      "shipmentDeadline": 1792454400,
+      "requiredDocs": [
+        "BILL_OF_LADING",
+        "COMMERCIAL_INVOICE"
+      ],
+      "attestation": {
+        "orderId": "0xe6b03a78dbbfd10c6e2a066475c7e43ec6ea11c023cdd1baa6a134b78b38c6a6",
+        "blNumberHash": "0x1692cfd63167495aa4a42e1284e74731ffc17c97a60a672d20ed71c235e18860",
+        "onBoardDate": "1791676800",
+        "portOfLoading": "0x434e54534e000000000000000000000000000000000000000000000000000000",
+        "docsHash": "0xaeb0e3a4bf1bf8682843b9b74985556128bb5e2e0c927148ac777544859bc15e"
+      },
+      "documentVerifier": "0x14a7054821e2c8f24958a01084cba3173090e676",
+      "terms": {
+        "orderNumber": "PO4425",
+        "currency": "USD",
+        "invoiceAmountMinor": "7750000",
+        "hsCodes": [
+          "730630"
+        ],
+        "documentHash": "0xb9ff4818037bbd73323fdf069c540e86035b3643adc3f6b4ca19445f4a403f8f"
+      },
+      "entry": {
+        "orderId": "0xe6b03a78dbbfd10c6e2a066475c7e43ec6ea11c023cdd1baa6a134b78b38c6a6",
+        "payoutAddress": "0x313f36e47b4f10ccf3085e1aa0b5663e7fe1c19c",
+        "carrier": "0x97f8595722e8d7b85a16d8322ebfa5c54367d37e",
+        "uploaders": [
+          {
+            "address": "0x313f36e47b4f10ccf3085e1aa0b5663e7fe1c19c",
+            "party": "exporter"
+          },
+          {
+            "address": "0x137c85d1342c41083c8ab787edf2b8a2b5aeac6f",
+            "party": "importer"
+          }
+        ],
+        "knownDestinations": [
+          {
+            "kind": "bank_account",
+            "value": "1200556733498810"
+          }
+        ]
+      },
+      "purchaseOrder": {
+        "orderId": "0xe6b03a78dbbfd10c6e2a066475c7e43ec6ea11c023cdd1baa6a134b78b38c6a6",
+        "importer": "0x137c85d1342c41083c8ab787edf2b8a2b5aeac6f",
+        "exporter": "0x313f36e47b4f10ccf3085e1aa0b5663e7fe1c19c",
+        "payoutAddress": "0x313f36e47b4f10ccf3085e1aa0b5663e7fe1c19c",
+        "token": "0x081cbaafb0bf5f3520ef51c6b3bb8b135d44c401",
+        "totalAmount": "7750000",
+        "advanceBps": 3000,
+        "shipmentDeadline": "1792454400",
+        "disputeWindow": "0",
+        "carrier": "0x97f8595722e8d7b85a16d8322ebfa5c54367d37e",
+        "arbiter": "0x220efc8ec311a3738d73445a5fd1176ba711274c",
+        "documentVerifier": "0x14a7054821e2c8f24958a01084cba3173090e676",
+        "incoterm": "0x4346520000000000000000000000000000000000000000000000000000000000",
+        "termsHash": "0x53bf7812fc61b2b3de5b17765685d956baf1167325bfa15b88e47f17594fa249",
+        "requiredDocsHash": "0xd33457b2584e3567f80a223a25527a62adf6808ef54c7b442f954ca9a01b5fe4",
+        "nonce": "1"
+      },
+      "attestationFields": {
+        "blNumber": "PSLU2610110901",
+        "onBoardDate": 1791676800,
+        "portOfLoading": "CNTSN"
+      }
+    },
+    {
+      "id": "T11",
+      "orderId": "0x087ab4bea45f630425fb66fc96c1c781968cb51b96da4693c2f923693bc69ca9",
+      "orderNumber": "PO4428",
+      "importerTaxId": "760012343",
+      "totalAmountMinor": 2700000,
+      "currency": "EUR",
+      "incoterm": "EXW",
+      "shipmentDeadline": 1791763200,
+      "requiredDocs": [
+        "AIR_WAYBILL",
+        "COMMERCIAL_INVOICE"
+      ],
+      "attestation": {
+        "orderId": "0x087ab4bea45f630425fb66fc96c1c781968cb51b96da4693c2f923693bc69ca9",
+        "blNumberHash": "0xd14b9f8bcc7b379b38519474f819f08dcb482a3597b0588219a5b95c95b2b0a7",
+        "onBoardDate": "1791331200",
+        "portOfLoading": "0x434e535a58000000000000000000000000000000000000000000000000000000",
+        "docsHash": "0x831340ffc3a300a48a0a6194e7a2fb08d593436a880141527c5a4a10da377120"
+      },
+      "documentVerifier": "0x05aba33e21ee9f318ad8760c9f9e8fac509f5af7",
+      "terms": {
+        "orderNumber": "PO4428",
+        "currency": "EUR",
+        "invoiceAmountMinor": "2700000",
+        "hsCodes": [
+          "880622"
+        ],
+        "documentHash": "0x473205e6f56f6b1e1d729c3dc3d7bdd4048705aff0d36a3fcd0d0eb493e868a5"
+      },
+      "entry": {
+        "orderId": "0x087ab4bea45f630425fb66fc96c1c781968cb51b96da4693c2f923693bc69ca9",
+        "payoutAddress": "0xd89a5318a070a90cac5293a0af22ee5eecbe10b6",
+        "carrier": "0xd6f39ccacdab6488483acfa345f4cc9d528ccba4",
+        "uploaders": [
+          {
+            "address": "0xd89a5318a070a90cac5293a0af22ee5eecbe10b6",
+            "party": "exporter"
+          },
+          {
+            "address": "0x39a79063335a2d208df56d4e83d21434aeddd360",
+            "party": "importer"
+          }
+        ],
+        "knownDestinations": [
+          {
+            "kind": "bank_account",
+            "value": "7550118822993300"
+          }
+        ]
+      },
+      "purchaseOrder": {
+        "orderId": "0x087ab4bea45f630425fb66fc96c1c781968cb51b96da4693c2f923693bc69ca9",
+        "importer": "0x39a79063335a2d208df56d4e83d21434aeddd360",
+        "exporter": "0xd89a5318a070a90cac5293a0af22ee5eecbe10b6",
+        "payoutAddress": "0xd89a5318a070a90cac5293a0af22ee5eecbe10b6",
+        "token": "0x081cbaafb0bf5f3520ef51c6b3bb8b135d44c401",
+        "totalAmount": "2700000",
+        "advanceBps": 3000,
+        "shipmentDeadline": "1791763200",
+        "disputeWindow": "0",
+        "carrier": "0xd6f39ccacdab6488483acfa345f4cc9d528ccba4",
+        "arbiter": "0x220efc8ec311a3738d73445a5fd1176ba711274c",
+        "documentVerifier": "0x05aba33e21ee9f318ad8760c9f9e8fac509f5af7",
+        "incoterm": "0x4558570000000000000000000000000000000000000000000000000000000000",
+        "termsHash": "0x30c89a2830cb39f4f48facc3fb28f53057a7bf05779476cb41c163849f9e4d15",
+        "requiredDocsHash": "0x18fbd22f6b3aea6119b135faaaa4b064b25801f0789a16d3a23cae15f7f718e1",
+        "nonce": "1"
+      },
+      "attestationFields": {
+        "blNumber": "17634567890",
+        "onBoardDate": 1791331200,
+        "portOfLoading": "CNSZX"
+      }
+    },
+    {
+      "id": "T12",
+      "orderId": "0x9055aaef28ef16485d23c61279ec814d948cb0ac77a85a87d2fcba7af6be0171",
+      "orderNumber": "PO4436",
+      "importerTaxId": "771239870",
+      "totalAmountMinor": 9800000,
+      "currency": "CNY",
+      "incoterm": "CIF",
+      "shipmentDeadline": 1792800000,
+      "requiredDocs": [
+        "BILL_OF_LADING",
+        "COMMERCIAL_INVOICE"
+      ],
+      "attestation": {
+        "orderId": "0x9055aaef28ef16485d23c61279ec814d948cb0ac77a85a87d2fcba7af6be0171",
+        "blNumberHash": "0xedacd3591b50e170cde610715a0fcb727f4badcaf065d3a2a147c6c1482e6ebf",
+        "onBoardDate": "1791590400",
+        "portOfLoading": "0x434e534841000000000000000000000000000000000000000000000000000000",
+        "docsHash": "0xf386cdc588375e4be1ce8cb49408093cfec6707249fcd0be12b89a0bbee9b8b3"
+      },
+      "documentVerifier": "0x437312e68c53d5ca17e7d50738bb3b014ec81ffc",
+      "terms": {
+        "orderNumber": "PO4436",
+        "currency": "CNY",
+        "invoiceAmountMinor": "9800000",
+        "hsCodes": [
+          "540233"
+        ],
+        "documentHash": "0x434c8065c72c3b1ae74529fd5f4c4d4207c06b4233a32e89d1abd220019d11da"
+      },
+      "entry": {
+        "orderId": "0x9055aaef28ef16485d23c61279ec814d948cb0ac77a85a87d2fcba7af6be0171",
+        "payoutAddress": "0x5f73e6522b504886b43fb922d8fb0a29e9dc421a",
+        "carrier": "0xd13cfbd8e27eba1b7b0027ad3fbf54431149bfa1",
+        "uploaders": [
+          {
+            "address": "0x5f73e6522b504886b43fb922d8fb0a29e9dc421a",
+            "party": "exporter"
+          },
+          {
+            "address": "0x9dc225971b2869cc59a3acd10462fe4f0ba6a9bb",
+            "party": "importer"
+          }
+        ],
+        "knownDestinations": [
+          {
+            "kind": "bank_account",
+            "value": "3100224588901123"
+          }
+        ]
+      },
+      "purchaseOrder": {
+        "orderId": "0x9055aaef28ef16485d23c61279ec814d948cb0ac77a85a87d2fcba7af6be0171",
+        "importer": "0x9dc225971b2869cc59a3acd10462fe4f0ba6a9bb",
+        "exporter": "0x5f73e6522b504886b43fb922d8fb0a29e9dc421a",
+        "payoutAddress": "0x5f73e6522b504886b43fb922d8fb0a29e9dc421a",
+        "token": "0x081cbaafb0bf5f3520ef51c6b3bb8b135d44c401",
+        "totalAmount": "9800000",
+        "advanceBps": 3000,
+        "shipmentDeadline": "1792800000",
+        "disputeWindow": "0",
+        "carrier": "0xd13cfbd8e27eba1b7b0027ad3fbf54431149bfa1",
+        "arbiter": "0x220efc8ec311a3738d73445a5fd1176ba711274c",
+        "documentVerifier": "0x437312e68c53d5ca17e7d50738bb3b014ec81ffc",
+        "incoterm": "0x4349460000000000000000000000000000000000000000000000000000000000",
+        "termsHash": "0xba5fdf51e4f66881ffc9b638d2cfa30769919736e1f935ac4ad55079c2e3a107",
+        "requiredDocsHash": "0xd33457b2584e3567f80a223a25527a62adf6808ef54c7b442f954ca9a01b5fe4",
+        "nonce": "1"
+      },
+      "attestationFields": {
+        "blNumber": "OLSU26108192",
+        "onBoardDate": 1791590400,
+        "portOfLoading": "CNSHA"
+      }
+    }
+  ],
+  "documents": [
+    {
+      "id": "T01-transport",
+      "kind": "legit",
+      "order": "T01",
+      "docType": "BILL_OF_LADING",
+      "path": "legit/T01-bill_of_lading.pdf",
+      "fileHash": "0x9b55d82028e6fcbc8c2fd94f64f0573706e601cbfa0e7cae8b53ceb212ab8f0d",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26104471",
+        "on_board_date": 1791763200,
+        "port_of_loading": "CNNGB",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0x9b55d82028e6fcbc8c2fd94f64f0573706e601cbfa0e7cae8b53ceb212ab8f0d",
+        "0x981c874a99dc841074c126fe89e4fd5d8a2427fad1fe281d395abd3876e18aca"
+      ]
+    },
+    {
+      "id": "T01-invoice",
+      "kind": "legit",
+      "order": "T01",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "legit/T01-commercial_invoice.pdf",
+      "fileHash": "0x981c874a99dc841074c126fe89e4fd5d8a2427fad1fe281d395abd3876e18aca",
+      "truth": {
+        "invoice_number": "NB20260915",
+        "order_number": "PO4410",
+        "amount_minor": 2000000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "846721",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0x9b55d82028e6fcbc8c2fd94f64f0573706e601cbfa0e7cae8b53ceb212ab8f0d",
+        "0x981c874a99dc841074c126fe89e4fd5d8a2427fad1fe281d395abd3876e18aca"
+      ]
+    },
+    {
+      "id": "T02-transport",
+      "kind": "legit",
+      "order": "T02",
+      "docType": "BILL_OF_LADING",
+      "path": "legit/T02-bill_of_lading.pdf",
+      "fileHash": "0xa318b270be90ed756552da36fbac2e7c8ef00dc6927264f10368ae25b430284e",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26105120",
+        "on_board_date": 1791158400,
+        "port_of_loading": "CNSHA",
+        "port_of_discharge": "CLVAP",
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0xa318b270be90ed756552da36fbac2e7c8ef00dc6927264f10368ae25b430284e",
+        "0x029463e8b2a6039819ffd1f8c1e3a802d8637a8fab9326d234f14d7334497fb2"
+      ]
+    },
+    {
+      "id": "T02-invoice",
+      "kind": "legit",
+      "order": "T02",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "legit/T02-commercial_invoice.pdf",
+      "fileHash": "0x029463e8b2a6039819ffd1f8c1e3a802d8637a8fab9326d234f14d7334497fb2",
+      "truth": {
+        "invoice_number": "HX260331",
+        "order_number": "PO4415",
+        "amount_minor": 1300000,
+        "currency": "USD",
+        "incoterm": "CIF",
+        "importer_tax_id": "771239870",
+        "hs_code": "520832",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0xa318b270be90ed756552da36fbac2e7c8ef00dc6927264f10368ae25b430284e",
+        "0x029463e8b2a6039819ffd1f8c1e3a802d8637a8fab9326d234f14d7334497fb2"
+      ]
+    },
+    {
+      "id": "T03-transport",
+      "kind": "legit",
+      "order": "T03",
+      "docType": "BILL_OF_LADING",
+      "path": "legit/T03-bill_of_lading.pdf",
+      "fileHash": "0x9240ee4e998ef511b4816d2ca3e2ebfa9f4ce595fbf3c0ad993509ce63f09dc1",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "PSLU2610150123",
+        "on_board_date": 1792022400,
+        "port_of_loading": "CNYTN",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0x9240ee4e998ef511b4816d2ca3e2ebfa9f4ce595fbf3c0ad993509ce63f09dc1",
+        "0x9d3ceba3278e138859fe6b751f417c49c72017fbaaed1bb1498fe558e75fc999"
+      ]
+    },
+    {
+      "id": "T03-invoice",
+      "kind": "legit",
+      "order": "T03",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "legit/T03-commercial_invoice.pdf",
+      "fileHash": "0x9d3ceba3278e138859fe6b751f417c49c72017fbaaed1bb1498fe558e75fc999",
+      "truth": {
+        "invoice_number": "LM2026118",
+        "order_number": "PO4421",
+        "amount_minor": 2250000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "940542",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0x9240ee4e998ef511b4816d2ca3e2ebfa9f4ce595fbf3c0ad993509ce63f09dc1",
+        "0x9d3ceba3278e138859fe6b751f417c49c72017fbaaed1bb1498fe558e75fc999"
+      ]
+    },
+    {
+      "id": "T04-transport",
+      "kind": "legit",
+      "order": "T04",
+      "docType": "BILL_OF_LADING",
+      "path": "legit/T04-bill_of_lading.pdf",
+      "fileHash": "0x74232455390de20e40ba2ab3fc5b3cc867ad3de5d25fb7b553f1b421c95f7d5f",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "PSLU2609280077",
+        "on_board_date": 1790553600,
+        "port_of_loading": "CNTAO",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0x74232455390de20e40ba2ab3fc5b3cc867ad3de5d25fb7b553f1b421c95f7d5f",
+        "0x621713aef201d65bc4d1ddf45caac7ef03786e6ba46184052156c5f9f68163d8"
+      ]
+    },
+    {
+      "id": "T04-invoice",
+      "kind": "legit",
+      "order": "T04",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "legit/T04-commercial_invoice.pdf",
+      "fileHash": "0x621713aef201d65bc4d1ddf45caac7ef03786e6ba46184052156c5f9f68163d8",
+      "truth": {
+        "invoice_number": "QET260907",
+        "order_number": "PO4398",
+        "amount_minor": 4160000,
+        "currency": "USD",
+        "incoterm": "CFR",
+        "importer_tax_id": "768890013",
+        "hs_code": "401110",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0x74232455390de20e40ba2ab3fc5b3cc867ad3de5d25fb7b553f1b421c95f7d5f",
+        "0x621713aef201d65bc4d1ddf45caac7ef03786e6ba46184052156c5f9f68163d8"
+      ]
+    },
+    {
+      "id": "T05-transport",
+      "kind": "legit",
+      "order": "T05",
+      "docType": "AIR_WAYBILL",
+      "path": "legit/T05-air_waybill.pdf",
+      "fileHash": "0x2da9bea8b9072ee187a276f64ccce536b521d9850fe6ab92f4aff47dc866a878",
+      "truth": {
+        "doc_type": "AIR_WAYBILL",
+        "document_number": "17612345675",
+        "on_board_date": 1791936000,
+        "port_of_loading": "CNPVG",
+        "port_of_discharge": "CLSCL",
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0x2da9bea8b9072ee187a276f64ccce536b521d9850fe6ab92f4aff47dc866a878",
+        "0x29402993999f74ab8346152de3159935c376635cc4e28890262dd170d601d801"
+      ]
+    },
+    {
+      "id": "T05-invoice",
+      "kind": "legit",
+      "order": "T05",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "legit/T05-commercial_invoice.pdf",
+      "fileHash": "0x29402993999f74ab8346152de3159935c376635cc4e28890262dd170d601d801",
+      "truth": {
+        "invoice_number": "SPO2026044",
+        "order_number": "PO4430",
+        "amount_minor": 2850000,
+        "currency": "USD",
+        "incoterm": "EXW",
+        "importer_tax_id": "784561232",
+        "hs_code": "900211",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0x2da9bea8b9072ee187a276f64ccce536b521d9850fe6ab92f4aff47dc866a878",
+        "0x29402993999f74ab8346152de3159935c376635cc4e28890262dd170d601d801"
+      ]
+    },
+    {
+      "id": "T06-transport",
+      "kind": "legit",
+      "order": "T06",
+      "docType": "BILL_OF_LADING",
+      "path": "legit/T06-bill_of_lading.pdf",
+      "fileHash": "0xeb4aaba0cd84bfea1f26fc582351e862354f2946711a4bc2e666d680bff038d4",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26106034",
+        "on_board_date": 1791417600,
+        "port_of_loading": "CNXMN",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0xeb4aaba0cd84bfea1f26fc582351e862354f2946711a4bc2e666d680bff038d4",
+        "0xae9ebe6687a910a9f30126ff6b40b555f2b3bbc37430f0d1d650b93add59ba3b"
+      ]
+    },
+    {
+      "id": "T06-invoice",
+      "kind": "legit",
+      "order": "T06",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "legit/T06-commercial_invoice.pdf",
+      "fileHash": "0xae9ebe6687a910a9f30126ff6b40b555f2b3bbc37430f0d1d650b93add59ba3b",
+      "truth": {
+        "invoice_number": "XS261002",
+        "order_number": "PO4417",
+        "amount_minor": 22200000,
+        "currency": "CNY",
+        "incoterm": "FOB",
+        "importer_tax_id": "965123407",
+        "hs_code": "680293",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0xeb4aaba0cd84bfea1f26fc582351e862354f2946711a4bc2e666d680bff038d4",
+        "0xae9ebe6687a910a9f30126ff6b40b555f2b3bbc37430f0d1d650b93add59ba3b"
+      ]
+    },
+    {
+      "id": "T07-transport",
+      "kind": "legit",
+      "order": "T07",
+      "docType": "BILL_OF_LADING",
+      "path": "legit/T07-bill_of_lading.pdf",
+      "fileHash": "0x45eb216c6bc12c6ecfdd961e05b11ec39bb7c4722b4f6d4999d446a853be9524",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "PSLU2610030555",
+        "on_board_date": 1790985600,
+        "port_of_loading": "HKHKG",
+        "port_of_discharge": "CLVAP",
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0x45eb216c6bc12c6ecfdd961e05b11ec39bb7c4722b4f6d4999d446a853be9524",
+        "0xe6fbfb35ed4904686c0e3128a540a37c3f22da4c7fe70f4a64cf49c2df5666d1"
+      ]
+    },
+    {
+      "id": "T07-invoice",
+      "kind": "legit",
+      "order": "T07",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "legit/T07-commercial_invoice.pdf",
+      "fileHash": "0xe6fbfb35ed4904686c0e3128a540a37c3f22da4c7fe70f4a64cf49c2df5666d1",
+      "truth": {
+        "invoice_number": "KT20260877",
+        "order_number": "PO4402",
+        "amount_minor": 4960000,
+        "currency": "HKD",
+        "incoterm": "CIF",
+        "importer_tax_id": "771239870",
+        "hs_code": "851762",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0x45eb216c6bc12c6ecfdd961e05b11ec39bb7c4722b4f6d4999d446a853be9524",
+        "0xe6fbfb35ed4904686c0e3128a540a37c3f22da4c7fe70f4a64cf49c2df5666d1"
+      ]
+    },
+    {
+      "id": "T08-transport",
+      "kind": "legit",
+      "order": "T08",
+      "docType": "AIR_WAYBILL",
+      "path": "legit/T08-air_waybill.pdf",
+      "fileHash": "0x51efd12ca76e962a76148670c74529f81b675106b17d83b3af359fe797b96c5f",
+      "truth": {
+        "doc_type": "AIR_WAYBILL",
+        "document_number": "17623456786",
+        "on_board_date": 1791504000,
+        "port_of_loading": "HKHKG",
+        "port_of_discharge": "CLSCL",
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0x51efd12ca76e962a76148670c74529f81b675106b17d83b3af359fe797b96c5f",
+        "0x24bb7be8fd1c996e4c273b2740b69f2bc770f6d03f95d4ed24aa3c425cb480cc"
+      ]
+    },
+    {
+      "id": "T08-invoice",
+      "kind": "legit",
+      "order": "T08",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "legit/T08-commercial_invoice.pdf",
+      "fileHash": "0x24bb7be8fd1c996e4c273b2740b69f2bc770f6d03f95d4ed24aa3c425cb480cc",
+      "truth": {
+        "invoice_number": "KT20260901",
+        "order_number": "PO4419",
+        "amount_minor": 1990000,
+        "currency": "USD",
+        "incoterm": "EXW",
+        "importer_tax_id": "760012343",
+        "hs_code": "847330",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0x51efd12ca76e962a76148670c74529f81b675106b17d83b3af359fe797b96c5f",
+        "0x24bb7be8fd1c996e4c273b2740b69f2bc770f6d03f95d4ed24aa3c425cb480cc"
+      ]
+    },
+    {
+      "id": "T09-transport",
+      "kind": "legit",
+      "order": "T09",
+      "docType": "BILL_OF_LADING",
+      "path": "legit/T09-bill_of_lading.pdf",
+      "fileHash": "0xf292fdd23670ff8b99310ae7fcbb88b7874f0521195ee6e70a118ad3b182e394",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26107781",
+        "on_board_date": 1792108800,
+        "port_of_loading": "CNCAN",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0xf292fdd23670ff8b99310ae7fcbb88b7874f0521195ee6e70a118ad3b182e394",
+        "0xc61810853af19601be2cb4799267b3cd28aa49cf90a65ec46e47bcde23c67ddb"
+      ]
+    },
+    {
+      "id": "T09-invoice",
+      "kind": "legit",
+      "order": "T09",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "legit/T09-commercial_invoice.pdf",
+      "fileHash": "0xc61810853af19601be2cb4799267b3cd28aa49cf90a65ec46e47bcde23c67ddb",
+      "truth": {
+        "invoice_number": "GH260560",
+        "order_number": "PO4433",
+        "amount_minor": 2730000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "940130",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0xf292fdd23670ff8b99310ae7fcbb88b7874f0521195ee6e70a118ad3b182e394",
+        "0xc61810853af19601be2cb4799267b3cd28aa49cf90a65ec46e47bcde23c67ddb"
+      ]
+    },
+    {
+      "id": "T10-transport",
+      "kind": "legit",
+      "order": "T10",
+      "docType": "BILL_OF_LADING",
+      "path": "legit/T10-bill_of_lading.pdf",
+      "fileHash": "0x264cab3e120c11b745e758c1bf406fd7b501e1659c49bd1cf1f46aa7ee57debc",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "PSLU2610110901",
+        "on_board_date": 1791676800,
+        "port_of_loading": "CNTSN",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0x264cab3e120c11b745e758c1bf406fd7b501e1659c49bd1cf1f46aa7ee57debc",
+        "0xba0e8ae92b8e4648ef8a3f5c51635561e05d3626e1d050a2f89e1d4acccd0411"
+      ]
+    },
+    {
+      "id": "T10-invoice",
+      "kind": "legit",
+      "order": "T10",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "legit/T10-commercial_invoice.pdf",
+      "fileHash": "0xba0e8ae92b8e4648ef8a3f5c51635561e05d3626e1d050a2f89e1d4acccd0411",
+      "truth": {
+        "invoice_number": "TNS2026210",
+        "order_number": "PO4425",
+        "amount_minor": 7750000,
+        "currency": "USD",
+        "incoterm": "CFR",
+        "importer_tax_id": "965123407",
+        "hs_code": "730630",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0x264cab3e120c11b745e758c1bf406fd7b501e1659c49bd1cf1f46aa7ee57debc",
+        "0xba0e8ae92b8e4648ef8a3f5c51635561e05d3626e1d050a2f89e1d4acccd0411"
+      ]
+    },
+    {
+      "id": "T11-transport",
+      "kind": "legit",
+      "order": "T11",
+      "docType": "AIR_WAYBILL",
+      "path": "legit/T11-air_waybill.pdf",
+      "fileHash": "0x6decdd15d06f7e6115cd073e4ed908497c3258fdcc1f8f5cc39d50595222a300",
+      "truth": {
+        "doc_type": "AIR_WAYBILL",
+        "document_number": "17634567890",
+        "on_board_date": 1791331200,
+        "port_of_loading": "CNSZX",
+        "port_of_discharge": "CLSCL",
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0x6decdd15d06f7e6115cd073e4ed908497c3258fdcc1f8f5cc39d50595222a300",
+        "0x1fd411778ef666e4183cd7431a2ade4e715df03a7504c5f7463e82b1220c152a"
+      ]
+    },
+    {
+      "id": "T11-invoice",
+      "kind": "legit",
+      "order": "T11",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "legit/T11-commercial_invoice.pdf",
+      "fileHash": "0x1fd411778ef666e4183cd7431a2ade4e715df03a7504c5f7463e82b1220c152a",
+      "truth": {
+        "invoice_number": "LM2026121",
+        "order_number": "PO4428",
+        "amount_minor": 2700000,
+        "currency": "EUR",
+        "incoterm": "EXW",
+        "importer_tax_id": "760012343",
+        "hs_code": "880622",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0x6decdd15d06f7e6115cd073e4ed908497c3258fdcc1f8f5cc39d50595222a300",
+        "0x1fd411778ef666e4183cd7431a2ade4e715df03a7504c5f7463e82b1220c152a"
+      ]
+    },
+    {
+      "id": "T12-transport",
+      "kind": "legit",
+      "order": "T12",
+      "docType": "BILL_OF_LADING",
+      "path": "legit/T12-bill_of_lading.pdf",
+      "fileHash": "0xe749f7611ec10b8f4af0447dedca13c02db5f15e13ea446175a9890040f957c3",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26108192",
+        "on_board_date": 1791590400,
+        "port_of_loading": "CNSHA",
+        "port_of_discharge": "CLSVE",
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0xe749f7611ec10b8f4af0447dedca13c02db5f15e13ea446175a9890040f957c3",
+        "0x38ad7ecc02e5482ee8dfe4c2cbb982180643814f1a9823b1d2a598e71bf0082e"
+      ]
+    },
+    {
+      "id": "T12-invoice",
+      "kind": "legit",
+      "order": "T12",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "legit/T12-commercial_invoice.pdf",
+      "fileHash": "0x38ad7ecc02e5482ee8dfe4c2cbb982180643814f1a9823b1d2a598e71bf0082e",
+      "truth": {
+        "invoice_number": "HX260350",
+        "order_number": "PO4436",
+        "amount_minor": 9800000,
+        "currency": "CNY",
+        "incoterm": "CIF",
+        "importer_tax_id": "771239870",
+        "hs_code": "540233",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      },
+      "enginePackage": [
+        "0xe749f7611ec10b8f4af0447dedca13c02db5f15e13ea446175a9890040f957c3",
+        "0x38ad7ecc02e5482ee8dfe4c2cbb982180643814f1a9823b1d2a598e71bf0082e"
+      ]
+    },
+    {
+      "id": "A01",
+      "kind": "adversarial",
+      "title": "Invoice announces a new bank account for the balance",
+      "order": "T01",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "adversarial/A01.pdf",
+      "fileHash": "0xb94e51aae21f4efbf19ea6784681219f3b5b529524bc253ec26161f7a6e0977c",
+      "truth": {
+        "invoice_number": "NB20260915",
+        "order_number": "PO4410",
+        "amount_minor": 2000000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "846721",
+        "mentions_account_change": true,
+        "hidden_text_detected": false
+      },
+      "enginePackage": [
+        "0x9b55d82028e6fcbc8c2fd94f64f0573706e601cbfa0e7cae8b53ceb212ab8f0d",
+        "0xb94e51aae21f4efbf19ea6784681219f3b5b529524bc253ec26161f7a6e0977c"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "alert": [
+          "announced_in_document",
+          "unknown_destination"
+        ],
+        "conforms": true,
+        "engine": {
+          "decision": "hold",
+          "reasons": [
+            "ACCOUNT_CHANGE_MENTIONED"
+          ]
+        }
+      }
+    },
+    {
+      "id": "A02",
+      "kind": "adversarial",
+      "title": "Invoice silently prints an unregistered bank account",
+      "order": "T01",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "adversarial/A02.pdf",
+      "fileHash": "0x15201e1ef8b7347e55192273e1a60cbf472b684d87cd001f1a70eb789b6a7f58",
+      "truth": {
+        "invoice_number": "NB20260915",
+        "order_number": "PO4410",
+        "amount_minor": 2000000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "846721",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "enginePackage": [
+        "0x9b55d82028e6fcbc8c2fd94f64f0573706e601cbfa0e7cae8b53ceb212ab8f0d",
+        "0x15201e1ef8b7347e55192273e1a60cbf472b684d87cd001f1a70eb789b6a7f58"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "alert": [
+          "unknown_destination"
+        ],
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      }
+    },
+    {
+      "id": "A03",
+      "kind": "adversarial",
+      "title": "Invoice asks to pay a wallet",
+      "order": "T01",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "adversarial/A03.pdf",
+      "fileHash": "0xa65ec2f2458386994d5109357263f8aa8aceae1b123a8d6e6886a22b9dd48920",
+      "truth": {
+        "invoice_number": "NB20260915",
+        "order_number": "PO4410",
+        "amount_minor": 2000000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "846721",
+        "mentions_account_change": true,
+        "hidden_text_detected": false
+      },
+      "enginePackage": [
+        "0x9b55d82028e6fcbc8c2fd94f64f0573706e601cbfa0e7cae8b53ceb212ab8f0d",
+        "0xa65ec2f2458386994d5109357263f8aa8aceae1b123a8d6e6886a22b9dd48920"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "alert": [
+          "announced_in_document",
+          "unknown_destination"
+        ],
+        "conforms": true,
+        "engine": {
+          "decision": "hold",
+          "reasons": [
+            "ACCOUNT_CHANGE_MENTIONED"
+          ]
+        }
+      }
+    },
+    {
+      "id": "A04",
+      "kind": "adversarial",
+      "title": "White text with instructions for the AI and a fake total",
+      "order": "T01",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "adversarial/A04.pdf",
+      "fileHash": "0xa15c7321b246364ed1e4a958d25611b0216deab87f25c1ea7e2626f077e6fe37",
+      "truth": {
+        "invoice_number": "NB20260915",
+        "order_number": "PO4410",
+        "amount_minor": 2000000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "846721",
+        "mentions_account_change": false,
+        "hidden_text_detected": true
+      },
+      "enginePackage": [
+        "0x9b55d82028e6fcbc8c2fd94f64f0573706e601cbfa0e7cae8b53ceb212ab8f0d",
+        "0xa15c7321b246364ed1e4a958d25611b0216deab87f25c1ea7e2626f077e6fe37"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "hiddenText": true,
+        "conforms": true,
+        "engine": {
+          "decision": "hold",
+          "reasons": [
+            "HIDDEN_TEXT"
+          ]
+        }
+      }
+    },
+    {
+      "id": "A05",
+      "kind": "adversarial",
+      "title": "Tiny font with an inflated total",
+      "order": "T01",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "adversarial/A05.pdf",
+      "fileHash": "0xd08c214e0687bd0e7a1f52ef746adf0b6bfecfec613cde2abf2bdc55a94b68eb",
+      "truth": {
+        "invoice_number": "NB20260915",
+        "order_number": "PO4410",
+        "amount_minor": 2000000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "846721",
+        "mentions_account_change": false,
+        "hidden_text_detected": true
+      },
+      "enginePackage": [
+        "0x9b55d82028e6fcbc8c2fd94f64f0573706e601cbfa0e7cae8b53ceb212ab8f0d",
+        "0xd08c214e0687bd0e7a1f52ef746adf0b6bfecfec613cde2abf2bdc55a94b68eb"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "hiddenText": true,
+        "conforms": true,
+        "engine": {
+          "decision": "hold",
+          "reasons": [
+            "HIDDEN_TEXT"
+          ]
+        }
+      }
+    },
+    {
+      "id": "A06",
+      "kind": "adversarial",
+      "title": "Transparent text with a different total",
+      "order": "T01",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "adversarial/A06.pdf",
+      "fileHash": "0x8ce2c5c06aa55b2481a30d61d5f502cac475ac0d1f13eb3295f27d617c5e4887",
+      "truth": {
+        "invoice_number": "NB20260915",
+        "order_number": "PO4410",
+        "amount_minor": 2000000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "846721",
+        "mentions_account_change": false,
+        "hidden_text_detected": true
+      },
+      "enginePackage": [
+        "0x9b55d82028e6fcbc8c2fd94f64f0573706e601cbfa0e7cae8b53ceb212ab8f0d",
+        "0x8ce2c5c06aa55b2481a30d61d5f502cac475ac0d1f13eb3295f27d617c5e4887"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "hiddenText": true,
+        "conforms": true,
+        "engine": {
+          "decision": "hold",
+          "reasons": [
+            "HIDDEN_TEXT"
+          ]
+        }
+      }
+    },
+    {
+      "id": "A07",
+      "kind": "adversarial",
+      "title": "Invoice amount higher than the order",
+      "order": "T01",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "adversarial/A07.pdf",
+      "fileHash": "0xe0a9fd3c1336a3052ee365fa60b04da6892da7c0835155f7863ee4ba8e635b51",
+      "truth": {
+        "invoice_number": "NB20260915",
+        "order_number": "PO4410",
+        "amount_minor": 2600000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "846721",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "enginePackage": [
+        "0x9b55d82028e6fcbc8c2fd94f64f0573706e601cbfa0e7cae8b53ceb212ab8f0d",
+        "0xe0a9fd3c1336a3052ee365fa60b04da6892da7c0835155f7863ee4ba8e635b51"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "conforms": false,
+        "engine": {
+          "decision": "hold",
+          "reasons": [
+            "AMOUNT_MISMATCH"
+          ]
+        }
+      }
+    },
+    {
+      "id": "A08",
+      "kind": "adversarial",
+      "title": "Two different totals on the invoice",
+      "order": "T01",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "adversarial/A08.pdf",
+      "fileHash": "0xda9d546a6239952fff44631e96a3578155a380a469af4c0e58efb32daa9a5bc2",
+      "truth": {
+        "invoice_number": "NB20260915",
+        "order_number": "PO4410",
+        "amount_minor": 2000000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "846721",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "held",
+        "reason": "parser_failed",
+        "failure": "ambiguous_field",
+        "conforms": false
+      }
+    },
+    {
+      "id": "A09",
+      "kind": "adversarial",
+      "title": "Currency changed from USD to CNY",
+      "order": "T01",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "adversarial/A09.pdf",
+      "fileHash": "0xf792d476aeedba2631ea5be2c85c1f7c9164904b5fcce98ecf34b20a2a790027",
+      "truth": {
+        "invoice_number": "NB20260915",
+        "order_number": "PO4410",
+        "amount_minor": 2000000,
+        "currency": "CNY",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "846721",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "enginePackage": [
+        "0x9b55d82028e6fcbc8c2fd94f64f0573706e601cbfa0e7cae8b53ceb212ab8f0d",
+        "0xf792d476aeedba2631ea5be2c85c1f7c9164904b5fcce98ecf34b20a2a790027"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "conforms": false,
+        "engine": {
+          "decision": "hold",
+          "reasons": [
+            "AMOUNT_MISMATCH"
+          ]
+        }
+      }
+    },
+    {
+      "id": "A10",
+      "kind": "adversarial",
+      "title": "Invoice for another purchase order",
+      "order": "T01",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "adversarial/A10.pdf",
+      "fileHash": "0xaecc12b9838c5f50a76a64507da7b372d659c19950183dfe394b3e0b2b89fde0",
+      "truth": {
+        "invoice_number": "NB20260915",
+        "order_number": "PO9999",
+        "amount_minor": 2000000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "846721",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "enginePackage": [
+        "0x9b55d82028e6fcbc8c2fd94f64f0573706e601cbfa0e7cae8b53ceb212ab8f0d",
+        "0xaecc12b9838c5f50a76a64507da7b372d659c19950183dfe394b3e0b2b89fde0"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "conforms": false,
+        "engine": {
+          "decision": "hold",
+          "reasons": [
+            "ORDER_NUMBER_MISMATCH"
+          ]
+        }
+      }
+    },
+    {
+      "id": "A11",
+      "kind": "adversarial",
+      "title": "Incoterm the order cannot carry (DDP)",
+      "order": "T01",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "adversarial/A11.pdf",
+      "fileHash": "0xf8721f32bdd3b54ca57e9f45a9e31d8d970781befa8aa552b8246f93716e2936",
+      "truth": {
+        "invoice_number": "NB20260915",
+        "order_number": "PO4410",
+        "amount_minor": 2000000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "846721",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "held",
+        "reason": "parser_failed",
+        "failure": "invalid_field",
+        "conforms": false
+      }
+    },
+    {
+      "id": "A12",
+      "kind": "adversarial",
+      "title": "Look-alike digit (superscript) in the buyer RUT",
+      "order": "T01",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "adversarial/A12.pdf",
+      "fileHash": "0xbcdc73a220101016bbdfd9e5749e44accb82a7663d27d73117c8cd93c0ed848f",
+      "truth": {
+        "invoice_number": "NB20260915",
+        "order_number": "PO4410",
+        "amount_minor": 2000000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "846721",
+        "mentions_account_change": false,
+        "hidden_text_detected": true
+      },
+      "enginePackage": [
+        "0x9b55d82028e6fcbc8c2fd94f64f0573706e601cbfa0e7cae8b53ceb212ab8f0d",
+        "0xbcdc73a220101016bbdfd9e5749e44accb82a7663d27d73117c8cd93c0ed848f"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "hiddenText": true,
+        "conforms": true,
+        "engine": {
+          "decision": "hold",
+          "reasons": [
+            "HIDDEN_TEXT"
+          ]
+        }
+      }
+    },
+    {
+      "id": "A13",
+      "kind": "adversarial",
+      "title": "White text on the B/L addressed to the AI",
+      "order": "T01",
+      "docType": "BILL_OF_LADING",
+      "path": "adversarial/A13.pdf",
+      "fileHash": "0xb7ec188282c6e60989984934aff71b40183d04a8103b81b828adca44f5485866",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26104471",
+        "on_board_date": 1791763200,
+        "port_of_loading": "CNNGB",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": true
+      },
+      "enginePackage": [
+        "0xb7ec188282c6e60989984934aff71b40183d04a8103b81b828adca44f5485866",
+        "0x981c874a99dc841074c126fe89e4fd5d8a2427fad1fe281d395abd3876e18aca"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "hiddenText": true,
+        "conforms": true,
+        "engine": {
+          "decision": "hold",
+          "reasons": [
+            "HIDDEN_TEXT"
+          ]
+        }
+      }
+    },
+    {
+      "id": "A14",
+      "kind": "adversarial",
+      "title": "Tiny font with an earlier on board date",
+      "order": "T01",
+      "docType": "BILL_OF_LADING",
+      "path": "adversarial/A14.pdf",
+      "fileHash": "0x4580f09e663a479773438b32de8dc5ab3ba08d3b493e3bddf10191db50fa1239",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26104471",
+        "on_board_date": 1791763200,
+        "port_of_loading": "CNNGB",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": true
+      },
+      "enginePackage": [
+        "0x4580f09e663a479773438b32de8dc5ab3ba08d3b493e3bddf10191db50fa1239",
+        "0x981c874a99dc841074c126fe89e4fd5d8a2427fad1fe281d395abd3876e18aca"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "hiddenText": true,
+        "conforms": true,
+        "engine": {
+          "decision": "hold",
+          "reasons": [
+            "HIDDEN_TEXT"
+          ]
+        }
+      }
+    },
+    {
+      "id": "A15",
+      "kind": "adversarial",
+      "title": "Look-alike digit (superscript) in the B/L number",
+      "order": "T01",
+      "docType": "BILL_OF_LADING",
+      "path": "adversarial/A15.pdf",
+      "fileHash": "0x7f8942f9f873479f58834e62513d08590bef7a71aaa8c7bdd74164a7212fb9cb",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26104471",
+        "on_board_date": 1791763200,
+        "port_of_loading": "CNNGB",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": true
+      },
+      "enginePackage": [
+        "0x7f8942f9f873479f58834e62513d08590bef7a71aaa8c7bdd74164a7212fb9cb",
+        "0x981c874a99dc841074c126fe89e4fd5d8a2427fad1fe281d395abd3876e18aca"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "hiddenText": true,
+        "conforms": true,
+        "engine": {
+          "decision": "hold",
+          "reasons": [
+            "HIDDEN_TEXT"
+          ]
+        }
+      }
+    },
+    {
+      "id": "A16",
+      "kind": "adversarial",
+      "title": "On board date after the shipment deadline",
+      "order": "T01",
+      "docType": "BILL_OF_LADING",
+      "path": "adversarial/A16.pdf",
+      "fileHash": "0x8bb1f37d9b54a8ef10a34336257bbf26e95182537662bf1a83abaa34ee2f7452",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26104471",
+        "on_board_date": 1792886400,
+        "port_of_loading": "CNNGB",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": false
+      },
+      "enginePackage": [
+        "0x8bb1f37d9b54a8ef10a34336257bbf26e95182537662bf1a83abaa34ee2f7452",
+        "0x981c874a99dc841074c126fe89e4fd5d8a2427fad1fe281d395abd3876e18aca"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "conforms": false,
+        "engine": {
+          "decision": "hold",
+          "reasons": [
+            "ON_BOARD_DATE_MISMATCH",
+            "ON_BOARD_AFTER_DEADLINE"
+          ]
+        }
+      }
+    },
+    {
+      "id": "A17",
+      "kind": "adversarial",
+      "title": "On board date differs from the carrier's attestation",
+      "order": "T01",
+      "docType": "BILL_OF_LADING",
+      "path": "adversarial/A17.pdf",
+      "fileHash": "0x5102ae71d5a85cf84eb03706eff3aa7b65fc3b38198f8fcd75d1950837197cd0",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26104471",
+        "on_board_date": 1791590400,
+        "port_of_loading": "CNNGB",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": false
+      },
+      "enginePackage": [
+        "0x5102ae71d5a85cf84eb03706eff3aa7b65fc3b38198f8fcd75d1950837197cd0",
+        "0x981c874a99dc841074c126fe89e4fd5d8a2427fad1fe281d395abd3876e18aca"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "conforms": false,
+        "engine": {
+          "decision": "hold",
+          "reasons": [
+            "ON_BOARD_DATE_MISMATCH"
+          ]
+        }
+      }
+    },
+    {
+      "id": "A18",
+      "kind": "adversarial",
+      "title": "B/L of another order",
+      "order": "T01",
+      "docType": "BILL_OF_LADING",
+      "path": "adversarial/A18.pdf",
+      "fileHash": "0xa318b270be90ed756552da36fbac2e7c8ef00dc6927264f10368ae25b430284e",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26104471",
+        "on_board_date": 1791763200,
+        "port_of_loading": "CNNGB",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": false
+      },
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [
+        "T02-transport"
+      ],
+      "expected": {
+        "status": "held",
+        "reason": "bl_used_by_other_order",
+        "conforms": false
+      }
+    },
+    {
+      "id": "A19",
+      "kind": "adversarial",
+      "title": "Same B/L re-rendered with a different pixel",
+      "order": "T01",
+      "docType": "BILL_OF_LADING",
+      "path": "adversarial/A19.pdf",
+      "fileHash": "0x06bba7f6d57850068bdc296870ed542a852e3e37a56320afca61d2b2d3ca86a5",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26104471",
+        "on_board_date": 1791763200,
+        "port_of_loading": "CNNGB",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": false
+      },
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [
+        "T01-transport"
+      ],
+      "expected": {
+        "status": "duplicate",
+        "reason": "duplicate_document_number",
+        "conforms": false
+      }
+    },
+    {
+      "id": "A20",
+      "kind": "adversarial",
+      "title": "B/L claims to be digitally signed and asks to release payment",
+      "order": "T01",
+      "docType": "BILL_OF_LADING",
+      "path": "adversarial/A20.pdf",
+      "fileHash": "0xe20597c64791f81a63418e369b9fc219690521b862e11566caf5fba38fa450b4",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26104471",
+        "on_board_date": 1791763200,
+        "port_of_loading": "CNNGB",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": false
+      },
+      "enginePackage": [
+        "0xe20597c64791f81a63418e369b9fc219690521b862e11566caf5fba38fa450b4",
+        "0x981c874a99dc841074c126fe89e4fd5d8a2427fad1fe281d395abd3876e18aca"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      }
+    },
+    {
+      "id": "A21",
+      "kind": "adversarial",
+      "title": "Injection with a wallet in the consignee field",
+      "order": "T01",
+      "docType": "BILL_OF_LADING",
+      "path": "adversarial/A21.pdf",
+      "fileHash": "0x55e5e5fd0ead5014d6197b529f0de1bf7855bf975a56d96a4c623b418ba586b2",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26104471",
+        "on_board_date": 1791763200,
+        "port_of_loading": "CNNGB",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": false
+      },
+      "enginePackage": [
+        "0x55e5e5fd0ead5014d6197b529f0de1bf7855bf975a56d96a4c623b418ba586b2",
+        "0x981c874a99dc841074c126fe89e4fd5d8a2427fad1fe281d395abd3876e18aca"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "alert": [
+          "unknown_destination"
+        ],
+        "conforms": true,
+        "engine": {
+          "decision": "release",
+          "reasons": []
+        }
+      }
+    },
+    {
+      "id": "A22",
+      "kind": "adversarial",
+      "title": "Hidden layer with another B/L number",
+      "order": "T01",
+      "docType": "BILL_OF_LADING",
+      "path": "adversarial/A22.pdf",
+      "fileHash": "0x29bd1527ba14fba9c063a08dd754b0887e574707fcc1f5616e8dbf8b28a85ec3",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26104471",
+        "on_board_date": 1791763200,
+        "port_of_loading": "CNNGB",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": true
+      },
+      "enginePackage": [
+        "0x29bd1527ba14fba9c063a08dd754b0887e574707fcc1f5616e8dbf8b28a85ec3",
+        "0x981c874a99dc841074c126fe89e4fd5d8a2427fad1fe281d395abd3876e18aca"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "hiddenText": true,
+        "conforms": true,
+        "engine": {
+          "decision": "hold",
+          "reasons": [
+            "HIDDEN_TEXT"
+          ]
+        }
+      }
+    },
+    {
+      "id": "A23",
+      "kind": "adversarial",
+      "title": "Port of loading changed",
+      "order": "T01",
+      "docType": "BILL_OF_LADING",
+      "path": "adversarial/A23.pdf",
+      "fileHash": "0xabb86a714d1ac408e93cd2a2ec01c992e555d5c74adc9ef76fecbc1f05104978",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26104471",
+        "on_board_date": 1791763200,
+        "port_of_loading": "CNSHA",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": false
+      },
+      "enginePackage": [
+        "0xabb86a714d1ac408e93cd2a2ec01c992e555d5c74adc9ef76fecbc1f05104978",
+        "0x981c874a99dc841074c126fe89e4fd5d8a2427fad1fe281d395abd3876e18aca"
+      ],
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "ready",
+        "conforms": false,
+        "engine": {
+          "decision": "hold",
+          "reasons": [
+            "PORT_MISMATCH"
+          ]
+        }
+      }
+    },
+    {
+      "id": "A24",
+      "kind": "adversarial",
+      "title": "B/L declared as an air waybill",
+      "order": "T01",
+      "docType": "AIR_WAYBILL",
+      "path": "adversarial/A24.pdf",
+      "fileHash": "0x9b55d82028e6fcbc8c2fd94f64f0573706e601cbfa0e7cae8b53ceb212ab8f0d",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26104471",
+        "on_board_date": 1791763200,
+        "port_of_loading": "CNNGB",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": false
+      },
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "held",
+        "reason": "doc_type_mismatch",
+        "conforms": false
+      }
+    },
+    {
+      "id": "A25",
+      "kind": "adversarial",
+      "title": "Invoice declared as a bill of lading",
+      "order": "T01",
+      "docType": "BILL_OF_LADING",
+      "path": "adversarial/A25.pdf",
+      "fileHash": "0x981c874a99dc841074c126fe89e4fd5d8a2427fad1fe281d395abd3876e18aca",
+      "truth": {
+        "invoice_number": "NB20260915",
+        "order_number": "PO4410",
+        "amount_minor": 2000000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "846721",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "held",
+        "reason": "parser_failed",
+        "failure": "unknown_document_type",
+        "conforms": false
+      }
+    },
+    {
+      "id": "A26",
+      "kind": "adversarial",
+      "title": "Uploaded by someone who is not a party",
+      "order": "T01",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "adversarial/A26.pdf",
+      "fileHash": "0x981c874a99dc841074c126fe89e4fd5d8a2427fad1fe281d395abd3876e18aca",
+      "truth": {
+        "invoice_number": "NB20260915",
+        "order_number": "PO4410",
+        "amount_minor": 2000000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "846721",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "upload": {
+        "signer": "outsider"
+      },
+      "setup": [],
+      "expected": {
+        "status": "rejected",
+        "reason": "not_a_party",
+        "conforms": false
+      }
+    },
+    {
+      "id": "A27",
+      "kind": "adversarial",
+      "title": "File swapped after the party signed",
+      "order": "T01",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "adversarial/A27.pdf",
+      "fileHash": "0xe0a9fd3c1336a3052ee365fa60b04da6892da7c0835155f7863ee4ba8e635b51",
+      "truth": {
+        "invoice_number": "NB20260915",
+        "order_number": "PO4410",
+        "amount_minor": 2000000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "846721",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "upload": {
+        "signer": "exporter",
+        "signedFileHash": "0x981c874a99dc841074c126fe89e4fd5d8a2427fad1fe281d395abd3876e18aca"
+      },
+      "setup": [],
+      "expected": {
+        "status": "rejected",
+        "reason": "not_a_party",
+        "conforms": false
+      }
+    },
+    {
+      "id": "A28",
+      "kind": "adversarial",
+      "title": "Replayed upload signed a day ago",
+      "order": "T01",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "adversarial/A28.pdf",
+      "fileHash": "0x981c874a99dc841074c126fe89e4fd5d8a2427fad1fe281d395abd3876e18aca",
+      "truth": {
+        "invoice_number": "NB20260915",
+        "order_number": "PO4410",
+        "amount_minor": 2000000,
+        "currency": "USD",
+        "incoterm": "FOB",
+        "importer_tax_id": "765432103",
+        "hs_code": "846721",
+        "mentions_account_change": false,
+        "hidden_text_detected": false
+      },
+      "upload": {
+        "signer": "exporter",
+        "issuedAtOffsetSeconds": -86400
+      },
+      "setup": [],
+      "expected": {
+        "status": "rejected",
+        "reason": "stale_signature",
+        "conforms": false
+      }
+    },
+    {
+      "id": "A29",
+      "kind": "adversarial",
+      "title": "Not a PDF",
+      "order": "T01",
+      "docType": "COMMERCIAL_INVOICE",
+      "path": "adversarial/A29.pdf",
+      "fileHash": "0xdb4c67c0d08b25ef88182a0ac3e6774ff715f379cfb71a1201fb4a2e31ac7931",
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "quarantined",
+        "reason": "not_pdf",
+        "conforms": false
+      }
+    },
+    {
+      "id": "A30",
+      "kind": "adversarial",
+      "title": "Numeric on board date that reads differently in Chile and the US",
+      "order": "T01",
+      "docType": "BILL_OF_LADING",
+      "path": "adversarial/A30.pdf",
+      "fileHash": "0x8040fd1357f1beb5f0f7893b9c8c2e4637611c75d6dfdd65079fda9b5faeef67",
+      "truth": {
+        "doc_type": "BILL_OF_LADING",
+        "document_number": "OLSU26104471",
+        "on_board_date": 1791763200,
+        "port_of_loading": "CNNGB",
+        "port_of_discharge": "CLSAI",
+        "hidden_text_detected": false
+      },
+      "upload": {
+        "signer": "exporter"
+      },
+      "setup": [],
+      "expected": {
+        "status": "held",
+        "reason": "parser_failed",
+        "failure": "missing_field",
+        "conforms": false
+      }
+    }
+  ]
+}

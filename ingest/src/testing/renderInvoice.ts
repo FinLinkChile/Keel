@@ -10,6 +10,7 @@ import {
   setCharacterSqueeze,
   setStrokingRgbColor,
   setTextRenderingMode,
+  type PDFFont,
   type PDFPage,
 } from "pdf-lib";
 
@@ -52,8 +53,15 @@ export interface InvoiceSpec {
 
 const clp = (n: number) => "$ " + n.toLocaleString("es-CL").replace(/,/g, ".");
 
+// Fixed metadata, so the same spec always renders the same bytes (and the same file hash)
+const RENDERED_AT = new Date("2026-10-01T00:00:00Z");
+
 export async function renderInvoice(spec: InvoiceSpec): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
+  doc.setCreationDate(RENDERED_AT);
+  doc.setModificationDate(RENDERED_AT);
+  doc.setProducer("keel-corpus");
+  doc.setCreator("keel-corpus");
   const page = doc.addPage([595, 842]);
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -93,7 +101,13 @@ export async function renderInvoice(spec: InvoiceSpec): Promise<Uint8Array> {
   for (const b of spec.bankLines ?? []) line(b);
   for (const n of spec.notes ?? []) line(n);
 
-  for (const e of spec.extra ?? []) {
+  drawExtras(doc, page, font, spec.extra ?? []);
+  return doc.save();
+}
+
+// Draws extra runs, visible or hidden with one of the techniques, on top of a rendered page.
+export function drawExtras(doc: PDFDocument, page: PDFPage, font: PDFFont, extras: ExtraText[]): void {
+  for (const e of extras) {
     const [r, g, b] = e.color ?? [0, 0, 0];
     const draw = () =>
       page.drawText(e.text, {
@@ -120,7 +134,6 @@ export async function renderInvoice(spec: InvoiceSpec): Promise<Uint8Array> {
       draw();
     }
   }
-  return doc.save();
 }
 
 // A legitimate customs agent invoice: total 45.990 = 38.647 + 7.343 IVA

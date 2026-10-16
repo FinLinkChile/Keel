@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { ALIAS_IDS } from "@keel/schemas";
-import type { ExtractorProvider, InvoiceDocument } from "../extractor";
+import type { ExtractorProvider, ExtractionRequest } from "../extractor";
 import type { AliasTable } from "../parser";
 import { CHANGE_COOLDOWN_DAYS, IngestStore, MAX_EMAILS_PER_SENDER_PER_DAY } from "../store";
 import { composeEmail, fakeDns, makeDomain, signEmail, type Domain } from "../testing/renderEmail";
@@ -34,7 +34,7 @@ function countingModel() {
     calls: 0,
     provider: "fake",
     model: "fake-1",
-    async complete(doc: InvoiceDocument) {
+    async complete(doc: ExtractionRequest) {
       model.calls++;
       return JSON.stringify({
         alias_id: ALIAS,
