@@ -2,6 +2,7 @@
 
 ## 2026-10-16
 
+* **Actualización del Área 2 (Darienn):** `keel verify` imprime enlaces a sepolia.basescan.org (la transacción y el contrato que emitió cada evento) para que su salida sirva como evidencia de ejecución ante el jurado (elemento 06 de las reglas de la competencia). Ver [verificador](arquitectura/verificador.md).
 * **Revisión del Área 1 al PR #51, aplicada por el Área 2 (Darienn):** `keel verify` ya no confía en el archivo de evidencia sobre quién firmó ni dónde. Ancla cada PDR a `contracts/deployments/<chainId>.json`: solo cuenta el evento conocido del contrato oficial, y el firmante tiene que ser el `policySigner()` del gate en ese bloque o el `documentVerifier` de la orden que guarda el escrow. Sin red el resultado es EVIDENCE ONLY (código 3), nunca MATCH. **[PROPUESTA] al Área 1:** el script de despliegue de Trade usa las claves `fundingGate` y `tradeEscrow`. `rolesConfigHash` queda pendiente hasta que el Área 1 lo defina en T1.8. Se declaran los límites: el escrow no comprueba `policyHash` y solo se recuperan firmas EOA ([verificador](arquitectura/verificador.md)).
 
 ## 2026-10-15

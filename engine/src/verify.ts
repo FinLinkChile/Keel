@@ -312,6 +312,9 @@ function anchorOf(e: PdrEvidence): KnownEvent {
   return e.mode === "personal" ? "PaymentExecuted" : "FundingExecuted";
 }
 
+// The deployed contract that must have emitted the event of this PDR, if the deployment names it.
+export const emitterOf = (e: PdrEvidence, deployment: Deployment | null): Hex | undefined => deployment?.[EMITTER[anchorOf(e)]];
+
 // The check that turns MATCH from "the file is consistent" into "the deployed contract accepted
 // this decision from the key it trusted at that block".
 export const ANCHOR_CHECK = "signer on chain";

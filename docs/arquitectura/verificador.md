@@ -4,7 +4,7 @@ title: "Verificador reproducible"
 description: "Cómo `keel verify` comprueba una decisión del motor desde la transacción o desde el archivo de evidencia, cómo la ancla a los contratos desplegados, qué prueba y qué no."
 tags: [verificador, pdr, evidencia, t2-9, reproducible, despliegue]
 modo: ambos
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T02:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T14:00:00Z }
 ---
 
 El [archivo del PDR](evidencia-y-bitacora.md) guarda también todo lo que la decisión usó (`replay`): la orden, el contexto leído en ese momento, las extracciones y la política con su versión de reglas. Con eso, `keel verify` (T2.9, `engine/src/verify.ts`) vuelve a correr las mismas reglas y compara cada hash.
@@ -40,6 +40,8 @@ Límites declarados:
 * **`setPolicyHash` del gate es `onlySafe`.** Que pase por el Delay es una convención mientras no exista ConfigGuard (T1.5).
 * **Solo firmas EOA.** Un verificador o firmante ERC-1271 (por ejemplo, una Safe) no se recupera y sale como MISMATCH.
 * **Vencimiento:** que la decisión no dure más que su intención es una regla del motor, no del gate; el resultado la marca como `expiry (engine rule)`.
+
+**Enlaces al explorador:** cuando la red es conocida (Base Sepolia, https://sepolia.basescan.org), `keel verify` imprime el enlace de la transacción y, por cada PDR anclado, el del contrato que emitió el evento, de modo que la salida sirve como evidencia de ejecución para el jurado (elemento 06 de las reglas de la competencia). Sin cadena (modo offline) o con una red desconocida la salida no cambia.
 
 Un PDR de Keel Personal se comprueba (firma, hashes, evento y firmante) pero no se vuelve a ejecutar hasta que exista su motor (T2.2). Una decisión hecha con otra versión de reglas tampoco se vuelve a ejecutar: el verificador pide usar el de esa versión. Las pruebas están en `engine/src/verify.test.ts`, incluido el ataque de la revisión del PR #51: un archivo falso firmado con otra llave y emitido por un contrato propio no da MATCH.
 

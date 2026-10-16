@@ -8,7 +8,8 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import type { Hex } from "@keel/schemas";
 import { createPublicClient, http, isHash, parseAbi } from "viem";
-import { type ChainFacts, type ChainReader, type Check, candidateHashes, loadDeployment, loadEvidence, type Verdict, verdict, verifyEvidence } from "./verify";
+import { explorerAddressUrl, explorerTxUrl } from "./explorer";
+import { type ChainFacts, type ChainReader, type Check, candidateHashes, emitterOf, loadDeployment, loadEvidence, type Verdict, verdict, verifyEvidence } from "./verify";
 
 const DEFAULT_EVIDENCE = fileURLToPath(new URL("../../evidence/pdr/", import.meta.url));
 const DEFAULT_DEPLOYMENTS = fileURLToPath(new URL("../../contracts/deployments/", import.meta.url));
@@ -66,6 +67,8 @@ async function verify(args: string[]): Promise<number> {
     const deployments = values.deployments ?? DEFAULT_DEPLOYMENTS;
     facts = await readTransaction(rpc, tx, deployments);
     console.log(`Transaction ${tx} (chain ${facts.chainId}, block ${facts.blockNumber}, ${facts.status})`);
+    const txUrl = explorerTxUrl(facts.chainId, tx);
+    if (txUrl) console.log(`Explorer: ${txUrl}`);
     if (!facts.deployment) {
       console.log(`No ${facts.chainId}.json in ${deployments}: without Keel's official addresses nothing can be anchored`);
       return 1;
@@ -79,6 +82,9 @@ async function verify(args: string[]): Promise<number> {
     if (!evidence) continue;
     const checks = await verifyEvidence(evidence, facts);
     print(hash, checks);
+    const contract = facts && emitterOf(evidence, facts.deployment);
+    const contractUrl = facts && contract ? explorerAddressUrl(facts.chainId, contract) : undefined;
+    if (contractUrl) console.log(`  Contract: ${contractUrl}`);
     results.push(checks);
   }
   if (results.length === 0) {
