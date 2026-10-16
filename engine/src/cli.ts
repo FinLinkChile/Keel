@@ -9,9 +9,10 @@
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import type { Hex } from "@keel/schemas";
+import { tradeRolesConfigHash } from "@keel/schemas/hash";
 import { createPublicClient, http, isAddress, isHash, parseAbi } from "viem";
 import { Agent } from "./agent/agent";
-import { fundingGatePort, gateDeployment, mockRolesAllowance } from "./agent/gate";
+import { fundingGatePort, gateDeployment, mockRolesAllowance, readRolesAllowance, zodiacRolesAllowance } from "./agent/gate";
 import { botNotifier } from "./agent/notices";
 import { rpcChain } from "./agent/rpc";
 import { FileStore } from "./agent/store";
@@ -109,8 +110,11 @@ async function verify(args: string[]): Promise<number> {
   return EXIT[result];
 }
 
-// Configuration from the environment: KEEL_RPC_URL, KEEL_ESCROW, KEEL_SAFE, KEEL_ROLES_CONFIG_HASH
-// and the keys RELAYER_PRIVATE_KEY and POLICY_SIGNER_PRIVATE_KEY (never in the repository).
+// Configuration from the environment: KEEL_RPC_URL, KEEL_ESCROW, KEEL_SAFE and the keys
+// RELAYER_PRIVATE_KEY and POLICY_SIGNER_PRIVATE_KEY (never in the repository). With KEEL_FUNDING_GATE
+// and the allowance keys KEEL_AGENT_ALLOWANCE_KEY and KEEL_COSIGNED_ALLOWANCE_KEY the gate runs on
+// the real Zodiac Roles and the rolesConfigHash is computed from the chain; otherwise (the demo on
+// MockTradeRoles, or no gate) KEEL_ROLES_CONFIG_HASH gives it.
 async function agent(args: string[]): Promise<number> {
   const { values } = parseArgs({
     args,
@@ -125,7 +129,6 @@ async function agent(args: string[]): Promise<number> {
   const rpc = need("KEEL_RPC_URL", Boolean);
   const escrow = need("KEEL_ESCROW", isAddress);
   const safe = need("KEEL_SAFE", isAddress);
-  const rolesConfigHash = need("KEEL_ROLES_CONFIG_HASH", isHash);
   const data = values.data ?? env.KEEL_DATA_DIR;
   if (!data) throw new UsageError("set --data or KEEL_DATA_DIR");
 
@@ -136,15 +139,49 @@ async function agent(args: string[]): Promise<number> {
 
   const chain = rpcChain(rpc, loadRelayer(env));
   const store = new FileStore(data);
-  // The Trade gate (Area 1). Without it, funding waits with GATE_NOT_DEPLOYED. The allowance is
-  // read from MockTradeRoles, the Roles of the demo; the real Zodiac reader goes with T1.7.
+  // The Trade gate (Area 1). Without it, funding waits with GATE_NOT_DEPLOYED.
   const gateAddress = env.KEEL_FUNDING_GATE as Hex | undefined;
   if (gateAddress && !isAddress(gateAddress)) throw new UsageError("KEEL_FUNDING_GATE is not an address");
+  const agentKey = env.KEEL_AGENT_ALLOWANCE_KEY as Hex | undefined;
+  const cosignedKey = env.KEEL_COSIGNED_ALLOWANCE_KEY as Hex | undefined;
+  if (Boolean(agentKey) !== Boolean(cosignedKey)) throw new UsageError("set both KEEL_AGENT_ALLOWANCE_KEY and KEEL_COSIGNED_ALLOWANCE_KEY, or neither");
+  if (agentKey && !(isHash(agentKey) && isHash(cosignedKey!))) throw new UsageError("the allowance keys are not bytes32");
+  const configured = env.KEEL_ROLES_CONFIG_HASH as Hex | undefined;
+  if (configured && !isHash(configured)) throw new UsageError("KEEL_ROLES_CONFIG_HASH is not a bytes32");
   let gate: ReturnType<typeof fundingGatePort> | undefined;
-  if (gateAddress) {
+  let rolesConfigHash = configured;
+  if (gateAddress && agentKey) {
+    // Real Zodiac Roles: the hash is rebuilt from the deployment (TradeRolesConfig), so the PDR
+    // names the configuration the chain holds. Caps and period come from each allowance, which
+    // TradeRolesConfig sets as setAllowance(key, cap, cap, cap, period, 0).
+    const deployment = await gateDeployment(chain, gateAddress);
+    const agentAllowance = await readRolesAllowance(chain, deployment.roles, agentKey);
+    const cosignedAllowance = await readRolesAllowance(chain, deployment.roles, cosignedKey!);
+    for (const a of [agentAllowance, cosignedAllowance]) {
+      if (a.refill !== a.maxRefill) throw new UsageError("a Roles allowance is not the Keel Trade configuration (refill differs from maxRefill)");
+    }
+    if (agentAllowance.period !== cosignedAllowance.period) throw new UsageError("the two Roles allowances have different periods");
+    const computed = tradeRolesConfigHash({
+      token: deployment.token,
+      escrow,
+      gate: gateAddress,
+      agentRole: deployment.agentRoleKey,
+      cosignedRole: deployment.cosignedRoleKey,
+      agentAllowanceKey: agentKey,
+      cosignedAllowanceKey: cosignedKey!,
+      agentCap: agentAllowance.refill,
+      cosignedCap: cosignedAllowance.refill,
+      period: agentAllowance.period,
+    });
+    if (configured && configured.toLowerCase() !== computed) throw new UsageError(`KEEL_ROLES_CONFIG_HASH does not match the deployment (${computed})`);
+    rolesConfigHash = computed;
+    gate = fundingGatePort(chain, gateAddress, zodiacRolesAllowance(chain, deployment.roles, agentKey));
+  } else if (gateAddress) {
+    // The demo: MockTradeRoles keys each allowance by its role key
     const { roles, agentRoleKey } = await gateDeployment(chain, gateAddress);
     gate = fundingGatePort(chain, gateAddress, mockRolesAllowance(chain, roles, agentRoleKey));
   }
+  if (!rolesConfigHash) throw new UsageError("set KEEL_ROLES_CONFIG_HASH, or KEEL_FUNDING_GATE with the allowance keys");
   const keel = new Agent(
     { chainId: await chain.chainId(), escrow, safe, policy: tradePolicy(rolesConfigHash), decisionTtlSeconds: 3600, evidenceDir: values.evidence ?? DEFAULT_EVIDENCE },
     // Each sent step, hold and notice is printed once as a JSON line and, with the bot
