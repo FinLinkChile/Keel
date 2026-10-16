@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { keccak256, recoverTypedDataAddress, stringToBytes } from 'viem';
 
 import { config } from '@/config';
+import { useData } from '@/data';
 import { UPLOAD_TYPES, uploadDomain, type DocumentUpload } from '@/ingest/upload';
 import { useSession } from '@/session';
 import { Address } from '@/ui/Address';
@@ -17,23 +18,24 @@ import { keyStorage } from '@/wallet';
 // Development check of the device wallet: signs a DocumentUpload for PO-0142 and recovers
 // the signer locally, the same way ingest does. Nothing is sent anywhere.
 
-const ORDER_PO_0142: Hex = `0x${'142'.padStart(64, '0')}`;
 // Used only when EXPO_PUBLIC_CHAIN_ID is not set; ingest needs the real one
 const LOCAL_CHAIN_ID = 31337;
 
 type Result = { message: DocumentUpload; signature: Hex; recovered: Hex; ms: number } | { error: string };
 
 export default function Signature() {
-  const { signer, address, resetWallet } = useSession();
+  const { signer, address, resetWallet, role } = useSession();
+  // PO-0142 as the connected wallet sees it: its id depends on the wallets of the parties
+  const orderId = useData(async (d) => (await d.orders()).find((o) => o.label === 'PO-0142')?.po.orderId, [role, address]);
   const [result, setResult] = useState<Result>();
   const chainId = config.chainId ?? LOCAL_CHAIN_ID;
 
   async function sign() {
-    if (!signer) return;
+    if (!signer || !orderId) return;
     try {
       const start = Date.now();
       const message: DocumentUpload = {
-        orderId: ORDER_PO_0142,
+        orderId,
         docType: 'COMMERCIAL_INVOICE',
         fileHash: keccak256(stringToBytes('Keel test document')),
         issuedAt: BigInt(Math.floor(Date.now() / 1000)),

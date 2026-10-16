@@ -37,8 +37,9 @@ npm run demo-data -w app -- --exporter 0x… [--importer 0x…] [--out <dir>]
 | `<out>/ingest-orders.json` | ingest, as `INGEST_ORDERS_FILE` | The open orders a test wallet can upload to: `orderId`, `payoutAddress` and `carrier` from the order, and the wallets as `uploaders` |
 | `<out>/agent/orders/<orderId>/order.json` | the agent (Area 2) | `{ order, terms, label }`: the `PurchaseOrder` with its real `termsHash` and `requiredDocsHash`, the `OrderTerms` and the label of the bot notices |
 | `<out>/agent/registry.json` | the agent | `parties` (address, bot account, the importer's RUT) and `history` (settled amounts by exporter) |
+| `<out>/bot-orders.json` | the bot, as `BOT_ORDERS_FILE` | The label and the bot accounts of each order, by order id |
 
-Ids and labels are those of `bot/examples/orders.json` (`PO-0142` is `0x…0142`). The default `--out` is `app/demo-data/`, ignored by git. `scripts/demoData.test.ts` checks the files against the shapes ingest (`TradeOrderEntry`) and the agent (`engine/src/agent/store.ts`) read.
+Every order id is computed the way `TradeEscrow.open` checks it, `keccak256(abi.encode(importer, exporter, nonce))`, with the addresses of the wallets given to the script: the same order has another id with other wallets, while its label (PO-0142, the nonce in hex) stays. The generated files all use the same ids. `npm run bot-examples -w app` rewrites the ids of `bot/examples` with the mock's default addresses. The default `--out` is `app/demo-data/`, ignored by git. `scripts/demoData.test.ts` checks the files against the shapes ingest (`TradeOrderEntry`), the agent (`engine/src/agent/store.ts`) and the bot read, and the orders against the checks of `TradeEscrow.open` that can be made off chain.
 
 ## Uploading a document from a phone to ingest
 
@@ -76,7 +77,7 @@ This is the end to end test of the signed upload (step 4 of the flow): the expor
    npm run demo-data -w app -- --exporter 0xTHE_ADDRESS
    ```
 
-7. **Upload.** On Home, tap **Upload** on PO-0142. On the order, tap **Upload** next to **Bill of lading** (its commercial invoice is already under review in the demo data) and choose `redteam/corpus/trade/legit/T01-bill_of_lading.pdf`, or T02 to T04. To get the PDF onto the phone, email it to yourself or put it in Drive, and pick it from the file picker. The row should end in **Accepted**.
+7. **Upload.** On Home, tap **Upload** on PO-0142. On the order, tap **Upload** next to **Bill of lading** and choose `redteam/corpus/trade/legit/T01-bill_of_lading.pdf`, then **Upload** next to **Commercial invoice** with `T01-commercial_invoice.pdf` from the same set. Both rows start empty and show only what this phone uploaded. To get the PDF onto the phone, email it to yourself or put it in Drive, and pick it from the file picker. The row should end in **Accepted**.
 
 What each outcome means:
 

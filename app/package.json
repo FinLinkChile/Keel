@@ -39,7 +39,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "demo-data": "tsx scripts/demo-data.ts"
+    "demo-data": "tsx scripts/demo-data.ts",
+    "bot-examples": "tsx scripts/bot-examples.ts"
   },
   "private": true
 }

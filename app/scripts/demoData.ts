@@ -6,12 +6,13 @@
 //   ingest  TradeOrderEntry          ingest/src/trade/upload.ts      (area3/trade-ingest)
 //   agent   StoredOrder, Registry    engine/src/agent/store.ts       (area2/agent-service)
 //   agent   canonical JSON           engine/src/canonical.ts: keys sorted, bigints as decimal text
+//   bot     order book               bot/src/adapters/config/orders-file.ts (BOT_ORDERS_FILE)
 import type { Hex, OrderTerms, PurchaseOrder } from '@keel/schemas';
 import { getAddress, isAddress } from 'viem';
 
 import { isClosed } from '../src/data/orderLine';
 import { bindWallets, mockData } from '../src/data/mock';
-import type { Role } from '../src/data/types';
+import type { Order, Role } from '../src/data/types';
 
 export type Wallets = Partial<Record<Role, Hex>>;
 
@@ -33,10 +34,16 @@ export type Registry = {
   history: Record<string, bigint[]>;
 };
 
+// bot: BOT_ORDERS_FILE, the label and the bot accounts of each order, by orderId
+export type BotOrders = {
+  orders: Record<string, { label: string; importer: string; exporter: string; arbiter?: string; shipmentDeadline: number }>;
+};
+
 export type DemoData = {
   ingestOrders: TradeOrderEntry[];
   agentOrders: StoredOrder[];
   registry: Registry;
+  botOrders: BotOrders;
 };
 
 // Same as engine/src/canonical.ts
@@ -61,9 +68,34 @@ export function checkWallet(role: Role, value: string | undefined): Hex | undefi
   return getAddress(value.toLowerCase());
 }
 
+// Every order whose importer and exporter have an account in the bot directory, closed ones
+// included: the bot also tells how an order ended. Orders with an unknown party are left out,
+// because the bot refuses an order book that names an account it does not know.
+async function botOrderBook(orders: Order[], botAccounts: readonly string[]): Promise<BotOrders> {
+  const account = async (a: Hex) => {
+    const p = await mockData.partyByAddress(a);
+    return p && botAccounts.includes(p.id) ? p.id : undefined;
+  };
+  const book: BotOrders = { orders: {} };
+  for (const o of orders) {
+    const [importer, exporter, arbiter] = await Promise.all([account(o.po.importer), account(o.po.exporter), account(o.po.arbiter)]);
+    if (!importer || !exporter) continue;
+    book.orders[o.po.orderId] = {
+      label: o.label,
+      importer,
+      exporter,
+      ...(arbiter && { arbiter }),
+      shipmentDeadline: Number(o.po.shipmentDeadline),
+    };
+  }
+  return book;
+}
+
 // botAccounts: the account slugs of the bot directory (bot/examples/recipients.json)
-export async function demoData(wallets: Wallets, botAccounts: readonly string[]): Promise<DemoData> {
-  if (!wallets.exporter && !wallets.importer) throw new Error('give at least one test wallet (--exporter or --importer)');
+// withoutWallets: only for bot/examples, which use the mock's default addresses
+export async function demoData(wallets: Wallets, botAccounts: readonly string[], opts: { withoutWallets?: boolean } = {}): Promise<DemoData> {
+  if (!opts.withoutWallets && !wallets.exporter && !wallets.importer)
+    throw new Error('give at least one test wallet (--exporter or --importer)');
   bindWallets(wallets);
   try {
     const all = await mockData.orders();
@@ -101,7 +133,7 @@ export async function demoData(wallets: Wallets, botAccounts: readonly string[])
       (history[key] ??= []).push(o.po.totalAmount);
     }
 
-    return { ingestOrders, agentOrders, registry: { parties, history } };
+    return { ingestOrders, agentOrders, registry: { parties, history }, botOrders: await botOrderBook(all, botAccounts) };
   } finally {
     bindWallets({});
   }

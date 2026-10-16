@@ -2,6 +2,7 @@ import type { Hex, OrderTerms, RequiredDocType } from '@keel/schemas';
 import { bytes32Text, requiredDocsHash, termsHash } from '@keel/schemas/hash';
 import { getAddress, keccak256, stringToBytes } from 'viem';
 
+import { orderIdOf } from './orderRules';
 import type { Account, KeelData, NeedsYou, Order, OrderStage, Party, PartyId, Role, Wallet } from './types';
 
 // Test data for the screens and the single source of the demo data files (scripts/demo-data.ts).
@@ -10,7 +11,6 @@ import type { Account, KeelData, NeedsYou, Order, OrderStage, Party, PartyId, Ro
 // documentHash stands for the order document with its proforma, which does not exist yet.
 
 const day = (month: number, date: number) => Date.UTC(2026, month - 1, date) / 1000;
-const id = (n: number): Hex => `0x${n.toString(16).padStart(64, '0')}`;
 // Checksummed, as viem requires to sign or hash an address
 const addr = (a: string): Hex => getAddress(a.toLowerCase());
 
@@ -100,7 +100,9 @@ function order(s: Seed): Order {
     transportDoc: 'BILL_OF_LADING',
     documents: s.documents ?? [],
     po: {
-      orderId: id(s.n),
+      // As TradeEscrow.open requires; the fixed nonce is the order number, so the label
+      // stays the same and the id follows the wallets bound to the parties
+      orderId: orderIdOf(address('acme-imports'), address(s.exporter), BigInt(s.n)),
       importer: address('acme-imports'),
       exporter: address(s.exporter),
       payoutAddress: PAYOUT[s.exporter],
@@ -121,11 +123,10 @@ function order(s: Seed): Order {
   };
 }
 
-// Ids 0x131, 0x142 and 0x150 are the orders of bot/examples (labels PO-0131, PO-0142, PO-0150).
-// The label is the id written in hex, as in the bot examples.
+// PO-0131, PO-0142 and PO-0150 are the orders of bot/examples. The label is the nonce in hex.
 const ORDERS = (): Order[] => [
   order({ n: 0x157, goods: 'Agar powder', goodsShort: 'Agar', quantity: '6,000 kg', exporter: 'lingnan', totalMinor: 4_800_000, stage: 'awaiting_signature', waitingOn: 'importer', deadline: day(11, 20), hsCode: '130231' }),
-  order({ n: 0x142, goods: 'Agar powder', goodsShort: 'Agar', quantity: '6,000 kg', exporter: 'lingnan', totalMinor: 4_800_000, stage: 'advance_paid', waitingOn: 'exporter', deadline: day(11, 20), hsCode: '130231', signedAt: day(10, 2), advancePaidAt: day(10, 2), documents: [{ docType: 'COMMERCIAL_INVOICE', fileName: 'INV-LH-0988.pdf', uploadedAt: day(10, 13) + 15 * 3600, status: 'under_review' }] }),
+  order({ n: 0x142, goods: 'Agar powder', goodsShort: 'Agar', quantity: '6,000 kg', exporter: 'lingnan', totalMinor: 4_800_000, stage: 'advance_paid', waitingOn: 'exporter', deadline: day(11, 20), hsCode: '130231', signedAt: day(10, 2), advancePaidAt: day(10, 2) }),
   order({ n: 0x150, goods: 'Agar powder', goodsShort: 'Agar', quantity: '2,500 kg', exporter: 'lingnan', totalMinor: 2_000_000, stage: 'advance_paid', waitingOn: 'exporter', deadline: day(11, 20), hsCode: '130231', signedAt: day(10, 5), advancePaidAt: day(10, 5) }),
   order({ n: 0x139, goods: 'Carrageenan', quantity: '3,000 kg', exporter: 'pearl-delta', totalMinor: 2_150_000, stage: 'shipped', deadline: day(10, 30), hsCode: '130239', signedAt: day(9, 20), advancePaidAt: day(9, 20), shippedAt: day(10, 14) }),
   order({ n: 0x151, goods: 'Gelatin', quantity: '1,200 kg', exporter: 'kowloon', totalMinor: 1_325_000, stage: 'signed', deadline: day(12, 5), hsCode: '350300', signedAt: day(10, 13), blockedBy: 'supplier_check' }),
@@ -153,13 +154,17 @@ const WALLETS: Record<Role, Wallet> = {
   },
 };
 
-const NEEDS_YOU: Record<Role, NeedsYou[]> = {
+// By label: the ids depend on the bound wallets
+type Pending = { kind: 'sign_order' | 'upload_documents'; label: string } | { kind: 'verify_supplier'; party: PartyId };
+const NEEDS_YOU: Record<Role, Pending[]> = {
   importer: [
-    { kind: 'sign_order', orderId: id(0x157) },
+    { kind: 'sign_order', label: 'PO-0157' },
     { kind: 'verify_supplier', party: 'kowloon' },
   ],
-  exporter: [{ kind: 'upload_documents', orderId: id(0x142) }],
+  exporter: [{ kind: 'upload_documents', label: 'PO-0142' }],
 };
+
+const idOf = (label: string) => ORDERS().find((o) => o.label === label)!.po.orderId;
 
 export const mockData: KeelData = {
   account: async (role) => ACCOUNTS[role],
@@ -168,5 +173,6 @@ export const mockData: KeelData = {
   wallet: async (role) => WALLETS[role],
   orders: async () => ORDERS(),
   order: async (orderId) => ORDERS().find((o) => o.po.orderId === orderId),
-  needsYou: async (role) => NEEDS_YOU[role],
+  needsYou: async (role) =>
+    NEEDS_YOU[role].map((n): NeedsYou => (n.kind === 'verify_supplier' ? n : { kind: n.kind, orderId: idOf(n.label) })),
 };

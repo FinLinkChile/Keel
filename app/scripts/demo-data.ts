@@ -5,6 +5,7 @@
 //   <out>/ingest-orders.json                    INGEST_ORDERS_FILE for ingest
 //   <out>/agent/registry.json                   agent registry (parties, history)
 //   <out>/agent/orders/<orderId>/order.json     agent order files ({ order, terms, label })
+//   <out>/bot-orders.json                       BOT_ORDERS_FILE for the bot (orderId -> label)
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -37,6 +38,11 @@ async function main() {
   write(['ingest-orders.json'], data.ingestOrders);
   write(['agent', 'registry.json'], data.registry);
   for (const o of data.agentOrders) write(['agent', 'orders', o.order.orderId, 'order.json'], o);
+  // The bot reads it as is, in its own key order (not canonical)
+  const botFile = join(out, 'bot-orders.json');
+  writeFileSync(botFile, `${JSON.stringify(data.botOrders, null, 2)}
+`);
+  console.log('wrote', botFile);
   console.log(`${data.ingestOrders.length} orders in the ingest registry, ${data.agentOrders.length} orders for the agent`);
 }
 
