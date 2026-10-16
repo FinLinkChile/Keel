@@ -10,6 +10,8 @@
     "extract": "node --env-file-if-exists=../.env --import tsx scripts/extract.ts",
     "corpus": "node --import tsx scripts/corpus.ts",
     "corpus:run": "node --env-file-if-exists=../.env --import tsx scripts/corpus-run.ts",
+    "carrier-forms": "node --import tsx scripts/carrier-forms.ts",
+    "carrier-forms:run": "node --env-file-if-exists=../.env --import tsx scripts/carrier-forms-run.ts",
     "llm:check": "node --env-file-if-exists=../.env --import tsx scripts/llm-check.ts"
   },
   "dependencies": {

@@ -1,0 +1,109 @@
+{
+  "filled": {
+    "csav-inline.pdf": {
+      "document_number": "CSVNGB26100447",
+      "port_of_loading": "CNNGB",
+      "port_of_discharge": "CLSAI",
+      "doc_type": "BILL_OF_LADING",
+      "on_board_date": 1792022400,
+      "hiddenReasons": [
+        "invisible_mode"
+      ]
+    },
+    "csav-inline-face.pdf": {
+      "document_number": "CSVNGB26100447",
+      "port_of_loading": "CNNGB",
+      "port_of_discharge": "CLSAI",
+      "doc_type": "BILL_OF_LADING",
+      "on_board_date": 1792022400,
+      "hiddenReasons": [
+        "invisible_mode"
+      ]
+    },
+    "csav-below.pdf": {
+      "document_number": "CSVNGB26100447",
+      "port_of_loading": "CNNGB",
+      "port_of_discharge": "CLSAI",
+      "doc_type": "BILL_OF_LADING",
+      "on_board_date": 1792022400,
+      "hiddenReasons": [
+        "invisible_mode"
+      ]
+    },
+    "csav-below-face.pdf": {
+      "document_number": "CSVNGB26100447",
+      "port_of_loading": "CNNGB",
+      "port_of_discharge": "CLSAI",
+      "doc_type": "BILL_OF_LADING",
+      "on_board_date": 1792022400,
+      "hiddenReasons": [
+        "invisible_mode"
+      ]
+    },
+    "hapag-inline.pdf": {
+      "document_number": "HLCUSHA261009812",
+      "port_of_loading": "CNSHA",
+      "port_of_discharge": "CLVAP",
+      "doc_type": "BILL_OF_LADING",
+      "on_board_date": 1791504000,
+      "hiddenReasons": [
+        "off_page",
+        "invisible_mode"
+      ]
+    },
+    "hapag-inline-face.pdf": {
+      "document_number": "HLCUSHA261009812",
+      "port_of_loading": "CNSHA",
+      "port_of_discharge": "CLVAP",
+      "doc_type": "BILL_OF_LADING",
+      "on_board_date": 1791504000,
+      "hiddenReasons": [
+        "off_page",
+        "invisible_mode"
+      ]
+    },
+    "hapag-below.pdf": {
+      "document_number": "HLCUSHA261009812",
+      "port_of_loading": "CNSHA",
+      "port_of_discharge": "CLVAP",
+      "doc_type": "BILL_OF_LADING",
+      "on_board_date": 1791504000,
+      "hiddenReasons": [
+        "off_page",
+        "invisible_mode"
+      ]
+    },
+    "hapag-below-face.pdf": {
+      "document_number": "HLCUSHA261009812",
+      "port_of_loading": "CNSHA",
+      "port_of_discharge": "CLVAP",
+      "doc_type": "BILL_OF_LADING",
+      "on_board_date": 1791504000,
+      "hiddenReasons": [
+        "off_page",
+        "invisible_mode"
+      ]
+    }
+  },
+  "blank": {
+    "15269_Formular_BillofLading_CSAV.pdf": {
+      "reason": "missing_field",
+      "field": "document_number"
+    },
+    "7345_BillofLading_A4.pdf": {
+      "reason": "missing_field",
+      "field": "document_number"
+    },
+    "7346_Sea_Waybill_LV_06-16.pdf": {
+      "reason": "unknown_document_type"
+    },
+    "sample-copy-heavyconbill.pdf": {
+      "reason": "missing_field",
+      "field": "document_number"
+    },
+    "shubil-a-sample.pdf": {
+      "reason": "missing_field",
+      "field": "document_number"
+    }
+  }
+}
