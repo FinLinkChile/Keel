@@ -6,9 +6,15 @@
   "exports": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "start": "tsx src/index.ts"
+    "start": "node --env-file-if-exists=../.env --import tsx src/start.ts",
+    "notify": "node --env-file-if-exists=../.env --import tsx src/cli.ts"
   },
   "dependencies": {
-    "@keel/schemas": "*"
+    "@keel/schemas": "*",
+    "grammy": "^1.46.0",
+    "zod": "^4.6.6"
+  },
+  "devDependencies": {
+    "@keel/ingest": "*"
   }
 }

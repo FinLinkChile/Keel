@@ -4,7 +4,7 @@ title: "Amenazas que el flujo debe resistir"
 description: "Modelo de amenazas de Keel Trade: cada amenaza con su ejemplo, la defensa y el riesgo residual declarado."
 tags: [amenazas, seguridad, riesgo-residual]
 modo: trade
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T21:00:00Z }
 ---
 
 | Amenaza | Ejemplo | Defensa | Riesgo residual |
@@ -14,14 +14,18 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
 | Llave de la naviera robada | Atestaciones falsas | Naviera registrada y rotable; ventana de disputa; monitoreo | |
 | Prompt injection en un documento (OWASP LLM01) | Texto oculto en el BL o la factura | Extractor sin herramientas, esquema sin texto libre, concordancia con el parser | El extractor puede devolver valores falsos; los frenan la firma de la naviera y el contrato |
 | Agencia excesiva (OWASP LLM06) | El agente intenta una acción fuera de su tarea | Rol Zodiac limitado al escrow, con cupo | Acciones dentro del rol siguen siendo posibles |
-| Mismo BL para dos órdenes | Cobrar dos veces con un embarque | Registro de `blNumberHash` usados | Depende de normalizar bien el número |
+| Mismo BL para dos órdenes | Cobrar dos veces con un embarque | Registro de `blNumberHash` usados, en ingesta y en el contrato | Depende de normalizar bien el número |
+| Documento subido por quien no es parte | Un tercero sube un BL o una factura a una orden ajena | Solo se lee lo que firma con EIP-712 un representante registrado de la orden, sobre el hash exacto del archivo ([carga de documentos](../interfaces/carga-de-documentos.md)) | Llave de un representante robada: puede subir documentos, pero no cambia la orden ni el destino del pago |
+| Inundación de documentos | Cientos de cargas para cansar al importador o gastar llamadas al LLM | Máximo 10 cargas firmadas por orden y por día, duplicados descartados por hash y alertas agrupadas en un resumen | |
 | Llave del agente o del relayer robada | Intento de mover fondos | Sin PDR válido no pasa por el gate de Trade; el rol solo permite llamar al escrow, con cupo | Ninguna autoridad propia; puede gastar gas |
 | Llave de política robada | PDR falsos | El Roles limita destino y cupo; el escrow solo paga a las partes de la orden | Puede depositar órdenes firmadas dentro del cupo y aprobar documentos no conformes. Mientras el gate de Trade no verifique en la cadena el registro de proveedores (T1.11), eso incluye una orden firmada por ambas partes con una dirección de cobro nueva |
 | Importador retira tras ver el embarque | Deja al exportador sin cobrar | El contrato no tiene función de retiro unilateral | Disputa de mala fe, que resuelve el árbitro |
-| Exportador nunca embarca | Se queda con el anticipo | Reembolso del saldo por vencimiento | El anticipo solo se recupera por disputa |
+| Exportador nunca embarca | Se queda con el anticipo | Reembolso del saldo por vencimiento | El anticipo no se recupera en la cadena: la disputa solo reparte el saldo restante y no se abre sin embarque. Queda para un acuerdo entre las partes fuera de la cadena |
 | El motor no puede leer el BL o no responde | Saldo trabado aunque el embarque ocurrió | El importador aprueba a mano (`BalanceApproval`); una orden Embarcado no se reembolsa por vencimiento y va a disputa | Si el importador no aprueba, el exportador depende del árbitro |
 | Colusión de exportador y naviera | Atestación de un embarque que no ocurrió | Ventana de disputa, árbitro, reputación e identidad verificada | Riesgo residual declarado |
 | Árbitro corrupto | Reparte a favor de una parte | Solo puede repartir entre las partes; opción de 2 de 3 | Reparto injusto |
+| Decisión de documentos vieja | Un `DocumentDecision` firmado con una versión anterior de las reglas se usa para liberar el saldo | Ata la orden, la atestación aceptada y los documentos; vence en `expiresAt`; el saldo solo va al `payoutAddress` firmado | **Riesgo aceptado:** el escrow no lleva registro de política, así que no rechaza una versión vieja de `policyHash`; la limita solo `expiresAt`, y el verificador queda fijado en la orden (no se rota) |
+| Exportador bloquea el reembolso con una disputa | Disputa abierta antes del embarque para congelar el saldo | `raiseDispute` solo desde Embarcado; sin embarque el reembolso sale tras el plazo | |
 | Evento externo que amplía permisos (estilo Bankr) | Un NFT o un mensaje que cambia la configuración | Solo la Safe gobierna los módulos, por el Delay | Compromiso de la propia Safe |
 | Repetición de firmas | Reusar la firma de una orden en otra | EIP-712 con `chainId`, contrato, `orderId` y `nonce` | Ninguna identificada en el diseño; lo demuestran las pruebas |
 | Reentrancia | Token malicioso que reentra | Solo tokens permitidos; checks, effects, interactions; guard de reentrancia | |
