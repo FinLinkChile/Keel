@@ -2,7 +2,7 @@
 // DeepSeek, Kimi, or a self-hosted model. Not all of them support strict JSON Schema,
 // so the output is requested as a JSON object and contract.ts validates it strictly.
 import OpenAI from "openai";
-import { ExtractionError, LLM_OUTPUT_SCHEMA, SYSTEM_PROMPT, userMessage, type ExtractorProvider, type InvoiceDocument } from "../contract";
+import { ExtractionError, type ExtractionRequest, type ExtractorProvider } from "../contract";
 
 export class OpenAICompatibleProvider implements ExtractorProvider {
   readonly provider = "openai-compatible";
@@ -16,7 +16,7 @@ export class OpenAICompatibleProvider implements ExtractorProvider {
     this.client = new OpenAI({ apiKey, baseURL });
   }
 
-  async complete(doc: InvoiceDocument): Promise<string> {
+  async complete(request: ExtractionRequest): Promise<string> {
     let res: OpenAI.Chat.ChatCompletion;
     try {
       res = await this.client.chat.completions.create({
@@ -26,9 +26,9 @@ export class OpenAICompatibleProvider implements ExtractorProvider {
         messages: [
           {
             role: "system",
-            content: `${SYSTEM_PROMPT}\n\nReply with one JSON object that matches this JSON Schema exactly:\n${JSON.stringify(LLM_OUTPUT_SCHEMA)}`,
+            content: `${request.system}\n\nReply with one JSON object that matches this JSON Schema exactly:\n${JSON.stringify(request.schema)}`,
           },
-          { role: "user", content: userMessage(doc.text) },
+          { role: "user", content: request.user },
         ],
       });
     } catch (e) {
