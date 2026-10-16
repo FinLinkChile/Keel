@@ -6,6 +6,16 @@ import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 export const MAX_PDF_BYTES = 10 * 1024 * 1024;
 export const MAX_PDF_PAGES = 20;
 
+// The PDF standard lets the %PDF- header appear anywhere in the first 1024 bytes, and some
+// scanners write bytes before it. -1 when there is no header.
+export const PDF_HEADER_WINDOW = 1024;
+const PDF_HEADER = [0x25, 0x50, 0x44, 0x46, 0x2d];
+export function pdfHeaderOffset(file: Uint8Array): number {
+  const last = Math.min(PDF_HEADER_WINDOW, file.length) - PDF_HEADER.length;
+  for (let i = 0; i <= last; i++) if (PDF_HEADER.every((b, j) => file[i + j] === b)) return i;
+  return -1;
+}
+
 export const PDF_READ_FAILURES = ["too_large", "too_many_pages", "unreadable"] as const;
 export type PdfReadFailure = (typeof PDF_READ_FAILURES)[number];
 
