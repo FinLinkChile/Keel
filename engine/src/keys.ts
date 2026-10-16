@@ -9,6 +9,7 @@ export const KEY_ENV = {
   relayer: "RELAYER_PRIVATE_KEY",
   policySigner: "POLICY_SIGNER_PRIVATE_KEY",
   cosigner: "COSIGNER_PRIVATE_KEY",
+  pauser: "MONITOR_PAUSER_PRIVATE_KEY",
 } as const;
 export type KeyRole = keyof typeof KEY_ENV;
 
@@ -63,4 +64,12 @@ export function loadPolicySigner(env: KeyEnv, registeredAddress?: Hex): PolicySi
 export function loadRelayer(env: KeyEnv) {
   assertSeparateKeys(env);
   return accountFor("relayer", env);
+}
+
+// The monitor's pause key (T2.8): it may only pause the Trade gate, through a pause-only role
+// Area 1 adds to the gate. Optional: without it the monitor only alerts. Never the cosigner key,
+// which also cosigns tier 3.
+export function loadPauser(env: KeyEnv) {
+  assertSeparateKeys(env);
+  return env[KEY_ENV.pauser] ? accountFor("pauser", env) : undefined;
 }

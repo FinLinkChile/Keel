@@ -184,7 +184,7 @@ export function botNotifier(deps: BotNotifierDeps) {
       if (notices !== "NOTHING_TO_NOTIFY") log({ bot: "skipped", orderId: event.orderId, reason: notices });
       return Promise.resolve();
     }
-    return post(doFetch, deps.endpoint, notices).then(
+    return postNotices(doFetch, deps.endpoint, notices).then(
       (status) => {
         if (status !== 202) log({ bot: "rejected", orderId: event.orderId, status, ids: notices.map((n) => n.id) });
       },
@@ -195,7 +195,8 @@ export function botNotifier(deps: BotNotifierDeps) {
   };
 }
 
-async function post(doFetch: typeof fetch, endpoint: BotEndpoint, notices: BotNotice[]): Promise<number> {
+// POST /notices of the bot; returns the HTTP status. Also used by the monitor (T2.8).
+export async function postNotices(doFetch: typeof fetch, endpoint: BotEndpoint, notices: readonly object[]): Promise<number> {
   const res = await doFetch(new URL("/notices", endpoint.url), {
     method: "POST",
     headers: { authorization: `Bearer ${endpoint.token}`, "content-type": "application/json" },

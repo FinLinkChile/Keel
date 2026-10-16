@@ -2,6 +2,7 @@
 //   keel verify <txHash> [--rpc <url>] [--evidence <dir>]   a transaction and every PDR it carries (T2.9)
 //   keel verify --pdr <pdrHash> [--evidence <dir>]          one PDR from its evidence file, offline
 //   keel agent --data <dir> [--once] [--interval <s>]       the agent service of one importer Safe (T2.11)
+//   keel monitor --data <dir> [--from-block <n>] [--once] [--interval <s>]   the monitor of one importer Safe (T2.8)
 // verify exits 0 when everything matches, 1 on any mismatch, 2 on a usage or read error.
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -12,7 +13,10 @@ import { fundingGatePort, gateDeployment, mockRolesAllowance } from "./agent/gat
 import { botNotifier } from "./agent/notices";
 import { rpcChain } from "./agent/rpc";
 import { FileStore } from "./agent/store";
-import { loadPolicySigner, loadRelayer } from "./keys";
+import { loadPauser, loadPolicySigner, loadRelayer } from "./keys";
+import { Monitor, pauserOn } from "./monitor/monitor";
+import { monitorNotifier } from "./monitor/notices";
+import { rpcMonitorChain } from "./monitor/rpc";
 import { tradePolicy } from "./policy";
 import { type ChainFacts, type Check, candidateHashes, loadEvidence, verdict, verifyEvidence } from "./verify";
 
@@ -129,6 +133,53 @@ async function agent(args: string[]): Promise<number> {
   }
 }
 
+// T2.8. Reads the gate and the escrow of one importer Safe, needs no relayer and holds no
+// authority to move funds. With MONITOR_PAUSER_PRIVATE_KEY it pauses the gate on an incident;
+// until the gate has a pause-only role that pause reverts and the monitor only alerts.
+async function monitor(args: string[]): Promise<number> {
+  const { values } = parseArgs({
+    args,
+    options: { data: { type: "string" }, once: { type: "boolean" }, interval: { type: "string" }, evidence: { type: "string" }, "from-block": { type: "string" } },
+  });
+  const env = process.env;
+  const need = (name: string, check: (v: string) => boolean) => {
+    const v = env[name];
+    if (!v || !check(v)) throw new UsageError(`set ${name}`);
+    return v as Hex;
+  };
+  const rpc = need("KEEL_RPC_URL", Boolean);
+  const escrow = need("KEEL_ESCROW", isAddress);
+  const safe = need("KEEL_SAFE", isAddress);
+  const gate = need("KEEL_FUNDING_GATE", isAddress);
+  const data = values.data ?? env.KEEL_DATA_DIR;
+  if (!data) throw new UsageError("set --data or KEEL_DATA_DIR");
+  const botUrl = env.KEEL_BOT_URL;
+  const botToken = env.KEEL_BOT_TOKEN;
+  if (Boolean(botUrl) !== Boolean(botToken)) throw new UsageError("set both KEEL_BOT_URL and KEEL_BOT_TOKEN, or neither");
+  if (values["from-block"] !== undefined && !/^[0-9]+$/.test(values["from-block"])) throw new UsageError("--from-block takes a block number");
+
+  const chain = rpcMonitorChain(rpc);
+  const pauserKey = loadPauser(env);
+  const pauser = pauserKey && pauserOn(rpcChain(rpc, pauserKey), pauserKey.address);
+  const client = createPublicClient({ transport: http(rpc) });
+  const fromBlock = values["from-block"] !== undefined ? BigInt(values["from-block"]) : (await chain.latestBlock()) + 1n;
+  const watch = new Monitor(
+    { chainId: await client.getChainId(), gate, escrow, evidenceDir: values.evidence ?? DEFAULT_EVIDENCE, fromBlock },
+    {
+      chain,
+      pauser,
+      notify: monitorNotifier({ store: new FileStore(data), safe, gate, endpoint: botUrl && botToken ? { url: botUrl, token: botToken } : undefined }),
+    },
+  );
+  console.log(JSON.stringify({ monitor: "started", fromBlock: fromBlock.toString(), pauser: pauser?.address ?? null }));
+  const intervalMs = Number(values.interval ?? 15) * 1000;
+  for (;;) {
+    await watch.tick();
+    if (values.once) return 0;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+}
+
 class UsageError extends Error {}
 
 async function main(argv: string[]): Promise<number> {
@@ -136,6 +187,7 @@ async function main(argv: string[]): Promise<number> {
   try {
     if (command === "verify") return await verify(args);
     if (command === "agent") return await agent(args);
+    if (command === "monitor") return await monitor(args);
     throw new UsageError(USAGE);
   } catch (e) {
     console.error(e instanceof UsageError ? e.message : `error: ${(e as Error).message}`);
