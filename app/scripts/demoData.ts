@@ -22,7 +22,12 @@ export type TradeOrderEntry = {
   payoutAddress: Hex;
   carrier: Hex;
   uploaders: { address: Hex; party: Role }[];
+  // The exporter's registered bank account, so its own invoice raises no unknown_destination
+  knownDestinations?: { kind: 'bank_account'; value: string }[];
 };
+
+// As ingest normalizes the account it finds in a document (findTradeDestinations)
+export const compactAccount = (account: string) => account.replace(/[\s-]/g, '');
 
 // agent: orders/<orderId>/order.json
 export type StoredOrder = { order: PurchaseOrder; terms: OrderTerms; label: string };
@@ -110,8 +115,15 @@ export async function demoData(wallets: Wallets, botAccounts: readonly string[],
       if (wallets.exporter && o.po.exporter === getAddress(wallets.exporter.toLowerCase()))
         uploaders.push({ address: o.po.exporter, party: 'exporter' });
       // Only orders a test wallet can upload to; the others have no one to sign
-      if (uploaders.length > 0)
-        ingestOrders.push({ orderId: o.po.orderId, payoutAddress: o.po.payoutAddress, carrier: o.po.carrier, uploaders });
+      if (uploaders.length === 0) continue;
+      const bankAccount = (await mockData.partyByAddress(o.po.exporter))?.bankAccount;
+      ingestOrders.push({
+        orderId: o.po.orderId,
+        payoutAddress: o.po.payoutAddress,
+        carrier: o.po.carrier,
+        uploaders,
+        ...(bankAccount && { knownDestinations: [{ kind: 'bank_account' as const, value: compactAccount(bankAccount) }] }),
+      });
     }
 
     const agentOrders = orders.map((o) => ({ order: o.po, terms: o.terms, label: o.label }));

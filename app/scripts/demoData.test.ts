@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import { checkOrderShape, orderIdOf } from '../src/data/orderRules';
 
-import { checkWallet, demoData, toFileText } from './demoData';
+import { checkWallet, compactAccount, demoData, toFileText } from './demoData';
 
 const repo = resolve(__dirname, '../..');
 const json = (path: string) => JSON.parse(readFileSync(join(repo, path), 'utf8'));
@@ -30,12 +30,21 @@ describe('demo data for ingest', () => {
     const labelOf = Object.fromEntries((await demoData({ exporter: EXPORTER }, botAccounts)).agentOrders.map((o) => [o.order.orderId, o.label]));
     expect(file.map((e) => labelOf[e.orderId as string])).toEqual(['PO-0157', 'PO-0142', 'PO-0150']);
     for (const e of file) {
-      expect(Object.keys(e).sort()).toEqual(['carrier', 'orderId', 'payoutAddress', 'uploaders']);
+      expect(Object.keys(e).sort()).toEqual(['carrier', 'knownDestinations', 'orderId', 'payoutAddress', 'uploaders']);
       expect(e.orderId).toMatch(HEX(32));
       expect(e.payoutAddress).toMatch(HEX(20));
       expect(e.carrier).toMatch(HEX(20));
       expect(e.uploaders).toEqual([{ address: EXPORTER, party: 'exporter' }]);
     }
+  });
+
+  it("registers the exporter's bank account as ingest finds it on the invoice", async () => {
+    const { ingestOrders } = await demoData({ exporter: EXPORTER }, botAccounts);
+    for (const e of ingestOrders) expect(e.knownDestinations).toEqual([{ kind: 'bank_account', value: '0128440755120142' }]);
+    // The line the corpus renderer prints, read with ingest's ACCOUNT_RE and compacted
+    const printed = 'A/C No.: 0128 4407 5512 0142';
+    const found = /\b(?:A\/C|ACCOUNT)\s*(?:NO\.?|NUMBER|#)?\s*:?\s*([0-9][0-9\- ]{5,30}[0-9])\b/.exec(printed.toUpperCase())![1]!;
+    expect(compactAccount(found)).toBe(ingestOrders[0]!.knownDestinations![0]!.value);
   });
 
   it('adds the importer wallet to every open order of the importer', async () => {

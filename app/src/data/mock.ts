@@ -16,9 +16,9 @@ const addr = (a: string): Hex => getAddress(a.toLowerCase());
 
 const PARTIES: Party[] = [
   { id: 'acme-imports', short: 'Pacífico', name: 'Pacífico Foods SpA', place: 'Chile', address: addr('0x7A3f91C2b04E6d1A8c3F5e2D9b7A0c4E1f6B55D8'), tint: 3, taxId: '765432103' },
-  { id: 'lingnan', short: 'Lingnan', name: 'Lingnan Hydrocolloids', place: 'Hong Kong', address: addr('0x5C1e0a9B7d3F2c6E8a4B1d9F0e7C3a5B2d6E04a1'), tint: 0 },
-  { id: 'kowloon', short: 'Kowloon', name: 'Kowloon Fine Chemicals', place: 'Hong Kong', address: addr('0x9B2d4F6a8C0e1B3d5F7a9C2e4B6d8F0a1C3e7A62'), tint: 1 },
-  { id: 'pearl-delta', short: 'Pearl Delta', name: 'Pearl Delta Ingredients', place: 'Guangzhou', address: addr('0x2E4a6C8e0B1d3F5a7C9e2B4d6F8a0C1e3B5d9F17'), tint: 2 },
+  { id: 'lingnan', short: 'Lingnan', name: 'Lingnan Hydrocolloids', place: 'Hong Kong', address: addr('0x5C1e0a9B7d3F2c6E8a4B1d9F0e7C3a5B2d6E04a1'), tint: 0, bankAccount: '0128 4407 5512 0142' },
+  { id: 'kowloon', short: 'Kowloon', name: 'Kowloon Fine Chemicals', place: 'Hong Kong', address: addr('0x9B2d4F6a8C0e1B3d5F7a9C2e4B6d8F0a1C3e7A62'), tint: 1, bankAccount: '0043 6620 1975 0151' },
+  { id: 'pearl-delta', short: 'Pearl Delta', name: 'Pearl Delta Ingredients', place: 'Guangzhou', address: addr('0x2E4a6C8e0B1d3F5a7C9e2B4d6F8a0C1e3B5d9F17'), tint: 2, bankAccount: '3602 8815 4420 0139' },
   { id: 'harbor-line', short: 'Harbor Line', name: 'Harbor Line', place: 'Hong Kong', address: addr('0x4D6f8B0d2A3c5E7f9B1d4A6c8E0f2B3d5A7c1E88') },
   { id: 'hk-arbitration', short: 'HK Arbitration', name: 'HK Trade Arbitration', place: 'Hong Kong', address: addr('0x6F8b0D2f4C5e7A9b1D3f6C8e0A2b4D5f7C9e3A09') },
   { id: 'keel-verifier', short: 'Keel verifier', name: 'Keel document verifier', place: 'Keel', address: addr('0x8A0c2E4a6D7f9C1a3E5b8D0f2C4a6E7b9D1f5C33') },

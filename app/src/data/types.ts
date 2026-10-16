@@ -14,6 +14,9 @@ export type Party = {
   address: Hex;
   // Chilean RUT without dots or dash, for the importer: the invoice is checked against it
   taxId?: string;
+  // Bank account registered for an exporter, as its invoice prints it. A document may print it
+  // without raising an alert; the escrow still pays only the order's payoutAddress.
+  bankAccount?: string;
   // Avatar colour when the party is shown as a counterparty. Your own company is drawn
   // without it.
   tint?: number;

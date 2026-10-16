@@ -34,7 +34,7 @@ npm run demo-data -w app -- --exporter 0x… [--importer 0x…] [--out <dir>]
 
 | File | For | Content |
 |---|---|---|
-| `<out>/ingest-orders.json` | ingest, as `INGEST_ORDERS_FILE` | The open orders a test wallet can upload to: `orderId`, `payoutAddress` and `carrier` from the order, and the wallets as `uploaders` |
+| `<out>/ingest-orders.json` | ingest, as `INGEST_ORDERS_FILE` | The open orders a test wallet can upload to: `orderId`, `payoutAddress` and `carrier` from the order, the wallets as `uploaders`, and the exporter's registered bank account as `knownDestinations`, so its own invoice raises no unknown account alert |
 | `<out>/agent/orders/<orderId>/order.json` | the agent (Area 2) | `{ order, terms, label }`: the `PurchaseOrder` with its real `termsHash` and `requiredDocsHash`, the `OrderTerms` and the label of the bot notices |
 | `<out>/agent/registry.json` | the agent | `parties` (address, bot account, the importer's RUT) and `history` (settled amounts by exporter) |
 | `<out>/bot-orders.json` | the bot, as `BOT_ORDERS_FILE` | The label and the bot accounts of each order, by order id |
