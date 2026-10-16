@@ -4,7 +4,7 @@ title: "Amenazas que el flujo debe resistir"
 description: "Modelo de amenazas de Keel Trade: cada amenaza con su ejemplo, la defensa y el riesgo residual declarado."
 tags: [amenazas, seguridad, riesgo-residual]
 modo: trade
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T21:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T15:30:00Z }
 ---
 
 | Amenaza | Ejemplo | Defensa | Riesgo residual |
@@ -25,6 +25,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T21:00:00Z }
 | Colusión de exportador y naviera | Atestación de un embarque que no ocurrió | Ventana de disputa, árbitro, reputación e identidad verificada | Riesgo residual declarado |
 | Árbitro corrupto | Reparte a favor de una parte | Solo puede repartir entre las partes; opción de 2 de 3 | Reparto injusto |
 | Proveedor o naviera que la empresa no aprobó | Orden firmada por ambas partes con una cuenta de cobro nueva o con una naviera que controla el exportador | El gate de Trade exige proveedor y terceros activos en el registro de la Safe; agregar uno espera `configDelay` con veto por cambio | Los propios dueños de la Safe pueden encolar y esperar; la defensa es el aviso y el veto del cosignatario |
+| Llave del guardian robada | Pausar el gate de Trade una y otra vez | El guardian solo puede llamar `emergencyPause`: no reanuda, no veta, no encola, no paga; la Safe lo quita con `setGuardian(address(0))` y reanuda en la misma transacción | Detiene depósitos hasta que la Safe lo quite; si eso pasa por el Delay, durante esa espera |
 | Llave del cosignatario robada | Vetar toda alta de proveedor y pausar el gate de Trade | El cosignatario solo puede vetar cambios en cola y pausar: no agrega, no reanuda, no paga; la Safe lo reemplaza con `setCosigner` | Demora las altas y los depósitos hasta que la Safe lo rote |
 | Decisión de documentos vieja | Un `DocumentDecision` firmado con una versión anterior de las reglas se usa para liberar el saldo | Ata la orden, la atestación aceptada y los documentos; vence en `expiresAt`; el saldo solo va al `payoutAddress` firmado | **Riesgo aceptado:** el escrow no lleva registro de política, así que no rechaza una versión vieja de `policyHash`; la limita solo `expiresAt`, y el verificador queda fijado en la orden (no se rota) |
 | Exportador bloquea el reembolso con una disputa | Disputa abierta antes del embarque para congelar el saldo | `raiseDispute` solo desde Embarcado; sin embarque el reembolso sale tras el plazo | |

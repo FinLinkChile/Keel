@@ -1,5 +1,9 @@
 # Historial de la documentación
 
+## 2026-10-16
+
+* **Decisión [PROPUESTA] del Área 1 (Adrean), pedida por el Área 2 en #57: guardian del gate de Trade.** `FundingGate` agrega un `guardian` que solo puede llamar `emergencyPause()` (pensado para el monitor o un operador): no reanuda, no veta, no encola, no quita ni configura. Lo fija la Safe con `setGuardian` y `address(0)` lo desactiva; debe ser distinto del firmante de política, del cosignatario y de la Safe, y al cambiar firmante o cosignatario tampoco pueden ser el guardian. **Afecta al Área 2:** `GATE_EVENTS` suma `GuardianSet` y `GATE_ERRORS` suma `OnlyPauser`, `InvalidGuardian` y `SignerIsGuardian`; un tercero que llame `emergencyPause` ahora recibe `OnlyPauser` (antes `OnlySafeOrCosigner`). **Afecta al Área 4:** el bot puede avisar con `GuardianSet(previousGuardian, guardian)` y `GatePaused(by)`. Riesgo declarado: una llave del guardian robada solo pausa, una y otra vez; la Safe la quita con `setGuardian(address(0))` y reanuda en la misma transacción ([amenazas](flujo/amenazas.md), [custodia de llaves](arquitectura/custodia-de-llaves.md)). PDRGate no cambia. El despliegue (T1.8) lo incluirá en un PR aparte ([eventos y errores](interfaces/eventos-y-errores.md), [Área 1](trabajo/area-1-contratos.md)).
+
 ## 2026-10-15
 
 * **Actualización**: ingesta avisa al bot del Área 4 cada resultado y el resumen diario de solicitudes de cambio, por la ruta que propuso el Área 4 (`POST /ingest/outcomes`), sin bloquear nunca el procesamiento. La carga de documentos responde CORS solo para el origen de la app configurado. Se agrega el corpus de Keel Personal (12 legítimas y 26 adversariales que entran por correo autenticado), con lo que T3.8 queda completa. Área 3 (Daniela). Conceptos: [Área 3](trabajo/area-3-ingesta.md), [carga de documentos](interfaces/carga-de-documentos.md).
