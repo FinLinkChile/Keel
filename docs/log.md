@@ -1,5 +1,9 @@
 # Historial de la documentación
 
+## 2026-10-16
+
+* **Plan**: revisión de las bases del International Track (Appendix 2) contra el repositorio. Se agregan dos tareas al Área 5: T5.8 (repositorio abierto al jurado, revisión del historial antes de abrirlo y licencias de terceros), porque `FinLinkChile/Keel` es privado y las bases piden el enlace; y T5.9 (rama de entrega: PRs a `dev` y `dev` a `main`, pruebas que pasen en un clon limpio, alinear los README con Base Sepolia e instrucciones de despliegue), porque `main` solo tiene el andamiaje. [Entregables](entrega/entregables.md) gana la tabla de los seis elementos de las bases con la tarea que cubre cada uno. T1.0 pasa al tablero (#62) con lo que queda abierto, el token de pago; T5.8 es #63 y T5.9 es #64. Lo pidió Darienn (Área 2); las tareas quedan **[PROPUESTA]** hasta que el Área 5 las confirme. Conceptos: [Área 5](trabajo/area-5-redteam-evidencia.md), [entregables](entrega/entregables.md).
+
 ## 2026-10-15
 
 * **Actualización**: ingesta avisa al bot del Área 4 cada resultado y el resumen diario de solicitudes de cambio, por la ruta que propuso el Área 4 (`POST /ingest/outcomes`), sin bloquear nunca el procesamiento. La carga de documentos responde CORS solo para el origen de la app configurado. Se agrega el corpus de Keel Personal (12 legítimas y 26 adversariales que entran por correo autenticado), con lo que T3.8 queda completa. Área 3 (Daniela). Conceptos: [Área 3](trabajo/area-3-ingesta.md), [carga de documentos](interfaces/carga-de-documentos.md).
