@@ -30,6 +30,8 @@ const carrier = privateKeyToAccount(word("carrier"));
 const policySigner = privateKeyToAccount(word("keel policy and document verifier"));
 const cosigner = privateKeyToAccount(word("cosigner"));
 const outsider = privateKeyToAccount(word("a key with no role in the gate"));
+// The monitor's own key: the gate's guardian, which can only call emergencyPause
+const guardian = privateKeyToAccount(word("monitor guardian"));
 const ATTACKER = address(0xbad);
 const RELAYER = address(0x7e1a);
 const ARBITER = address(0xa4b1);
@@ -106,6 +108,7 @@ describe("monitor of use outside the system (T2.8)", () => {
     await send("MockModuleSafe1271", safe, "enableModule", [roles], importerOwner.address);
     await asSafe(roles, chain.calldata("MockTradeRoles", "assignRole", [AGENT, gate, true]));
     await asSafe(roles, chain.calldata("MockTradeRoles", "setAllowance", [AGENT, 100n * TOTAL, 7n * DAY]));
+    await asSafe(gate, chain.calldata("FundingGate", "setGuardian", [guardian.address]));
     await asSafe(gate, chain.calldata("FundingGate", "queueSupplier", [exporter.address, PAYOUT]));
     await asSafe(gate, chain.calldata("FundingGate", "queueThirdParty", [carrier.address, 1]));
     await asSafe(gate, chain.calldata("FundingGate", "queueThirdParty", [ARBITER, 2]));
@@ -189,7 +192,7 @@ describe("monitor of use outside the system (T2.8)", () => {
 
   it("a deposit the engine issued is not an incident", async () => {
     const order = await openOrder(1n);
-    const monitor = watch(pauserFor(cosigner.address));
+    const monitor = watch(pauserFor(guardian.address));
     await fund(order, true);
     expect(await monitor.tick()).toEqual([]);
     expect(await paused()).toBe(false);
@@ -197,8 +200,7 @@ describe("monitor of use outside the system (T2.8)", () => {
 
   it("a deposit signed outside the engine pauses the gate, and the next one reverts", async () => {
     const [first, second] = [await openOrder(1n), await openOrder(2n)];
-    // Stands in for the pause-only role Area 1 adds to the gate: today only the Safe or the cosigner may pause
-    const monitor = watch(pauserFor(cosigner.address));
+    const monitor = watch(pauserFor(guardian.address));
     const tx = await fund(first, false, ATTACKER);
 
     const [incident] = await monitor.tick();
@@ -214,7 +216,7 @@ describe("monitor of use outside the system (T2.8)", () => {
     const monitor = watch(pauserFor(outsider.address));
     await fund(order, false, ATTACKER);
     const [incident] = await monitor.tick();
-    expect(incident).toMatchObject({ reason: "UNKNOWN_FUNDING_PDR", action: "alerted", pauseRevert: "OnlySafeOrCosigner" });
+    expect(incident).toMatchObject({ reason: "UNKNOWN_FUNDING_PDR", action: "alerted", pauseRevert: "OnlyPauser" });
     expect(await paused()).toBe(false);
     expect(reasons(await monitor.tick())).toEqual([]);
   });
@@ -230,7 +232,7 @@ describe("monitor of use outside the system (T2.8)", () => {
     const order = await openOrder(1n);
     await fund(order, true);
     const attestation = await ship(order);
-    const monitor = watch(pauserFor(cosigner.address));
+    const monitor = watch(pauserFor(guardian.address));
     const approval = await importerOwner.signTypedData({
       domain: keelDomain(1, escrow),
       types: { BalanceApproval: EIP712_TYPES.BalanceApproval },
@@ -246,7 +248,7 @@ describe("monitor of use outside the system (T2.8)", () => {
     const order = await openOrder(1n);
     await fund(order, true);
     const attestation = await ship(order);
-    const monitor = watch(pauserFor(cosigner.address));
+    const monitor = watch(pauserFor(guardian.address));
     const decision = {
       orderId: order.orderId,
       attestationHash: structHash("ShipmentAttestation", attestation),
@@ -267,20 +269,22 @@ describe("monitor of use outside the system (T2.8)", () => {
   });
 
   it("reports configuration changes without acting on them", async () => {
-    const monitor = watch(pauserFor(cosigner.address));
+    const monitor = watch(pauserFor(guardian.address));
     await asSafe(gate, chain.calldata("FundingGate", "queueSupplier", [exporter.address, address(0xbeef)]));
     await send("FundingGate", gate, "vetoPending", [5n], cosigner.address);
     await asSafe(gate, chain.calldata("FundingGate", "setPolicyHash", [word("other rules")]));
+    await asSafe(gate, chain.calldata("FundingGate", "setGuardian", [address(0)]));
     const events = await monitor.tick();
-    expect(reasons(events)).toEqual(["SUPPLIER_QUEUED", "CHANGE_VETOED", "POLICY_HASH_SET"]);
+    expect(reasons(events)).toEqual(["SUPPLIER_QUEUED", "CHANGE_VETOED", "POLICY_HASH_SET", "GUARDIAN_SET"]);
+    expect(events[3]).toMatchObject({ kind: "change", subject: address(0) });
     expect(events[0]).toMatchObject({ kind: "change", changeId: 5n, subject: exporter.address, activatesAt: chain.time() + CONFIG_DELAY });
     expect(await paused()).toBe(false);
   });
 
   it("reads each block once and in chunks", async () => {
     const monitor = new Monitor({ chainId: 1, gate, escrow, evidenceDir, fromBlock: 1n, maxRange: 2n }, { chain: monitorChain() });
-    // The setup queued one supplier and three third parties
-    expect(reasons(await monitor.tick())).toEqual(["SUPPLIER_QUEUED", "THIRD_PARTY_QUEUED", "THIRD_PARTY_QUEUED", "THIRD_PARTY_QUEUED"]);
+    // The setup set the guardian, then queued one supplier and three third parties
+    expect(reasons(await monitor.tick())).toEqual(["GUARDIAN_SET", "SUPPLIER_QUEUED", "THIRD_PARTY_QUEUED", "THIRD_PARTY_QUEUED", "THIRD_PARTY_QUEUED"]);
     expect(await monitor.tick()).toEqual([]);
   });
 });

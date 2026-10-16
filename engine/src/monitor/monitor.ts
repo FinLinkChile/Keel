@@ -27,6 +27,7 @@ export const MONITOR_EVENTS_ABI = parseAbi([
   "event PolicySignerSet(address signer)",
   "event PolicyHashSet(bytes32 policyHash)",
   "event CosignerSet(address cosigner)",
+  "event GuardianSet(address indexed previousGuardian, address indexed guardian)",
   "event BalanceReleased(bytes32 indexed orderId, address indexed to, uint256 amount, bytes32 authorizationDigest)",
 ]);
 
@@ -81,7 +82,9 @@ export type ChangeReason =
   | "GATE_UNPAUSED"
   | "POLICY_SIGNER_SET"
   | "POLICY_HASH_SET"
-  | "COSIGNER_SET";
+  | "COSIGNER_SET"
+  // The key that may only pause the gate (#67) was set, rotated or cleared (subject zero)
+  | "GUARDIAN_SET";
 
 export interface MonitorEvent {
   kind: "incident" | "change";
@@ -98,7 +101,7 @@ export interface MonitorEvent {
   // What the monitor did about an incident
   action?: "paused" | "alerted";
   pauseTx?: Hex;
-  // Why the pause did not happen (for example OnlySafeOrCosigner, until the pause role exists)
+  // Why the pause did not happen (for example OnlyPauser, a key that is not the gate's guardian)
   pauseRevert?: string;
 }
 
@@ -184,6 +187,8 @@ export class Monitor {
         return fromGate ? { ...at, kind: "change", reason: "POLICY_HASH_SET" } : null;
       case "CosignerSet":
         return fromGate ? { ...at, kind: "change", reason: "COSIGNER_SET", subject: a.cosigner as Hex } : null;
+      case "GuardianSet":
+        return fromGate ? { ...at, kind: "change", reason: "GUARDIAN_SET", subject: a.guardian as Hex } : null;
       default:
         return null;
     }

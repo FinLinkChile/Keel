@@ -43,7 +43,7 @@ describe("monitor notices for the bot (T2.8)", () => {
   });
 
   it("changes no bot notice fits are only logged", () => {
-    for (const reason of ["POLICY_SIGNER_SET", "POLICY_HASH_SET", "COSIGNER_SET", "CHANGE_VETOED", "GATE_UNPAUSED"] as const) {
+    for (const reason of ["POLICY_SIGNER_SET", "POLICY_HASH_SET", "COSIGNER_SET", "GUARDIAN_SET", "CHANGE_VETOED", "GATE_UNPAUSED"] as const) {
       expect(toMonitorNotices(event({ reason }), "acme-imports", GATE, AT)).toEqual([]);
     }
   });
