@@ -11,6 +11,8 @@ export const EXTRACTION_FAILURES = [
   "truncated",
   "invalid_output",
   "provider_error",
+  // The configured provider cannot read an image or a scanned PDF
+  "unsupported_input",
 ] as const;
 export type ExtractionFailure = (typeof EXTRACTION_FAILURES)[number];
 
@@ -29,11 +31,23 @@ export class ExtractionError extends Error {
 // Hidden runs are included, so the model faces the attack.
 export interface ExtractionRequest {
   text: string;
+  // Only for a document with no text to redact (a photo or a scanned proforma, T3.9): the file
+  // itself goes to the model. Never used for the documents that feed a payment.
+  attachment?: Attachment;
   system: string;
   user: string;
   // Name and portable JSON Schema of the structured output
   schemaName: string;
   schema: Record<string, unknown>;
+}
+
+export const ATTACHMENT_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"] as const;
+export type AttachmentType = (typeof ATTACHMENT_TYPES)[number];
+
+export interface Attachment {
+  mediaType: AttachmentType;
+  // base64 of the file bytes
+  data: string;
 }
 
 // One adapter per LLM vendor. It returns the raw JSON text and nothing else:
