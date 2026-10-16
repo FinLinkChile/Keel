@@ -55,6 +55,7 @@ type Seed = {
   shippedAt?: number;
   closedAt?: number;
   blockedBy?: Order['blockedBy'];
+  documents?: Order['documents'];
 };
 
 function order(s: Seed): Order {
@@ -72,6 +73,8 @@ function order(s: Seed): Order {
     shippedAt: s.shippedAt,
     closedAt: s.closedAt,
     blockedBy: s.blockedBy,
+    transportDoc: 'BILL_OF_LADING',
+    documents: s.documents ?? [],
     po: {
       orderId: id(s.n),
       importer: address('acme-imports'),
@@ -104,7 +107,7 @@ function order(s: Seed): Order {
 // The label is the id written in hex, as in the bot examples.
 const ORDERS = (): Order[] => [
   order({ n: 0x157, goods: 'Agar powder', goodsShort: 'Agar', quantity: '6,000 kg', exporter: 'lingnan', totalMinor: 4_800_000, stage: 'awaiting_signature', waitingOn: 'importer', deadline: day(11, 20), hsCode: '130231' }),
-  order({ n: 0x142, goods: 'Agar powder', goodsShort: 'Agar', quantity: '6,000 kg', exporter: 'lingnan', totalMinor: 4_800_000, stage: 'advance_paid', waitingOn: 'exporter', deadline: day(11, 20), hsCode: '130231', signedAt: day(10, 2), advancePaidAt: day(10, 2) }),
+  order({ n: 0x142, goods: 'Agar powder', goodsShort: 'Agar', quantity: '6,000 kg', exporter: 'lingnan', totalMinor: 4_800_000, stage: 'advance_paid', waitingOn: 'exporter', deadline: day(11, 20), hsCode: '130231', signedAt: day(10, 2), advancePaidAt: day(10, 2), documents: [{ docType: 'COMMERCIAL_INVOICE', fileName: 'INV-LH-0988.pdf', uploadedAt: day(10, 13) + 15 * 3600, status: 'under_review' }] }),
   order({ n: 0x150, goods: 'Agar powder', goodsShort: 'Agar', quantity: '2,500 kg', exporter: 'lingnan', totalMinor: 2_000_000, stage: 'advance_paid', waitingOn: 'exporter', deadline: day(11, 20), hsCode: '130231', signedAt: day(10, 5), advancePaidAt: day(10, 5) }),
   order({ n: 0x139, goods: 'Carrageenan', quantity: '3,000 kg', exporter: 'pearl-delta', totalMinor: 2_150_000, stage: 'shipped', deadline: day(10, 30), hsCode: '130239', signedAt: day(9, 20), advancePaidAt: day(9, 20), shippedAt: day(10, 14) }),
   order({ n: 0x151, goods: 'Gelatin', quantity: '1,200 kg', exporter: 'kowloon', totalMinor: 1_325_000, stage: 'signed', deadline: day(12, 5), hsCode: '350300', signedAt: day(10, 13), blockedBy: 'supplier_check' }),

@@ -1,4 +1,4 @@
-import type { Hex, OrderTerms, PurchaseOrder } from '@keel/schemas';
+import type { Hex, OrderTerms, PurchaseOrder, RequiredDocType } from '@keel/schemas';
 
 // Same slugs as bot/examples/recipients.json
 export type PartyId = string;
@@ -37,6 +37,14 @@ export type OrderStage =
   | 'refunded' // step 6
   | 'cancelled'; // mutual cancellation
 
+// A document already uploaded for an order, as the exporter sees it: only its outcome.
+export type OrderDocument = {
+  docType: RequiredDocType;
+  fileName: string;
+  uploadedAt: number;
+  status: 'accepted' | 'under_review';
+};
+
 export type Order = {
   label: string; // "PO-0142", as in bot/examples/orders.json
   goods: string; // "Agar powder"
@@ -53,6 +61,9 @@ export type Order = {
   closedAt?: number;
   // Why it waits, for orders that are blocked on something other than a party
   blockedBy?: 'supplier_check';
+  // Bill of lading for sea freight, air waybill for air
+  transportDoc: 'BILL_OF_LADING' | 'AIR_WAYBILL';
+  documents: OrderDocument[];
   po: PurchaseOrder;
   terms: OrderTerms;
 };

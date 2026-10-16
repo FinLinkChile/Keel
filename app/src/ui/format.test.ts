@@ -24,12 +24,13 @@ describe('addresses', () => {
   });
 
   it('shows every character in the full form and never drops one silently', () => {
-    expect(formatAddress(a, true)).toBe('0x7A3f 91C2 b04E 6d1A 8c3F 5e2D 9b7A 0c4E 1f6B 55D8');
-    expect(formatAddress(a, true).replace(/ /g, '')).toBe(a);
+    expect(formatAddress(a, 'full')).toBe('0x7A3f 91C2 b04E 6d1A 8c3F 5e2D 9b7A 0c4E 1f6B 55D8');
+    expect(formatAddress(a, 'full').replace(/ /g, '')).toBe(a);
   });
 
   it('marks the cut in the short form', () => {
     expect(formatAddress(a)).toBe('0x7A3f 91C2 … 55D8');
+    expect(formatAddress(a, 'inline')).toBe('0x7A3f … 55D8');
   });
 });
 

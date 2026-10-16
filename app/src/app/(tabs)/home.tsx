@@ -158,8 +158,16 @@ function NeedsYouSheet({ item }: { item: Item }) {
           color="textSoft"
           currencyColor="textFaint"
         />
-        {/* Review (04) and the exporter order (10) come later; until then both open Orders */}
-        <Button label={signing ? 'Review' : 'Upload'} variant="go" onPress={() => router.navigate('/orders')} />
+        {/* Review (04) comes later and opens Orders until then; Upload opens the order (10) */}
+        <Button
+          label={signing ? 'Review' : 'Upload'}
+          variant="go"
+          onPress={() =>
+            signing
+              ? router.navigate('/orders')
+              : router.push({ pathname: '/order/[orderId]', params: { orderId: order.po.orderId } })
+          }
+        />
       </View>
     </Sheet>
   );

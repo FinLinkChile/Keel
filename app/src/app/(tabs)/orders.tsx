@@ -119,19 +119,22 @@ function List({ rows, role, now, avatars = false, empty }: { rows: Row[]; role: 
       {rows.map(({ order, counterparty }, i) => {
         const line = orderLine(order, role, counterparty, now);
         return (
-          // Rows open the order (05) once that screen exists
-          <View
+          // The exporter opens its order (10); the importer's order (05) comes later
+          <Pressable
             key={order.label}
-            accessible
+            disabled={role !== 'exporter'}
+            accessibilityRole={role === 'exporter' ? 'button' : undefined}
+            onPress={() => router.push({ pathname: '/order/[orderId]', params: { orderId: order.po.orderId } })}
             accessibilityLabel={`${order.goodsShort} ${order.label}, ${line.detail.map((s) => s.text).join('')}, ${line.status}`}
-            style={{
+            style={({ pressed }) => ({
               flexDirection: 'row',
               alignItems: 'center',
               gap: 14,
               paddingVertical: 12,
               borderBottomWidth: i < rows.length - 1 ? 1 : 0,
               borderBottomColor: colors.divider,
-            }}
+              opacity: pressed ? 0.7 : 1,
+            })}
           >
             {avatars ? <Avatar name={counterparty.name} tint={counterparty.tint} /> : null}
             <View style={{ flex: 1 }}>
@@ -154,7 +157,7 @@ function List({ rows, role, now, avatars = false, empty }: { rows: Row[]; role: 
               </Text>
             </View>
             <StatusWord tone={line.yourTurn ? 'yourTurn' : 'plain'}>{line.status}</StatusWord>
-          </View>
+          </Pressable>
         );
       })}
     </View>

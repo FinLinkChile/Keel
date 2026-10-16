@@ -18,11 +18,15 @@ export function addressGroups(address: string): string[] {
   return groups;
 }
 
-// Full form only where the payee is decided; elsewhere the short form next to a name.
-export function formatAddress(address: string, full = false): string {
+// full: where the payee is decided. short: next to a name. inline: inside a sentence, where
+// two groups would wrap the line ("0x3E9d … 8812").
+export type AddressForm = 'full' | 'short' | 'inline';
+
+export function formatAddress(address: string, form: AddressForm = 'short'): string {
   const groups = addressGroups(address);
-  if (full || groups.length <= 3) return groups.join(' ');
-  return `${groups[0]} ${groups[1]} … ${groups[groups.length - 1]}`;
+  if (form === 'full' || groups.length <= 3) return groups.join(' ');
+  const last = groups[groups.length - 1];
+  return form === 'inline' ? `${groups[0]} … ${last}` : `${groups[0]} ${groups[1]} … ${last}`;
 }
 
 // "Lingnan Hydrocolloids" -> "LH", "Pacífico Foods SpA" -> "PF"
@@ -40,6 +44,12 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export function formatDay(unixSeconds: number | bigint): string {
   const d = new Date(Number(unixSeconds) * 1000);
   return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+}
+
+// Unix seconds -> "Oct 15" in the phone's time zone: for things people did, like an upload.
+export function formatLocalDay(unixSeconds: number): string {
+  const d = new Date(unixSeconds * 1000);
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
 }
 
 // 4_900_000n (49,000.00) -> "49k": compact figure for limits and gauges

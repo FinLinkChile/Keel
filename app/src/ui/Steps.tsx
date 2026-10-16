@@ -45,7 +45,8 @@ export function Steps({ steps, size = 'large' }: Props) {
               <Dot state={step.state} s={s} />
               <Segment visible={i < steps.length - 1} grow />
             </View>
-            <View style={{ flex: 1, paddingVertical: s.padY, gap: 10, justifyContent: 'center' }}>
+            {/* At least as tall as the dot with its padding, as in the design */}
+            <View style={{ flex: 1, minHeight: s.dot + 2 * s.padY, paddingVertical: s.padY, gap: 10, justifyContent: 'center' }}>
               {step.state === 'current' ? (
                 // Countdown beside the title, the explanation full width below it
                 <View style={{ gap: 6 }}>
