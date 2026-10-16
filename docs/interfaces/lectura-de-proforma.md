@@ -4,11 +4,10 @@ title: "Lectura de la proforma (Keel Trade)"
 description: "Cómo sube la app la proforma del exportador para prellenar la orden: mensaje EIP-712 que firma el importador, ruta HTTP, archivos aceptados, campos que devuelve y qué nunca devuelve."
 tags: [proforma, eip-712, ingesta, app, t3-9, paso-0]
 modo: trade
-status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T14:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T23:20:00Z }
 ---
 
-**[PROPUESTA]** Diseño del Área 3 (T3.9) para la pantalla de nueva orden del Área 4 (T4.9). El código ya existe en `ingest/src/trade/proforma.ts` y `ingest/src/extractor/proforma.ts` **[HECHO]**. Está por confirmar con el Área 4.
+Diseño del Área 3 (T3.9) para la pantalla de nueva orden del Área 4 (T4.9), confirmado por el Área 4 al aprobar el PR #66. El código está en `ingest/src/trade/proforma.ts` y `ingest/src/extractor/proforma.ts`. El envío de fotos y escaneos al modelo sin redactar sigue **[PROPUESTA]** hasta que lo confirme el equipo.
 
 Sirve al [paso 0](../flujo/paso-0-negociacion.md): el agente lee la proforma y propone la orden estructurada, y quienes la aprueban y firman son las personas. La lectura solo prellena la pantalla de revisión; **lo que vale es la orden firmada por ambas partes**.
 
@@ -37,7 +36,7 @@ Puede subir una proforma un representante del importador: en el prototipo, los `
 
 Existe junto con la ruta de carga de documentos (con `INGEST_ORDERS_FILE` e `INGEST_CHAIN_ID`) y responde CORS igual que ella, solo para `INGEST_APP_ORIGIN`.
 
-**Archivos aceptados.** El tipo se lee de los bytes, no de lo que declara la app:
+**Archivos aceptados.** El tipo se lee de los bytes, no de lo que declara la app. El encabezado `%PDF-` puede estar en cualquier parte del primer KB, como permite el estándar, porque algunos escáneres escriben bytes antes:
 
 | Archivo | Cómo se lee |
 | --- | --- |
@@ -84,9 +83,9 @@ Cuando el archivo va al modelo no hay texto que redactar: la transferencia queda
 ```
 
 - Un campo que la proforma no imprime llega como `null` y aparece en `missing`, para que el importador lo llene. Nunca se adivina ni se calcula.
-- Los valores pasan por las mismas normalizaciones que el BL y la factura: número compactado, monto en unidades menores sin decimales flotantes, fechas a medianoche UTC, códigos HS solo con dígitos, puertos en UN/LOCODE. Un valor que no se normaliza invalida la lectura completa (`unreadable`), en vez de mostrarse como una suposición.
+- Los valores pasan por las mismas normalizaciones que el BL y la factura: número compactado, monto en unidades menores sin decimales flotantes, fechas a medianoche UTC, códigos HS solo con dígitos (de 6 a 10), puertos en UN/LOCODE. Un valor que no se normaliza no se muestra como una suposición: ese campo llega como `null` y en `missing`, y los demás se conservan. Si falla un código HS, la lista queda vacía entera, para no mostrar una lista incompleta como si estuviera completa. Una respuesta que rompe el esquema (un campo de más, un tipo distinto) deja la lectura completa `unreadable`.
 - `mentions_account_change` y `hidden_text_detected` son advertencias para la pantalla. No llenan nada.
-- `fileHash` sirve para el `documentHash` de los `OrderTerms`, si la app firma la orden sobre la proforma ([paso 1](../flujo/paso-1-firma-orden.md)).
+- `fileHash` es el `documentHash` de los `OrderTerms` de la orden que sale de esta proforma; así lo usa la app ([paso 1](../flujo/paso-1-firma-orden.md)).
 - La misma proforma subida otra vez devuelve la misma lectura sin llamar de nuevo al modelo. Ingesta guarda el hash y la lectura tipada, nunca el archivo.
 
 **Lo que nunca devuelve:** la cuenta de cobro, nombres, direcciones ni texto libre. La cuenta de cobro de la orden sale del registro del proveedor verificado ([principio 1](../flujo/principios.md)); una proforma que imprime otra cuenta solo levanta `mentions_account_change`.
