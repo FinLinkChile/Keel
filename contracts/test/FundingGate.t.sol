@@ -503,7 +503,8 @@ contract FundingGateTest is Test {
         FundIntent memory i = _intent(po);
         PolicyDecision memory d = _decision(i, 1);
         bytes memory sig = _sign(policyPk, _pdrDigest(gate, d));
-        vm.expectRevert(abi.encodeWithSelector(MockTradeRoles.ConditionViolation.selector, uint8(17), bytes32(0)));
+        // Same Status and info shape as the real Roles on the fork: AllowanceExceeded with the key
+        vm.expectRevert(abi.encodeWithSelector(MockTradeRoles.ConditionViolation.selector, uint8(17), AGENT));
         gate.execute(i, d, sig, "");
     }
 
