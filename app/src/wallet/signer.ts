@@ -28,4 +28,6 @@ export interface WalletProvider {
   load(): Promise<Signer | null>;
   // Sets up a test wallet on this device
   create(): Promise<Signer>;
+  // Development only: deletes the test wallet key from this device
+  reset(): Promise<void>;
 }

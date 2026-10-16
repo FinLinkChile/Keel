@@ -30,7 +30,8 @@
         {
           "backgroundColor": "#000000"
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "scheme": "keel",
     "backgroundColor": "#000000",

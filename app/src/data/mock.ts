@@ -27,7 +27,17 @@ const PAYOUT: Record<PartyId, Hex> = {
 };
 
 const USDC: Hex = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
-const address = (party: PartyId) => PARTIES.find((p) => p.id === party)!.address;
+
+// The connected wallet stands in for the company of the role chosen at Connect, so what it
+// signs matches the orders on screen (importer: Pacífico, exporter: Lingnan).
+let bound: { party: PartyId; address: Hex } | undefined;
+
+export function bindWallet(role: Role, walletAddress: Hex | undefined) {
+  bound = walletAddress ? { party: ACCOUNTS[role].party, address: walletAddress } : undefined;
+}
+
+const parties = (): Party[] => PARTIES.map((p) => (bound && p.id === bound.party ? { ...p, address: bound.address } : p));
+const address = (party: PartyId) => parties().find((p) => p.id === party)!.address;
 
 type Seed = {
   n: number;
@@ -92,7 +102,7 @@ function order(s: Seed): Order {
 
 // Ids 0x131, 0x142 and 0x150 are the orders of bot/examples (labels PO-0131, PO-0142, PO-0150).
 // The label is the id written in hex, as in the bot examples.
-const ORDERS: Order[] = [
+const ORDERS = (): Order[] => [
   order({ n: 0x157, goods: 'Agar powder', goodsShort: 'Agar', quantity: '6,000 kg', exporter: 'lingnan', totalMinor: 4_800_000, stage: 'awaiting_signature', waitingOn: 'importer', deadline: day(11, 20), hsCode: '130231' }),
   order({ n: 0x142, goods: 'Agar powder', goodsShort: 'Agar', quantity: '6,000 kg', exporter: 'lingnan', totalMinor: 4_800_000, stage: 'advance_paid', waitingOn: 'exporter', deadline: day(11, 20), hsCode: '130231', signedAt: day(10, 2), advancePaidAt: day(10, 2) }),
   order({ n: 0x150, goods: 'Agar powder', goodsShort: 'Agar', quantity: '2,500 kg', exporter: 'lingnan', totalMinor: 2_000_000, stage: 'advance_paid', waitingOn: 'exporter', deadline: day(11, 20), hsCode: '130231', signedAt: day(10, 5), advancePaidAt: day(10, 5) }),
@@ -132,10 +142,10 @@ const NEEDS_YOU: Record<Role, NeedsYou[]> = {
 
 export const mockData: KeelData = {
   account: async (role) => ACCOUNTS[role],
-  party: async (party) => PARTIES.find((p) => p.id === party),
-  partyByAddress: async (a) => PARTIES.find((p) => p.address.toLowerCase() === a.toLowerCase()),
+  party: async (party) => parties().find((p) => p.id === party),
+  partyByAddress: async (a) => parties().find((p) => p.address.toLowerCase() === a.toLowerCase()),
   wallet: async (role) => WALLETS[role],
-  orders: async () => ORDERS,
-  order: async (orderId) => ORDERS.find((o) => o.po.orderId === orderId),
+  orders: async () => ORDERS(),
+  order: async (orderId) => ORDERS().find((o) => o.po.orderId === orderId),
   needsYou: async (role) => NEEDS_YOU[role],
 };

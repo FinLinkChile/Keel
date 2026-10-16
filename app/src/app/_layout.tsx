@@ -1,3 +1,6 @@
+// First, before anything that loads viem
+import '@/polyfills';
+
 import {
   Figtree_400Regular,
   Figtree_500Medium,
