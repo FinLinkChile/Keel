@@ -1,19 +1,22 @@
 import type { Hex, RequiredDocType } from '@keel/schemas';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { config } from '@/config';
 import { useData, type Order, type OrderDocument, type Party } from '@/data';
 import { tokenToCents } from '@/data/amounts';
 import { pickPdf } from '@/files/pickPdf';
+import type { PickedFile } from '@/files/pickPdf.types';
+import { uploadPreview } from '@/files/uploadPreview';
 import { uploadDocument, type UploadResult } from '@/ingest/client';
 import { uploadStatus } from '@/ingest/uploadStatus';
 import { useSession } from '@/session';
 import { Address } from '@/ui/Address';
 import { Amount } from '@/ui/Amount';
 import { Avatar } from '@/ui/Avatar';
+import { BottomSheet } from '@/ui/BottomSheet';
 import { Button } from '@/ui/Button';
 import { formatDay, formatLocalDay, formatMinor } from '@/ui/format';
 import { Icon } from '@/ui/Icon';
@@ -235,11 +238,32 @@ type Upload = { phase: 'signing' | 'uploading'; fileName: string } | { phase: 'd
 function DocumentRow({ order, docType, existing, last }: { order: Order; docType: RequiredDocType; existing?: OrderDocument; last: boolean }) {
   const { signer } = useSession();
   const [upload, setUpload] = useState<Upload>();
+  // The file chosen and waiting for the exporter to confirm it
+  const [pending, setPending] = useState<PickedFile>();
 
-  async function start() {
+  // Nothing is signed or sent until the exporter confirms what the file is. An oversize file is
+  // refused here, before the preview.
+  async function pick() {
     if (!signer) return;
     const file = await pickPdf();
     if (!file) return;
+    if (uploadPreview(docType, order.label, file).tooLarge) {
+      setUpload({ phase: 'done', fileName: file.name, at: Date.now() / 1000, result: { kind: 'rejected', reason: 'too_large' } });
+      return;
+    }
+    setPending(file);
+  }
+
+  async function chooseAnother() {
+    setPending(undefined);
+    // iOS cannot present the picker while the sheet is still sliding away
+    if (Platform.OS === 'ios') await new Promise((resolve) => setTimeout(resolve, 400));
+    await pick();
+  }
+
+  async function confirm(file: PickedFile) {
+    if (!signer) return;
+    setPending(undefined);
     setUpload({ phase: 'signing', fileName: file.name });
     const result = await uploadDocument({
       ingestUrl: config.ingestUrl,
@@ -297,9 +321,38 @@ function DocumentRow({ order, docType, existing, last }: { order: Order; docType
           label={busy ? 'Uploading' : upload?.phase === 'done' ? 'Try again' : 'Upload'}
           variant="small"
           disabled={busy || !signer}
-          onPress={start}
+          onPress={pick}
         />
       )}
+      <BottomSheet visible={!!pending} title="Upload this file?" onClose={() => setPending(undefined)}>
+        {pending ? <UploadConfirm preview={uploadPreview(docType, order.label, pending)} onConfirm={() => confirm(pending)} onAnother={chooseAnother} /> : null}
+      </BottomSheet>
+    </View>
+  );
+}
+
+// What the exporter is about to sign: the document, the order and the file as the phone has it.
+function UploadConfirm({ preview, onConfirm, onAnother }: { preview: ReturnType<typeof uploadPreview>; onConfirm: () => void; onAnother: () => void }) {
+  return (
+    <View style={{ gap: 14, paddingTop: 6 }}>
+      <View style={{ gap: 2 }}>
+        <Text size={17} weight={700}>
+          {preview.title}
+        </Text>
+        <Text size={15} color="textSoft" numberOfLines={2}>
+          {preview.fileName}
+        </Text>
+        <Text size={13} color="textMuted">
+          {preview.details}
+        </Text>
+      </View>
+      <Text size={14} leading={1.45} color="textMuted">
+        You sign these exact bytes for this order. Keel only tells you the outcome.
+      </Text>
+      <View style={{ gap: 10 }}>
+        <Button label="Confirm and upload" onPress={onConfirm} />
+        <Button label="Choose another file" variant="secondary" onPress={onAnother} />
+      </View>
     </View>
   );
 }
