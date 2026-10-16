@@ -10,7 +10,7 @@ import type { Hex } from "@keel/schemas";
 import type { AttachmentType, ExtractorProvider } from "../extractor/contract";
 import { ExtractionError, extractProforma, MAX_IMAGE_BYTES } from "../extractor";
 import { missingFields, type ProformaReading } from "../extractor/proforma";
-import { MAX_PDF_BYTES } from "../pdf/text";
+import { MAX_PDF_BYTES, pdfHeaderOffset } from "../pdf/text";
 import type { IngestStore } from "../store";
 import { fileHash, uploadDomain, UPLOAD_MAX_SKEW_SECONDS } from "./upload";
 
@@ -40,7 +40,7 @@ export const staticImporters = (addresses: readonly Hex[]): ImporterRegistry => 
 // default) is not accepted: the app sends JPEG.
 export function sniffMediaType(file: Uint8Array): AttachmentType | undefined {
   const starts = (...bytes: number[]) => bytes.every((b, i) => file[i] === b);
-  if (starts(0x25, 0x50, 0x44, 0x46, 0x2d)) return "application/pdf";
+  if (pdfHeaderOffset(file) >= 0) return "application/pdf";
   if (starts(0xff, 0xd8, 0xff)) return "image/jpeg";
   if (starts(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return "image/png";
   if (starts(0x52, 0x49, 0x46, 0x46) && String.fromCharCode(...file.slice(8, 12)) === "WEBP") return "image/webp";

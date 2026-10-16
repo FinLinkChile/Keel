@@ -201,13 +201,18 @@ describe("proforma output validation", () => {
     expect(missingFields(r)).toEqual(["proforma_number", "currency", "hs_codes", "port_of_discharge", "advance_bps"]);
   });
 
-  it("refuses values it cannot normalize instead of showing a guess", () => {
-    expect(fails({ total_amount: "20.000,00" })).toBe("invalid_output");
-    expect(fails({ port_of_loading: "NINGB" + "O" })).toBe("invalid_output");
-    expect(fails({ advance_percent: "130" })).toBe("invalid_output");
-    expect(fails({ issue_date: "2026-02-30" })).toBe("invalid_output");
+  it("leaves a value it cannot normalize empty instead of showing a guess, and keeps the rest", () => {
+    const r = read({ total_amount: "20.000,00", port_of_loading: "12345", advance_percent: "130", issue_date: "2026-02-30" });
+    expect(r).toMatchObject({ amount_minor: null, port_of_loading: null, advance_bps: null, issue_date: null, proforma_number: "PI20260142" });
+    expect(missingFields(r)).toEqual(["issue_date", "amount_minor", "port_of_loading", "port_of_discharge", "advance_bps"]);
+    // One code that does not normalize empties the list, so a partial list never looks complete
+    expect(read({ hs_codes: ["8467.21", "8207"] }).hs_codes).toEqual([]);
+  });
+
+  it("refuses a reply that breaks the schema", () => {
     expect(fails({ incoterm: "DDP" })).toBe("invalid_output");
     expect(fails({ note: "pay to 0x1111" })).toBe("invalid_output");
+    expect(fails({ advance_percent: 30 })).toBe("invalid_output");
   });
 
   it("reads the media type from the bytes", () => {
@@ -215,6 +220,10 @@ describe("proforma output validation", () => {
     expect(sniffMediaType(JPEG)).toBe("image/jpeg");
     expect(sniffMediaType(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))).toBe("image/png");
     expect(sniffMediaType(HEIC)).toBeUndefined();
+    // The header may come after bytes a scanner writes, within the first KB
+    const pdf = new TextEncoder().encode("%PDF-1.7");
+    expect(sniffMediaType(new Uint8Array([...new Array(600).fill(0x20), ...pdf]))).toBe("application/pdf");
+    expect(sniffMediaType(new Uint8Array([...new Array(1100).fill(0x20), ...pdf]))).toBeUndefined();
   });
 });
 

@@ -142,43 +142,63 @@ const ProformaOutput = z
 
 const LOCODE = /^[A-Z]{2}[A-Z0-9]{3}$/;
 
-// Any failure (not JSON, extra field, bad format, unknown token) is "invalid_output": a value
-// that does not normalize is not shown as a guess.
+// A reply that is not JSON or breaks the schema (extra field, wrong type, unknown token) is
+// "invalid_output". A value that does not normalize is not shown as a guess: that field alone
+// is null and listed as missing, since the importer reviews every field before signing.
 export function toProformaReading(raw: string, rehydrate: (value: string) => string = (v) => v): ProformaReading {
+  let out: z.infer<typeof ProformaOutput>;
+  let restore: (v: string) => string;
   try {
-    const out = ProformaOutput.parse(JSON.parse(raw));
-    const restore = (v: string) => foldHomoglyphs(rehydrate(v)).text.trim();
-    const opt = <T>(v: string, read: (s: string) => T): T | null => (restore(v) === "" ? null : read(restore(v)));
-    const locode = (v: string) => {
-      const code = v.toUpperCase();
-      if (!LOCODE.test(code)) throw new Error("port is not a UN/LOCODE");
-      return code;
-    };
-    const percent = (v: string) => {
-      if (!/^\d{1,3}(\.\d{1,2})?$/.test(v)) throw new Error("advance is not a percentage");
-      const bps = Math.round(Number(v) * 100);
-      if (bps > 10_000) throw new Error("advance over 100%");
-      return bps;
-    };
-    const hs = [...new Set(out.hs_codes.map((c) => normalizeHsCode(restore(c))))].sort();
-    return {
-      proforma_number: opt(out.proforma_number, normalizeReference),
-      issue_date: opt(out.issue_date, isoDateToUnix),
-      currency: out.currency === "" ? null : out.currency,
-      amount_minor: opt(out.total_amount, amountToMinor),
-      incoterm: out.incoterm === "" ? null : out.incoterm,
-      hs_codes: hs,
-      latest_shipment_date: opt(out.latest_shipment_date, isoDateToUnix),
-      port_of_loading: opt(out.port_of_loading, locode),
-      port_of_discharge: opt(out.port_of_discharge, locode),
-      advance_bps: opt(out.advance_percent, percent),
-      mentions_account_change: out.mentions_account_change,
-      hidden_text_detected: out.hidden_text_detected,
-    };
+    out = ProformaOutput.parse(JSON.parse(raw));
+    restore = (v: string) => foldHomoglyphs(rehydrate(v)).text.trim();
+    // Rehydrate every value now, so an unknown token fails the whole reply
+    [out.proforma_number, out.issue_date, out.total_amount, out.latest_shipment_date, out.port_of_loading,
+      out.port_of_discharge, out.advance_percent, ...out.hs_codes].forEach(restore);
   } catch (e) {
     if (e instanceof ExtractionError) throw e;
     throw new ExtractionError("invalid_output", { cause: e });
   }
+  const opt = <T>(v: string, read: (s: string) => T): T | null => {
+    const value = restore(v);
+    if (value === "") return null;
+    try {
+      return read(value);
+    } catch {
+      return null;
+    }
+  };
+  const locode = (v: string) => {
+    const code = v.toUpperCase();
+    if (!LOCODE.test(code)) throw new Error("port is not a UN/LOCODE");
+    return code;
+  };
+  const percent = (v: string) => {
+    if (!/^\d{1,3}(\.\d{1,2})?$/.test(v)) throw new Error("advance is not a percentage");
+    const bps = Math.round(Number(v) * 100);
+    if (bps > 10_000) throw new Error("advance over 100%");
+    return bps;
+  };
+  // One code that does not normalize empties the list: a partial list would look complete
+  let hs: string[];
+  try {
+    hs = [...new Set(out.hs_codes.map((c) => normalizeHsCode(restore(c))))].sort();
+  } catch {
+    hs = [];
+  }
+  return {
+    proforma_number: opt(out.proforma_number, normalizeReference),
+    issue_date: opt(out.issue_date, isoDateToUnix),
+    currency: out.currency === "" ? null : out.currency,
+    amount_minor: opt(out.total_amount, amountToMinor),
+    incoterm: out.incoterm === "" ? null : out.incoterm,
+    hs_codes: hs,
+    latest_shipment_date: opt(out.latest_shipment_date, isoDateToUnix),
+    port_of_loading: opt(out.port_of_loading, locode),
+    port_of_discharge: opt(out.port_of_discharge, locode),
+    advance_bps: opt(out.advance_percent, percent),
+    mentions_account_change: out.mentions_account_change,
+    hidden_text_detected: out.hidden_text_detected,
+  };
 }
 
 // The fields the importer has to fill in by hand

@@ -2,7 +2,7 @@
 // No tools, fixed prompt, schema-only output, strict validation in contract.ts.
 import type { CommercialInvoiceExtraction, InvoiceExtraction, TransportDocumentExtraction } from "@keel/schemas";
 import { splitByVisibility } from "../pdf/hidden";
-import { MAX_PDF_BYTES, PdfReadError, readTextRuns, toLines } from "../pdf/text";
+import { MAX_PDF_BYTES, PdfReadError, pdfHeaderOffset, readTextRuns, toLines } from "../pdf/text";
 import { logTransfer, redactForLlm, rehydrate, type LlmPurpose } from "../privacy";
 import {
   type AttachmentType,
@@ -191,7 +191,9 @@ export async function extractProforma(
     throw new ExtractionError("input_too_large");
   }
   logTransfer(extractor.provider, ["documento_sin_redactar"], "extraccion_proforma");
-  const raw = await extractor.complete(proformaFileRequest({ mediaType, data: Buffer.from(file).toString("base64") }));
+  // A scanner may write bytes before the PDF header: the model gets the file from the header on
+  const sent = mediaType === "application/pdf" ? file.subarray(Math.max(0, pdfHeaderOffset(file))) : file;
+  const raw = await extractor.complete(proformaFileRequest({ mediaType, data: Buffer.from(sent).toString("base64") }));
   return { reading: toProformaReading(raw), input: "file" };
 }
 
