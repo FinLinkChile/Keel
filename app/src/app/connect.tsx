@@ -82,6 +82,20 @@ export default function Connect() {
         ) : null}
       </View>
 
+      {/* Development builds only: reach the signature check from Expo Go without typing a URL */}
+      {__DEV__ && connected ? (
+        <Pressable
+          accessibilityRole="link"
+          onPress={() => router.push('/dev/signature')}
+          hitSlop={10}
+          style={{ alignSelf: 'flex-start', marginTop: -16, marginLeft: 16 }}
+        >
+          <Text size={13} weight={700} color="textMuted" style={{ textDecorationLine: 'underline' }}>
+            Wallet check
+          </Text>
+        </Pressable>
+      ) : null}
+
       <View style={{ gap: 12 }}>
         <Text size={20} weight={800} accessibilityRole="header">
           Use Keel as
