@@ -1,5 +1,9 @@
 # Historial de la documentación
 
+## 2026-10-16
+
+* **Revisión del Área 1 al PR #54 (servicio del agente), aplicada por el Área 2 (Darienn)** ([servicio del agente](arquitectura/servicio-del-agente.md), [custodia de llaves](arquitectura/custodia-de-llaves.md)). La llave de política sigue firmando el PDR del depósito y el `DocumentDecision` en el mismo servicio: queda declarado como riesgo del prototipo, limitado por los registros y el cupo del FundingGate y por la atestación de la naviera y la cuenta de cobro firmada; en producción, un verificador con llave y proceso propios. El agente nombra los reverts de TradeEscrow, FundingGate, Roles y el token, y dos pruebas atan sus errores a `ESCROW_ERRORS` y `GATE_ERRORS`. No envía un embarque a menos de `shipmentMarginSeconds` (120 s por defecto) del primer segundo del reembolso (`SHIPMENT_CUTOFF`), porque podría minarse después y revertir con `DeadlinePassed`. Retiene con `ON_BOARD_BEFORE_FUNDING` una atestación con fecha *on board* anterior al depósito (tomado del bloque de `OrderFunded`), para que la naviera sepa que debe volver a firmar. Afecta al Área 4 sin cambiar el bot: los dos motivos nuevos llegan como `simulation_failed` y `agent_data_incomplete`.
+
 ## 2026-10-15
 
 * **El agente deposita por el FundingGate** (T2.11 y T2.4, [servicio del agente](arquitectura/servicio-del-agente.md)). Decisiones del Área 2 (Darienn): el nonce del depósito es `uint256(orderHash)`, uno por versión de la orden, para que un reintento no pueda depositar dos veces; los proveedores conocidos y los terceros de confianza se leen del gate y no de `registry.json`, así el motor no aprueba lo que el gate rechazaría, sin cambiar las reglas (`keel-trade/2`); el nivel 3 queda para después del acto 1. Afecta al Área 4: `registry.json` ya no lleva `knownSuppliers`. `keel verify` reconoce `FundingExecuted`. Nueva [decisión abierta 16](decisiones/abiertas.md): cómo vuelve la firma del cosignatario en un depósito de nivel 3.

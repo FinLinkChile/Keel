@@ -10,8 +10,8 @@ import type { DocumentExtractions } from "../documents";
 import { tradePolicy, tradePolicyHash } from "../policy";
 import { compile, createChain, RevertError } from "../testing/chain";
 import { type ChainLog, loadEvidence, verdict, verifyEvidence } from "../verify";
-import { Agent, type AgentChain, type AgentConfig, type AgentEvent, CallReverted, type FundingGatePort } from "./agent";
-import { decodeOrderOf, orderOfCall } from "./escrow";
+import { Agent, type AgentChain, type AgentConfig, type AgentEvent, CallReverted, type FundingGatePort, SHIPMENT_MARGIN_SECONDS } from "./agent";
+import { decodeOrderOf, orderFundedTopics, orderOfCall, submitShipmentCall } from "./escrow";
 import { fundingCalldata, fundingGatePort, mockRolesAllowance } from "./gate";
 import { FileStore, writeStoreFile } from "./store";
 
@@ -116,6 +116,12 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
         return { hash, status: "reverted" };
       }
     },
+    // eth_getLogs of OrderFunded for the order, then the time of its block
+    fundedAt: async (to, orderId) => {
+      const topics = orderFundedTopics(orderId);
+      const log = chain.logs().find((l) => l.address.toLowerCase() === to.toLowerCase() && topics.every((t, i) => l.topics[i] === t));
+      return log?.timestamp;
+    },
   });
 
   const agent = (over: Partial<AgentConfig> = {}, gate?: FundingGatePort) =>
@@ -166,11 +172,11 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
     await asSafe(escrow, chain.calldata("TradeEscrow", "fund", [order.orderId]));
   }
 
-  async function storeShipment(order: PurchaseOrder, signer = carrier) {
+  async function storeShipment(order: PurchaseOrder, signer = carrier, onBoardDate = ON_BOARD) {
     const attestation: ShipmentAttestation = {
       orderId: order.orderId,
       blNumberHash: blNumberHash(order.carrier, "EGLV123456789"),
-      onBoardDate: ON_BOARD,
+      onBoardDate,
       portOfLoading: bytes32Text("CNSZX"),
       docsHash: docsHash(FILES),
     };
@@ -181,6 +187,7 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
       message: attestation,
     });
     writeStoreFile(dir, ["orders", order.orderId, "shipment.json"], { attestation, sigCarrier });
+    return { attestation, sigCarrier };
   }
 
   const storeDocuments = (order: PurchaseOrder, docs = extractions()) =>
@@ -283,6 +290,64 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
     expect(await stateOf(order.orderId)).toBe("REFUNDED");
     expect(await balanceOf(safe)).toBe(TOTAL / 2n);
     expect(notices.filter((n) => n.reason === "DEADLINE_SOON").map((n) => n.reminder)).toEqual([5, 1]);
+  });
+
+  it("does not send a shipment that could be mined after the refund is due, and refunds once it is", async () => {
+    const order = await openOrder();
+    await fundOrder(order);
+    const keel = agent();
+    // Before the cutoff the importer is already warned that the attestation is missing
+    chain.setTime(DEADLINE - DAY + 1n);
+    expect((await keel.tick())[0]).toMatchObject({ outcome: "notice", reason: "DEADLINE_SOON", reminder: 1 });
+
+    // The attestation arrives inside the margin: the escrow would still accept it now, not surely when mined
+    await storeShipment(order);
+    chain.setTime(DEADLINE + GRACE - BigInt(SHIPMENT_MARGIN_SECONDS) + 1n);
+    const [held] = await keel.tick();
+    expect(held).toMatchObject({ outcome: "held", hold: "bloqueada", reason: "SHIPMENT_CUTOFF", action: "submitShipment" });
+    expect(notices.filter((n) => n.reason === "SHIPMENT_CUTOFF")).toHaveLength(1);
+    expect(sent).toHaveLength(0);
+
+    // From the first second of the refund the escrow rejects the shipment and the agent refunds
+    chain.setTime(DEADLINE + GRACE + 1n);
+    const { attestation, sigCarrier } = await storeShipment(order);
+    await expect(chain.simulate(RELAYER, escrow, submitShipmentCall(escrow, attestation, sigCarrier).data)).rejects.toThrow("DeadlinePassed");
+    expect((await keel.tick())[0]).toMatchObject({ outcome: "sent", action: "refundAfterDeadline", status: "success" });
+    expect(await stateOf(order.orderId)).toBe("REFUNDED");
+  });
+
+  it("the shipment margin is inclusive and configurable", async () => {
+    const order = await openOrder();
+    await fundOrder(order);
+    await storeShipment(order);
+    chain.setTime(DEADLINE + GRACE - 60n);
+    expect((await agent().tick())[0]).toMatchObject({ outcome: "held", reason: "SHIPMENT_CUTOFF" });
+    expect((await agent({ shipmentMarginSeconds: 60 }).tick())[0]).toMatchObject({ outcome: "sent", action: "submitShipment", status: "success" });
+    expect(await stateOf(order.orderId)).toBe("SHIPPED");
+  });
+
+  it("an on board date before the funding time is held with its own reason until the carrier re-signs", async () => {
+    const order = await openOrder();
+    const fundedAt = ON_BOARD + 3600n;
+    chain.setTime(fundedAt);
+    await fundOrder(order);
+    await storeShipment(order);
+    chain.setTime(fundedAt + DAY);
+
+    const [held] = await agent().tick();
+    expect(held).toMatchObject({ outcome: "held", hold: "bloqueada", reason: "ON_BOARD_BEFORE_FUNDING", action: "submitShipment" });
+    expect(sent).toHaveLength(0);
+    // The real escrow agrees: without the pre-check the simulation reverts with InvalidAttestation
+    const blind = new Agent(
+      { chainId: 1, escrow, safe, policy: tradePolicy(word("roles-config-v1")), decisionTtlSeconds: 3600, evidenceDir: join(dir, "evidence") },
+      { chain: { ...agentChain(), fundedAt: async () => undefined }, store: new FileStore(dir), signer: policySigner },
+    );
+    expect((await blind.tick())[0]).toMatchObject({ outcome: "held", reason: "SIMULATION_REVERTED", revert: "InvalidAttestation" });
+
+    // Re-signed with the funding second as on board date: accepted
+    await storeShipment(order, carrier, fundedAt);
+    expect((await agent().tick())[0]).toMatchObject({ outcome: "sent", action: "submitShipment", status: "success" });
+    expect(await stateOf(order.orderId)).toBe("SHIPPED");
   });
 
   it("does not fund while the Trade gate does not exist", async () => {

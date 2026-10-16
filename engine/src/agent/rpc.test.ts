@@ -5,27 +5,31 @@ import { encodeErrorResult, keccak256, toBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { afterEach, describe, expect, it } from "vitest";
 import { CallReverted } from "./agent";
-import { ESCROW_ABI } from "./escrow";
+import { ESCROW_ABI, orderFundedTopics } from "./escrow";
 import { rpcChain } from "./rpc";
 
 const relayer = privateKeyToAccount(keccak256(toBytes("test relayer")));
 const call = { to: "0x00000000000000000000000000000000000000e5" as Hex, data: "0x" as Hex };
 
-// A node that answers every eth_call with the given JSON-RPC error
+// A node that answers each request with what `answer` returns for its method and params
 let server: Server;
-async function nodeAnswering(error: { code: number; message: string; data?: Hex }): Promise<string> {
+type Answer = { result: unknown } | { error: { code: number; message: string; data?: Hex } };
+async function node(answer: (method: string, params: unknown[]) => Answer): Promise<string> {
   server = createServer((req, res) => {
     let body = "";
     req.on("data", (c) => (body += c));
     req.on("end", () => {
-      const { id } = JSON.parse(body);
+      const { id, method, params } = JSON.parse(body);
       res.setHeader("content-type", "application/json");
-      res.end(JSON.stringify({ jsonrpc: "2.0", id, error }));
+      res.end(JSON.stringify({ jsonrpc: "2.0", id, ...answer(method, params) }));
     });
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 }
+
+// A node that answers every request with the given JSON-RPC error
+const nodeAnswering = (error: { code: number; message: string; data?: Hex }) => node(() => ({ error }));
 
 afterEach(() => new Promise<void>((r) => server.close(() => r())));
 
@@ -40,5 +44,28 @@ describe("agent chain over JSON-RPC", () => {
     const chain = rpcChain(await nodeAnswering({ code: -32000, message: "header not found" }), relayer);
     const error = await chain.call(call).catch((e) => e);
     expect(error).not.toBeInstanceOf(CallReverted);
+  });
+
+  it("the funding time is the time of the block with the OrderFunded log of the order", async () => {
+    const escrow = call.to;
+    const orderId = keccak256(toBytes("order"));
+    const blockHash = keccak256(toBytes("block"));
+    const asked: unknown[] = [];
+    const url = await node((method, params) => {
+      if (method === "eth_getLogs") {
+        asked.push(params[0]);
+        const log = { address: escrow, topics: orderFundedTopics(orderId), data: `0x${"00".repeat(32)}`, blockHash, blockNumber: "0x2a", transactionHash: blockHash, transactionIndex: "0x0", logIndex: "0x0", removed: false };
+        return { result: [log] };
+      }
+      if (method === "eth_getBlockByHash") return { result: { hash: blockHash, number: "0x2a", timestamp: "0x690a0000", transactions: [] } };
+      return { error: { code: -32601, message: "method not found" } };
+    });
+    expect(await rpcChain(url, relayer, { fromBlock: 7n }).fundedAt(escrow, orderId)).toBe(0x690a0000n);
+    expect(asked).toEqual([{ address: escrow, topics: orderFundedTopics(orderId), fromBlock: "0x7", toBlock: "latest" }]);
+  });
+
+  it("an order never funded has no funding time", async () => {
+    const url = await node((method) => (method === "eth_getLogs" ? { result: [] } : { error: { code: -32601, message: "method not found" } }));
+    expect(await rpcChain(url, relayer).fundedAt(call.to, keccak256(toBytes("order")))).toBeUndefined();
   });
 });

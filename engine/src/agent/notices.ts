@@ -47,6 +47,10 @@ const HELD: Partial<Record<AgentReason, HeldReason>> = {
   COSIGNATURE_NEEDED: "over_limit_cosign",
   FUNDING_BLOCKED: "funding_blocked",
   SIMULATION_REVERTED: "simulation_failed",
+  // Not sent because it would fail on chain once mined: the closest existing reason
+  SHIPMENT_CUTOFF: "simulation_failed",
+  // The attestation the agent holds does not fit the order: the carrier must re-sign
+  ON_BOARD_BEFORE_FUNDING: "agent_data_incomplete",
   DOCUMENTS_DO_NOT_CONFORM: "documents_mismatch",
   ATTESTATION_UNKNOWN: "agent_data_incomplete",
   IMPORTER_NOT_REGISTERED: "agent_data_incomplete",

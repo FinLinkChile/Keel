@@ -32,6 +32,9 @@ export interface AgentChain {
   call(call: Call): Promise<Hex>;
   // Sends and waits for the receipt
   send(call: Call): Promise<{ hash: Hex; status: "success" | "reverted" }>;
+  // Timestamp of the block with the OrderFunded log of the order, or undefined if none was found.
+  // The escrow keeps the funding time private and rejects an on board date before it.
+  fundedAt(escrow: Hex, orderId: Hex): Promise<bigint | undefined>;
 }
 
 export class CallReverted extends Error {
@@ -65,6 +68,10 @@ export type AgentReason =
   | "COSIGNATURE_NEEDED"
   | "AWAITING_SHIPMENT"
   | "DEADLINE_SOON"
+  // The attestation arrived so close to the refund that the shipment could be mined after it
+  | "SHIPMENT_CUTOFF"
+  // The carrier attested an on board date before the order was funded: it must re-sign
+  | "ON_BOARD_BEFORE_FUNDING"
   | "SIMULATION_REVERTED"
   | "DISPUTE_WINDOW"
   | "DOCUMENTS_PENDING"
@@ -108,15 +115,22 @@ export interface AgentConfig {
   evidenceDir: string;
   // Days before the shipment deadline when the importer is reminded, once each (T2.6)
   deadlineReminderDays?: readonly number[];
+  // Seconds kept between sending a shipment and the first second of the refund, so a shipment
+  // simulated just before it is not mined after it and reverts with DeadlinePassed
+  shipmentMarginSeconds?: number;
 }
 
 export const DEADLINE_REMINDER_DAYS: readonly number[] = [5, 3, 1];
+// Covers the wait for inclusion on the closed network; the demo refundGrace is 60 s, production 1 day
+export const SHIPMENT_MARGIN_SECONDS = 120;
 const DAY = 24n * 60n * 60n;
 
 export interface AgentDeps {
   chain: AgentChain;
   store: AgentStore;
-  // Policy key, in its own process in production (T2.7). Also the document verifier in the prototype.
+  // Policy key, in its own process in production (T2.7). Also the document verifier in the
+  // prototype: one key signs the funding PDR and the DocumentDecision (prototype risk in
+  // docs/arquitectura/servicio-del-agente.md).
   signer: PolicySigner;
   gate?: FundingGatePort;
   // Held operations and notices go to the bot (Area 4). Each one is sent once, with the order
@@ -129,6 +143,8 @@ const same = (a: Hex, b: Hex) => a.toLowerCase() === b.toLowerCase();
 export class Agent {
   private readonly notified = new Set<string>();
   private refundGrace?: bigint;
+  // Funding time per order: fixed once the order is funded
+  private readonly fundedAt = new Map<Hex, bigint>();
 
   constructor(
     private readonly config: AgentConfig,
@@ -224,7 +240,8 @@ export class Agent {
     const out = evaluateFunding(po, context, this.config.policy.funding);
     const failing = out.rules.filter((r) => r.tier === out.tier);
     if (out.tier === 4 || !out.intent) return { orderId, state, outcome: "held", hold: "bloqueada", reason: "FUNDING_BLOCKED", rules: failing };
-    // A new supplier goes through out of band verification and the Delay first (T4.1)
+    // A new supplier waits for out of band verification and for the Safe to queue it in the gate
+    // registries (queueSupplier), where it counts after configDelay unless vetoed (T4.1)
     if (out.tier === 2) return { orderId, state, outcome: "held", hold: "cambio_en_cola", reason: "SUPPLIER_NEW", rules: failing };
 
     const intent = out.intent;
@@ -257,24 +274,39 @@ export class Agent {
   // Steps 4 and 6: present the carrier attestation, or refund once the deadline and grace passed.
   private async shipmentOrRefund(orderId: Hex, record: OrderRecord, now: bigint): Promise<AgentEvent> {
     const state = record.state;
-    const shipment = this.deps.store.shipment(orderId);
-    let held: AgentEvent | undefined;
-    if (shipment) {
-      const event = await this.execute(orderId, state, "submitShipment", submitShipmentCall(this.config.escrow, shipment.attestation, shipment.sigCarrier));
-      if (event.outcome === "sent") return event;
-      held = { ...event, hold: "bloqueada" };
-    }
     this.refundGrace ??= decodeRefundGrace(await this.deps.chain.call(refundGraceCall(this.config.escrow)));
-    if (now > record.po.shipmentDeadline + this.refundGrace) {
+    // The comparison of the escrow: from this second on, submitShipment reverts and the refund is due
+    const refundFrom = record.po.shipmentDeadline + this.refundGrace;
+    if (now > refundFrom) {
       return this.execute(orderId, state, "refundAfterDeadline", refundCall(this.config.escrow, orderId));
     }
-    if (held) return held;
+    const shipment = this.deps.store.shipment(orderId);
+    if (shipment) {
+      const margin = BigInt(this.config.shipmentMarginSeconds ?? SHIPMENT_MARGIN_SECONDS);
+      // Too close to the refund: the transaction could be mined after it. The refund runs once due.
+      if (now + margin > refundFrom) return { orderId, state, outcome: "held", hold: "bloqueada", reason: "SHIPMENT_CUTOFF", action: "submitShipment" };
+      // The escrow rejects an on board date before the funding time (InvalidAttestation): name the cause
+      const fundedAt = await this.fundingTime(orderId);
+      if (fundedAt !== undefined && shipment.attestation.onBoardDate < fundedAt) {
+        return { orderId, state, outcome: "held", hold: "bloqueada", reason: "ON_BOARD_BEFORE_FUNDING", action: "submitShipment" };
+      }
+      const event = await this.execute(orderId, state, "submitShipment", submitShipmentCall(this.config.escrow, shipment.attestation, shipment.sigCarrier));
+      return event.outcome === "sent" ? event : { ...event, hold: "bloqueada" };
+    }
     // One reminder per threshold: a tick that runs late skips to the nearest one, never repeats
     const left = record.po.shipmentDeadline > now ? (record.po.shipmentDeadline - now + DAY - 1n) / DAY : 0n;
     const daysLeft = Number(left);
     const reminder = [...(this.config.deadlineReminderDays ?? DEADLINE_REMINDER_DAYS)].sort((a, b) => a - b).find((d) => daysLeft <= d);
     if (reminder !== undefined) return { orderId, state, outcome: "notice", reason: "DEADLINE_SOON", daysLeft, reminder };
     return { orderId, state, outcome: "waiting", reason: "AWAITING_SHIPMENT" };
+  }
+
+  private async fundingTime(orderId: Hex): Promise<bigint | undefined> {
+    const cached = this.fundedAt.get(orderId);
+    if (cached !== undefined) return cached;
+    const at = await this.deps.chain.fundedAt(this.config.escrow, orderId);
+    if (at !== undefined) this.fundedAt.set(orderId, at);
+    return at;
   }
 
   // Step 5: check the documents against the order and the attestation, then release the balance.

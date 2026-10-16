@@ -69,6 +69,8 @@ describe("agent notices for the bot (T2.6)", () => {
     expect(reasonOf("SIMULATION_REVERTED")).toBe("simulation_failed");
     expect(reasonOf("ATTESTATION_UNKNOWN")).toBe("agent_data_incomplete");
     expect(reasonOf("IMPORTER_NOT_REGISTERED")).toBe("agent_data_incomplete");
+    expect(reasonOf("ON_BOARD_BEFORE_FUNDING")).toBe("agent_data_incomplete");
+    expect(reasonOf("SHIPMENT_CUTOFF")).toBe("simulation_failed");
     expect(reasonOf("DOCUMENTS_DO_NOT_CONFORM", [{ rule: "hidden-text", ok: false, reason: "HIDDEN_TEXT" }])).toBe("hidden_text");
     expect(reasonOf("DOCUMENTS_DO_NOT_CONFORM", [{ rule: "account-change", ok: false, reason: "ACCOUNT_CHANGE_MENTIONED" }])).toBe("account_change_mention");
   });

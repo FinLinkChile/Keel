@@ -90,13 +90,18 @@ export async function createChain(artifacts: Record<string, Artifact>) {
     return result;
   }
 
+  // Every log of a sent transaction with the time of its block, like eth_getLogs plus the block
+  const history: { address: Hex; topics: Hex[]; data: Hex; timestamp: bigint }[] = [];
+
   async function sendRaw(from: Hex, to: Hex, data: Hex) {
     const result = await run(from, to, data);
-    return (result.execResult.logs ?? []).map(([address, topics, data]) => ({
+    const logs = (result.execResult.logs ?? []).map(([address, topics, data]) => ({
       address: bytesToHex(address),
       topics: topics.map((t) => bytesToHex(t)),
       data: bytesToHex(data),
     }));
+    history.push(...logs.map((l) => ({ ...l, timestamp })));
+    return logs;
   }
 
   return {
@@ -123,6 +128,7 @@ export async function createChain(artifacts: Record<string, Artifact>) {
       }
     },
     time: () => timestamp,
+    logs: () => history,
     async read<T = unknown>(name: string, to: Hex, functionName: string, args: unknown[] = []): Promise<T> {
       const abi = artifacts[name]!.abi;
       const result = await run(`0x${"00".repeat(19)}01`, to, encodeFunctionData({ abi, functionName, args }));

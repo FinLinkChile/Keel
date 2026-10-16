@@ -1,8 +1,10 @@
-// The agent's chain over JSON-RPC: block time, eth_call from the relayer and transactions it signs.
+// The agent's chain over JSON-RPC: block time, eth_call from the relayer, transactions it signs
+// and the funding time of an order (block of its OrderFunded log).
 import type { Hex } from "@keel/schemas";
 import { BaseError, createPublicClient, createWalletClient, ExecutionRevertedError, http, type LocalAccount, RawContractError } from "viem";
 import { type AgentChain, CallReverted } from "./agent";
-import { revertName } from "./escrow";
+import { revertName } from "./errors";
+import { ORDER_FUNDED_EVENT } from "./escrow";
 
 // The revert data of a failed eth_call, or null when the failure was not a revert (network, node).
 // Nodes put the data on the JSON-RPC error, which viem keeps somewhere in the cause chain.
@@ -17,7 +19,12 @@ function revertData(e: unknown): { data?: Hex } | null {
   return { data: withData?.data };
 }
 
-export function rpcChain(rpcUrl: string, relayer: LocalAccount): AgentChain & { chainId(): Promise<number> } {
+export interface RpcChainOptions {
+  // First block searched for escrow logs, such as the escrow deployment block. Default: earliest.
+  fromBlock?: bigint;
+}
+
+export function rpcChain(rpcUrl: string, relayer: LocalAccount, options: RpcChainOptions = {}): AgentChain & { chainId(): Promise<number> } {
   const transport = http(rpcUrl);
   const client = createPublicClient({ transport });
   const wallet = createWalletClient({ account: relayer, transport });
@@ -32,6 +39,11 @@ export function rpcChain(rpcUrl: string, relayer: LocalAccount): AgentChain & { 
         if (revert) throw new CallReverted(revertName(revert.data));
         throw e;
       }
+    },
+    async fundedAt(escrow, orderId) {
+      const [log] = await client.getLogs({ address: escrow, event: ORDER_FUNDED_EVENT, args: { orderId }, fromBlock: options.fromBlock ?? "earliest", toBlock: "latest" });
+      if (!log?.blockHash) return undefined;
+      return (await client.getBlock({ blockHash: log.blockHash })).timestamp;
     },
     async send(c) {
       const hash = await wallet.sendTransaction({ to: c.to, data: c.data, chain: null });

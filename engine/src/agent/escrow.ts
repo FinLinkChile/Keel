@@ -7,7 +7,7 @@ import {
   type PurchaseOrder,
   type ShipmentAttestation,
 } from "@keel/schemas";
-import { decodeErrorResult, decodeFunctionResult, encodeFunctionData, parseAbi } from "viem";
+import { decodeFunctionResult, encodeEventTopics, encodeFunctionData, getAbiItem, parseAbi } from "viem";
 
 export const ESCROW_ABI = parseAbi([
   "struct PurchaseOrder { bytes32 orderId; address importer; address exporter; address payoutAddress; address token; uint256 totalAmount; uint16 advanceBps; uint64 shipmentDeadline; uint64 disputeWindow; address carrier; address arbiter; address documentVerifier; bytes32 incoterm; bytes32 termsHash; bytes32 requiredDocsHash; uint256 nonce; }",
@@ -20,13 +20,27 @@ export const ESCROW_ABI = parseAbi([
   "function submitShipment(bytes32 orderId, ShipmentAttestation att, bytes sigCarrier)",
   "function releaseBalance(bytes32 orderId, DocumentDecision d, bytes sigVerifier)",
   "function refundAfterDeadline(bytes32 orderId)",
+  "event OrderFunded(bytes32 indexed orderId, uint256 amount)",
+  // Every error TradeEscrow declares (schemas ESCROW_ERRORS, checked in escrow.test.ts)
   "error InvalidState()",
+  "error OrderExists()",
+  "error BadImporterSignature()",
+  "error BadExporterSignature()",
   "error BadCarrierSignature()",
   "error BadDocumentDecision()",
   "error ShipmentTooLate()",
   "error BillOfLadingAlreadyUsed()",
   "error DeadlineNotReached()",
+  "error NotParty()",
+  "error BadResolution()",
+  "error TokenNotAllowed()",
+  "error AmountMismatch()",
+  "error ZeroAddress()",
+  "error InvalidOrder()",
+  "error BadOrderId()",
+  "error DeadlinePassed()",
   "error InvalidAttestation()",
+  "error BadArbiterSignature()",
 ]);
 
 export interface Call {
@@ -74,12 +88,10 @@ export const refundCall = (escrow: Hex, orderId: Hex): Call => ({
   data: encodeFunctionData({ abi: ESCROW_ABI, functionName: "refundAfterDeadline", args: [orderId] }),
 });
 
-// The error name of a revert, for the reason of a hold. Unknown data stays as hex.
-export function revertName(data: Hex | undefined): string {
-  if (!data || data === "0x") return "REVERTED";
-  try {
-    return decodeErrorResult({ abi: ESCROW_ABI, data }).errorName;
-  } catch {
-    return data;
-  }
-}
+// The funding time is private in the escrow: the agent reads it from the block of OrderFunded,
+// which fund emits once per order (only from OPEN).
+export const ORDER_FUNDED_EVENT = getAbiItem({ abi: ESCROW_ABI, name: "OrderFunded" });
+
+// Topics of the OrderFunded log of one order, to match a log without decoding it
+export const orderFundedTopics = (orderId: Hex): Hex[] =>
+  encodeEventTopics({ abi: ESCROW_ABI, eventName: "OrderFunded", args: { orderId } }) as Hex[];
