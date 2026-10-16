@@ -1,5 +1,6 @@
 import { formatDay, formatMinor } from '../ui/format';
 
+import { tokenToCents } from './amounts';
 import type { Order, OrderStage, Party, Role } from './types';
 
 // What a row of 14 Orders says about one order, in words. Pure, so the copy is tested and
@@ -29,8 +30,8 @@ function inDays(seconds: number): string {
 
 export function orderLine(order: Order, role: Role, counterparty: Party, now: number): OrderLine {
   const who = counterparty.short;
-  const total = formatMinor(order.po.totalAmount);
-  const balance = order.po.totalAmount - (order.po.totalAmount * BigInt(order.po.advanceBps)) / 10_000n;
+  const total = formatMinor(tokenToCents(order.po.totalAmount));
+  const balance = tokenToCents(order.po.totalAmount - (order.po.totalAmount * BigInt(order.po.advanceBps)) / 10_000n);
   const deadline = formatDay(order.po.shipmentDeadline);
   const mine = order.waitingOn === role;
 

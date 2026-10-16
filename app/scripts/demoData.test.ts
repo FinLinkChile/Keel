@@ -7,6 +7,7 @@ import { EIP712_TYPES, OrderTerms, REQUIRED_DOC_TYPES } from '@keel/schemas';
 import { requiredDocsHash, termsHash } from '@keel/schemas/hash';
 import { describe, expect, it } from 'vitest';
 
+import { centsToToken } from '../src/data/amounts';
 import { checkOrderShape, orderIdOf } from '../src/data/orderRules';
 
 import { checkWallet, compactAccount, demoData, toFileText } from './demoData';
@@ -82,7 +83,8 @@ describe('demo data for the agent', () => {
 
       expect(order.termsHash).toBe(termsHash(terms));
       expect(order.requiredDocsHash).toBe(requiredDocsHash(['BILL_OF_LADING', 'COMMERCIAL_INVOICE']));
-      expect(order.totalAmount).toBe(terms.invoiceAmountMinor);
+      // Token units (USDC, 6 decimals) for an invoice amount in cents
+      expect(order.totalAmount).toBe(centsToToken(terms.invoiceAmountMinor));
       const others = [order.importer, order.exporter, order.carrier, order.arbiter];
       expect(others).not.toContain(order.documentVerifier);
     }
@@ -99,8 +101,9 @@ describe('demo data for the agent', () => {
     expect(byAccount.lingnan.address).toBe(EXPORTER);
     expect(byAccount['hk-arbitration']).toBeDefined();
     for (const p of file.parties) expect(p.address).toMatch(HEX(20));
-    // PO-0131, settled, 48,000.00, as decimal text under the lowercase exporter address
-    expect(file.history).toEqual({ [EXPORTER.toLowerCase()]: ['4800000'] });
+    // PO-0131, settled, 48,000 USDC in token units, as decimal text under the lowercase exporter
+    // address: the engine compares it with an order's totalAmount
+    expect(file.history).toEqual({ [EXPORTER.toLowerCase()]: ['48000000000'] });
   });
 });
 

@@ -3,6 +3,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useData, type KeelData, type NeedsYou, type Order, type Party, type Role } from '@/data';
+import { tokenToCents } from '@/data/amounts';
 import { useSession } from '@/session';
 import { Amount } from '@/ui/Amount';
 import { Avatar } from '@/ui/Avatar';
@@ -151,7 +152,7 @@ function NeedsYouSheet({ item }: { item: Item }) {
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <Amount
-          minor={order.po.totalAmount}
+          minor={tokenToCents(order.po.totalAmount)}
           currency={order.terms.currency}
           size={18}
           weight={500}

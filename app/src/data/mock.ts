@@ -2,6 +2,7 @@ import type { Hex, OrderTerms, RequiredDocType } from '@keel/schemas';
 import { bytes32Text, requiredDocsHash, termsHash } from '@keel/schemas/hash';
 import { getAddress, keccak256, stringToBytes } from 'viem';
 
+import { centsToToken } from './amounts';
 import { orderIdOf } from './orderRules';
 import type { Account, KeelData, NeedsYou, Order, OrderStage, Party, PartyId, Role, Wallet } from './types';
 
@@ -107,7 +108,7 @@ function order(s: Seed): Order {
       exporter: address(s.exporter),
       payoutAddress: PAYOUT[s.exporter],
       token: USDC,
-      totalAmount: BigInt(s.totalMinor),
+      totalAmount: centsToToken(BigInt(s.totalMinor)),
       advanceBps: 5000,
       shipmentDeadline: BigInt(s.deadline),
       disputeWindow: 3n * 24n * 3600n,

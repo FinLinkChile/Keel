@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { config } from '@/config';
 import { useData, type Order, type OrderDocument, type Party } from '@/data';
+import { tokenToCents } from '@/data/amounts';
 import { pickPdf } from '@/files/pickPdf';
 import { uploadDocument, type UploadResult } from '@/ingest/client';
 import { uploadStatus } from '@/ingest/uploadStatus';
@@ -56,9 +57,12 @@ function ExporterOrder({ orderId }: { orderId: Hex }) {
   if (view === null) return <Placeholder title="Order not found" back />;
   const { order, me, buyer, carrier } = view;
 
-  const total = order.po.totalAmount;
-  const advance = (total * BigInt(order.po.advanceBps)) / 10_000n;
-  const balance = total - advance;
+  // Computed in token units, shown in cents
+  const units = order.po.totalAmount;
+  const advanceUnits = (units * BigInt(order.po.advanceBps)) / 10_000n;
+  const total = tokenToCents(units);
+  const advance = tokenToCents(advanceUnits);
+  const balance = tokenToCents(units - advanceUnits);
   const now = Date.now() / 1000;
   const daysLeft = Math.max(0, Math.ceil((Number(order.po.shipmentDeadline) - now) / DAY));
   const deadline = formatDay(order.po.shipmentDeadline);
