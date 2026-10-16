@@ -5,10 +5,10 @@ description: "Qué hace el servicio del agente en cada vuelta, de dónde lee sus
 tags: [agente, relayer, t2-11, t2-6, servicio, avisos, datos, bot]
 modo: trade
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T02:05:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T18:00:00Z }
 ---
 
-El servicio del agente (T2.11, `engine/src/agent/`) une la ingesta, el motor, el PDR y el relayer para la Safe de un importador. Se ejecuta con `npm run keel -- agent --data <carpeta>`, con `KEEL_RPC_URL`, `KEEL_ESCROW`, `KEEL_SAFE`, `KEEL_ROLES_CONFIG_HASH` y, para depositar, `KEEL_FUNDING_GATE`.
+El servicio del agente (T2.11, `engine/src/agent/`) une la ingesta, el motor, el PDR y el relayer para la Safe de un importador. Se ejecuta con `npm run keel -- agent --data <carpeta>`, con `KEEL_RPC_URL`, `KEEL_ESCROW`, `KEEL_SAFE` y, para depositar, `KEEL_FUNDING_GATE`. Con el Zodiac Roles real se agregan las llaves de cupo `KEEL_AGENT_ALLOWANCE_KEY` y `KEEL_COSIGNED_ALLOWANCE_KEY`: el agente lee el cupo restante con `allowances(key)`, sumando las recargas acumuladas como Roles 2.1.1, y calcula el `rolesConfigHash` desde la cadena (si además se da `KEEL_ROLES_CONFIG_HASH`, tiene que coincidir). En la demo sobre `MockTradeRoles`, o sin gate, el `rolesConfigHash` viene de `KEEL_ROLES_CONFIG_HASH`.
 
 # Qué hace en cada vuelta
 
