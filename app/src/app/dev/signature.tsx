@@ -24,7 +24,7 @@ const LOCAL_CHAIN_ID = 31337;
 type Result = { message: DocumentUpload; signature: Hex; recovered: Hex; ms: number } | { error: string };
 
 export default function Signature() {
-  const { signer, address, resetWallet, role } = useSession();
+  const { signer, address, addresses, resetWallet, role } = useSession();
   // PO-0142 as the connected wallet sees it: its id depends on the wallets of the parties
   const orderId = useData(async (d) => (await d.orders()).find((o) => o.label === 'PO-0142')?.po.orderId, [role, address]);
   const [result, setResult] = useState<Result>();
@@ -63,7 +63,7 @@ export default function Signature() {
           Wallet check
         </Text>
 
-        <Field label="Connected wallet">
+        <Field label={`Connected wallet, ${role}`}>
           {address ? (
             <Address address={address} full size={15} color="text" />
           ) : (
@@ -74,6 +74,18 @@ export default function Signature() {
             </Link>
           )}
         </Field>
+        {/* For the demo data script: --importer and --exporter */}
+        {(['importer', 'exporter'] as const).map((r) => (
+          <Field key={r} label={`Test wallet, ${r}`}>
+            {addresses[r] ? (
+              <Address address={addresses[r]} full size={15} color="text" />
+            ) : (
+              <Text size={15} color="textMuted">
+                None yet
+              </Text>
+            )}
+          </Field>
+        ))}
         <Field label="Key stored in">
           <Text mono size={14}>
             {keyStorage}

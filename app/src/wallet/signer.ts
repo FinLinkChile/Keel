@@ -1,5 +1,7 @@
 import type { Hex } from '@keel/schemas';
 
+import type { Role } from '../data/types';
+
 // EIP-712 pieces, shaped like viem's signTypedData arguments.
 export type TypedDataDomain = {
   name?: string;
@@ -22,12 +24,15 @@ export interface Signer {
   ): Promise<Hex>;
 }
 
-// Where the app gets its signer from.
+// One signer per role: the device holds a test key for the importer and one for the exporter
+export type Signers = Partial<Record<Role, Signer>>;
+
+// Where the app gets its signers from.
 export interface WalletProvider {
-  // The wallet already set up on this device, if any
-  load(): Promise<Signer | null>;
-  // Sets up a test wallet on this device
-  create(): Promise<Signer>;
-  // Development only: deletes the test wallet key from this device
+  // The wallets already set up on this device; a role without a key is missing
+  load(): Promise<Signers>;
+  // Sets up the test wallets this device lacks and returns both
+  create(): Promise<Required<Signers>>;
+  // Development only: deletes the test wallet keys from this device
   reset(): Promise<void>;
 }

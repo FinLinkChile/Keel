@@ -41,6 +41,7 @@ const ICONS = {
       <Circle cx={12} cy={13} r={3.5} />
     </>
   ),
+  send: <Path d="M4 12l16-8-6 16-3-7z" />,
   upload: <Path d="M12 19V5M6 11l6-6 6 6" />,
   chevronDown: <Path d="M6 9l6 6 6-6" />,
 } as const;

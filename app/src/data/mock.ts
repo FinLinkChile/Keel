@@ -38,12 +38,7 @@ const USDC: Hex = addr('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48');
 // so what they sign matches the orders on screen and in the data files.
 let bound: Partial<Record<PartyId, Hex>> = {};
 
-// The app: the connected wallet, for the role chosen at Connect
-export function bindWallet(role: Role, walletAddress: Hex | undefined) {
-  bound = walletAddress ? { [ACCOUNTS[role].party]: addr(walletAddress) } : {};
-}
-
-// The demo data script: both test wallets at once
+// The app and the demo data script: the test wallets of the device, one per role
 export function bindWallets(wallets: Partial<Record<Role, Hex>>) {
   bound = {};
   for (const role of ['importer', 'exporter'] as const) {

@@ -5,8 +5,9 @@ import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { config } from '@/config';
-import { useData, type SupplierRecord } from '@/data';
+import { proposals, useData, type SupplierRecord } from '@/data';
 import { buildOrder, REQUIRED_DOCS, type BuiltOrder, type FormField } from '@/data/newOrder';
+import { newProposal } from '@/data/proposals';
 import {
   advanceBpsOf,
   advanceSplit,
@@ -84,8 +85,6 @@ function NewOrderScreen() {
   const [proforma, setProforma] = useState<Proforma>();
   const [stored, setForm] = useState<ScreenForm>();
   const [blocked, setBlocked] = useState<Blocked>();
-  // The order built and valid, kept for the next step. Nothing is stored or sent.
-  const [, setBuilt] = useState<Extract<BuiltOrder, { kind: 'ready' }>>();
 
   // The supplier can be chosen before anything else, so the form exists from the start
   const form = stored ?? (data ? screenFormFrom(undefined, data.nextNumber) : undefined);
@@ -140,7 +139,7 @@ function NewOrderScreen() {
     setPhase('form');
   }
 
-  function send() {
+  async function send() {
     if (!data || !form) return;
     const { setup } = data;
     const built = buildOrder(
@@ -159,8 +158,10 @@ function NewOrderScreen() {
     );
     if (built.kind === 'blocked') return setBlocked({ fields: built.fields, problems: built.problems });
     setBlocked(undefined);
-    setBuilt(built);
-    router.push({ pathname: '/new-order-sent', params: { supplier: supplier?.party.short ?? '' } });
+    // Kept on this phone until the supplier signs. Nothing leaves the device.
+    const proposal = newProposal(built, form.goods, Date.now() / 1000);
+    await proposals.save(proposal);
+    router.replace({ pathname: '/new-order-sent', params: { orderId: proposal.orderId } });
   }
 
   return (

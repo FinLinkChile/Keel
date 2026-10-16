@@ -144,7 +144,7 @@ function NeedsYouSheet({ item }: { item: Item }) {
       </View>
       <View style={{ gap: 2 }}>
         <Text size={20} weight={800}>
-          {order.goods}, {order.quantity}
+          {[order.goods, order.quantity].filter(Boolean).join(', ')}
         </Text>
         <Text size={14} color="textMuted">
           {counterparty.name}, ship by {formatDay(order.po.shipmentDeadline)}

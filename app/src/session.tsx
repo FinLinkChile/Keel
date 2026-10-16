@@ -1,13 +1,16 @@
 import type { Hex } from '@keel/schemas';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { bindWallet, type Role } from '@/data';
-import { wallet, type Signer } from '@/wallet';
+import { bindWallets, type Role } from '@/data';
+import { wallets, type Signer, type Signers } from '@/wallet';
 
 type Session = {
-  // null while there is no wallet on this device; undefined while loading
+  // The signer of the role chosen at Connect: null while this device has no wallet for it;
+  // undefined while loading
   signer: Signer | null | undefined;
   address: Hex | undefined;
+  // The addresses of both test wallets of this device
+  addresses: Partial<Record<Role, Hex>>;
   role: Role;
   setRole: (role: Role) => void;
   createWallet: () => Promise<void>;
@@ -20,37 +23,46 @@ type Session = {
 const SessionContext = createContext<Session | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [signer, setSigner] = useState<Signer | null>();
-  const [address, setAddress] = useState<Hex>();
+  // null once forgotten for this session; undefined while loading
+  const [signers, setSigners] = useState<Signers | null>();
+  const [addresses, setAddresses] = useState<Partial<Record<Role, Hex>>>({});
   const [role, setRole] = useState<Role>('importer');
 
   // During render, not in an effect: screens below load their data in their own effects,
-  // which run before this provider's, and must already see the connected wallet.
-  bindWallet(role, address);
+  // which run before this provider's, and must already see the wallets.
+  bindWallets(addresses);
 
-  const use = useCallback(async (s: Signer | null) => {
-    setSigner(s);
-    setAddress(s ? await s.address() : undefined);
+  const use = useCallback(async (s: Signers | null) => {
+    const found: Partial<Record<Role, Hex>> = {};
+    for (const r of ['importer', 'exporter'] as const) {
+      const signer = s?.[r];
+      if (signer) found[r] = await signer.address();
+    }
+    setSigners(s);
+    setAddresses(found);
   }, []);
 
   useEffect(() => {
-    wallet.load().then(use);
+    wallets.load().then(use);
   }, [use]);
+
+  const signer = signers === undefined ? undefined : (signers?.[role] ?? null);
 
   const value = useMemo<Session>(
     () => ({
       signer,
-      address,
+      address: addresses[role],
+      addresses,
       role,
       setRole,
-      createWallet: async () => use(await wallet.create()),
+      createWallet: async () => use(await wallets.create()),
       disconnect: () => use(null),
       resetWallet: async () => {
-        await wallet.reset();
+        await wallets.reset();
         await use(null);
       },
     }),
-    [signer, address, role, use],
+    [signer, addresses, role, use],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

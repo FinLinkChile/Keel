@@ -40,7 +40,8 @@ export type OrderStage =
   | 'shipped' // step 4 done, dispute window running
   | 'settled' // step 5
   | 'refunded' // step 6
-  | 'cancelled'; // mutual cancellation
+  | 'cancelled' // mutual cancellation
+  | 'rejected'; // the exporter refused to sign the proposed order
 
 // A document already uploaded for an order, as the exporter sees it: only its outcome.
 export type OrderDocument = {

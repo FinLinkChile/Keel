@@ -1,9 +1,9 @@
-// Where the private key of the test wallet is kept on this device.
+// Where the private keys of the test wallets are kept on this device. Each key has a name.
 export interface KeyStore {
   // Shown in development screens, so it is clear which storage was used
   where: 'secure-store' | 'browser-storage';
-  read(): Promise<string | null>;
-  write(value: string): Promise<void>;
+  read(name: string): Promise<string | null>;
+  write(name: string, value: string): Promise<void>;
   // Development only: forgets the key for good
-  remove(): Promise<void>;
+  remove(name: string): Promise<void>;
 }
