@@ -12,6 +12,8 @@ export type Party = {
   place: string;
   // Company wallet that signs orders (the importer and exporter of a PurchaseOrder)
   address: Hex;
+  // Chilean RUT without dots or dash, for the importer: the invoice is checked against it
+  taxId?: string;
   // Avatar colour when the party is shown as a counterparty. Your own company is drawn
   // without it.
   tint?: number;

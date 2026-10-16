@@ -1,42 +1,57 @@
-import type { Hex } from '@keel/schemas';
+import type { Hex, OrderTerms, RequiredDocType } from '@keel/schemas';
+import { bytes32Text, requiredDocsHash, termsHash } from '@keel/schemas/hash';
+import { getAddress, keccak256, stringToBytes } from 'viem';
 
 import type { Account, KeelData, NeedsYou, Order, OrderStage, Party, PartyId, Role, Wallet } from './types';
 
-// Test data for the screens. Order ids, labels and party slugs match bot/examples so the
-// app and the bot tell the same story in the demo. Hashes are placeholders, not computed.
+// Test data for the screens and the single source of the demo data files (scripts/demo-data.ts).
+// Order ids, labels and party slugs match bot/examples so the app, the bot, ingest and the agent
+// tell the same story. termsHash and requiredDocsHash are computed with the schemas helpers;
+// documentHash stands for the order document with its proforma, which does not exist yet.
 
 const day = (month: number, date: number) => Date.UTC(2026, month - 1, date) / 1000;
 const id = (n: number): Hex => `0x${n.toString(16).padStart(64, '0')}`;
-const fill = (digit: string): Hex => `0x${digit.repeat(64)}`;
+// Checksummed, as viem requires to sign or hash an address
+const addr = (a: string): Hex => getAddress(a.toLowerCase());
 
 const PARTIES: Party[] = [
-  { id: 'acme-imports', short: 'Pacífico', name: 'Pacífico Foods SpA', place: 'Chile', address: '0x7A3f91C2b04E6d1A8c3F5e2D9b7A0c4E1f6B55D8', tint: 3 },
-  { id: 'lingnan', short: 'Lingnan', name: 'Lingnan Hydrocolloids', place: 'Hong Kong', address: '0x5C1e0a9B7d3F2c6E8a4B1d9F0e7C3a5B2d6E04a1', tint: 0 },
-  { id: 'kowloon', short: 'Kowloon', name: 'Kowloon Fine Chemicals', place: 'Hong Kong', address: '0x9B2d4F6a8C0e1B3d5F7a9C2e4B6d8F0a1C3e7A62', tint: 1 },
-  { id: 'pearl-delta', short: 'Pearl Delta', name: 'Pearl Delta Ingredients', place: 'Guangzhou', address: '0x2E4a6C8e0B1d3F5a7C9e2B4d6F8a0C1e3B5d9F17', tint: 2 },
-  { id: 'harbor-line', short: 'Harbor Line', name: 'Harbor Line', place: 'Hong Kong', address: '0x4D6f8B0d2A3c5E7f9B1d4A6c8E0f2B3d5A7c1E88' },
-  { id: 'hk-arbitration', short: 'HK Arbitration', name: 'HK Trade Arbitration', place: 'Hong Kong', address: '0x6F8b0D2f4C5e7A9b1D3f6C8e0A2b4D5f7C9e3A09' },
-  { id: 'keel-verifier', short: 'Keel verifier', name: 'Keel document verifier', place: 'Keel', address: '0x8A0c2E4a6D7f9C1a3E5b8D0f2C4a6E7b9D1f5C33' },
+  { id: 'acme-imports', short: 'Pacífico', name: 'Pacífico Foods SpA', place: 'Chile', address: addr('0x7A3f91C2b04E6d1A8c3F5e2D9b7A0c4E1f6B55D8'), tint: 3, taxId: '765432103' },
+  { id: 'lingnan', short: 'Lingnan', name: 'Lingnan Hydrocolloids', place: 'Hong Kong', address: addr('0x5C1e0a9B7d3F2c6E8a4B1d9F0e7C3a5B2d6E04a1'), tint: 0 },
+  { id: 'kowloon', short: 'Kowloon', name: 'Kowloon Fine Chemicals', place: 'Hong Kong', address: addr('0x9B2d4F6a8C0e1B3d5F7a9C2e4B6d8F0a1C3e7A62'), tint: 1 },
+  { id: 'pearl-delta', short: 'Pearl Delta', name: 'Pearl Delta Ingredients', place: 'Guangzhou', address: addr('0x2E4a6C8e0B1d3F5a7C9e2B4d6F8a0C1e3B5d9F17'), tint: 2 },
+  { id: 'harbor-line', short: 'Harbor Line', name: 'Harbor Line', place: 'Hong Kong', address: addr('0x4D6f8B0d2A3c5E7f9B1d4A6c8E0f2B3d5A7c1E88') },
+  { id: 'hk-arbitration', short: 'HK Arbitration', name: 'HK Trade Arbitration', place: 'Hong Kong', address: addr('0x6F8b0D2f4C5e7A9b1D3f6C8e0A2b4D5f7C9e3A09') },
+  { id: 'keel-verifier', short: 'Keel verifier', name: 'Keel document verifier', place: 'Keel', address: addr('0x8A0c2E4a6D7f9C1a3E5b8D0f2C4a6E7b9D1f5C33') },
 ];
 
 // Payout accounts signed in each order; never taken from a document
 const PAYOUT: Record<PartyId, Hex> = {
-  lingnan: '0x3E9dA4c7F1b2E8d06C5a9B3f7E1d4C8a2B6f8812',
-  kowloon: '0x1C7bE3a9D5f2B8c04E6a1D9f3B7c5E2a8D4f6630',
-  'pearl-delta': '0x7F2aC8e4B1d6F9a03C5e7B2d8F4a1C6e9B3d2A55',
+  lingnan: addr('0x3E9dA4c7F1b2E8d06C5a9B3f7E1d4C8a2B6f8812'),
+  kowloon: addr('0x1C7bE3a9D5f2B8c04E6a1D9f3B7c5E2a8D4f6630'),
+  'pearl-delta': addr('0x7F2aC8e4B1d6F9a03C5e7B2d8F4a1C6e9B3d2A55'),
 };
 
-const USDC: Hex = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
+const USDC: Hex = addr('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48');
 
-// The connected wallet stands in for the company of the role chosen at Connect, so what it
-// signs matches the orders on screen (importer: Pacífico, exporter: Lingnan).
-let bound: { party: PartyId; address: Hex } | undefined;
+// Test wallets stand in for the companies of the demo (importer: Pacífico, exporter: Lingnan),
+// so what they sign matches the orders on screen and in the data files.
+let bound: Partial<Record<PartyId, Hex>> = {};
 
+// The app: the connected wallet, for the role chosen at Connect
 export function bindWallet(role: Role, walletAddress: Hex | undefined) {
-  bound = walletAddress ? { party: ACCOUNTS[role].party, address: walletAddress } : undefined;
+  bound = walletAddress ? { [ACCOUNTS[role].party]: addr(walletAddress) } : {};
 }
 
-const parties = (): Party[] => PARTIES.map((p) => (bound && p.id === bound.party ? { ...p, address: bound.address } : p));
+// The demo data script: both test wallets at once
+export function bindWallets(wallets: Partial<Record<Role, Hex>>) {
+  bound = {};
+  for (const role of ['importer', 'exporter'] as const) {
+    const w = wallets[role];
+    if (w) bound[ACCOUNTS[role].party] = addr(w);
+  }
+}
+
+const parties = (): Party[] => PARTIES.map((p) => (bound[p.id] ? { ...p, address: bound[p.id]! } : p));
 const address = (party: PartyId) => parties().find((p) => p.id === party)!.address;
 
 type Seed = {
@@ -58,8 +73,17 @@ type Seed = {
   documents?: Order['documents'];
 };
 
+const REQUIRED_DOCS: RequiredDocType[] = ['BILL_OF_LADING', 'COMMERCIAL_INVOICE'];
+
 function order(s: Seed): Order {
   const label = `PO-${s.n.toString(16).padStart(4, '0')}`;
+  const terms: OrderTerms = {
+    orderNumber: label.replace('-', ''),
+    currency: 'USD',
+    invoiceAmountMinor: BigInt(s.totalMinor),
+    hsCodes: [s.hsCode],
+    documentHash: keccak256(stringToBytes(`Keel demo order ${label}`)),
+  };
   return {
     label,
     goods: s.goods,
@@ -88,18 +112,12 @@ function order(s: Seed): Order {
       carrier: address('harbor-line'),
       arbiter: address('hk-arbitration'),
       documentVerifier: address('keel-verifier'),
-      incoterm: fill('0'),
-      termsHash: fill('1'),
-      requiredDocsHash: fill('2'),
+      incoterm: bytes32Text('FOB'),
+      termsHash: termsHash(terms),
+      requiredDocsHash: requiredDocsHash(REQUIRED_DOCS),
       nonce: BigInt(s.n),
     },
-    terms: {
-      orderNumber: label.replace('-', ''),
-      currency: 'USD',
-      invoiceAmountMinor: BigInt(s.totalMinor),
-      hsCodes: [s.hsCode],
-      documentHash: fill('3'),
-    },
+    terms,
   };
 }
 
