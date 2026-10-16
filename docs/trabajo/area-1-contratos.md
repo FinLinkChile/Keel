@@ -5,7 +5,7 @@ description: "Objetivo, entregables y tareas T1.0 a T1.11: red y token, Safe, ro
 tags: [area-1, contratos, solidity, foundry, t1]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T16:30:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T18:00:00Z }
 ---
 
 **Perfil sugerido:** quien tenga más experiencia en Solidity y Foundry.
@@ -24,7 +24,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T16:30:00Z }
 **T1.0 Red y token (agregada por Trade, bloquea el resto).**
 Elegir con el equipo la red cerrada y el token de pago. Confirmar que Safe y los módulos de Zodiac se pueden desplegar ahí y qué herramientas quedan disponibles (SDK, explorador). Si la red no tiene una stablecoin, desplegar un token de prueba y declararlo. Si Safe o Zodiac no se pueden desplegar, avisar el mismo día: cambia el diseño de permisos.
 
-Personal se diseñó sobre Base Sepolia con USDC. Esta tarea decide también si Personal corre en la misma red que Trade o se queda en la original.
+Red decidida el 16 de octubre: Base Sepolia (chainId 84532) para Trade y Personal, con las direcciones en `contracts/deployments/84532.json`. Falta fijar el token ([decisión abierta 1](../decisiones/abiertas.md)).
 
 **T1.1 Safe base.**
 * **Personal (base):** desplegar una Safe con el dueño como único firmante (1 de 1) para la demo. Documentar que en producción sería 2 de 3, con recuperación social.

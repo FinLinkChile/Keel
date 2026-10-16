@@ -4,14 +4,14 @@ title: "Decisiones abiertas"
 description: "Las 14 preguntas que el equipo todavía no cierra. Si un componente toca alguna, se decide con el equipo antes de escribir código."
 tags: [decisiones-abiertas, pendiente]
 modo: ambos
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T01:40:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T18:00:00Z }
 ---
 
 No resolver ninguna por cuenta propia. Cuando el equipo cierra una, se actualiza primero el concepto afectado, luego esta tabla y después el código. Los números son estables: el código y los README los citan.
 
 | # | Pregunta | Quién decide | Concepto afectado |
 | --- | --- | --- | --- |
-| 1 | ¿Qué red cerrada se usa (por ejemplo FISCO BCOS) y qué token de pago existe en ella? De esto depende si Safe, Zodiac Roles y Delay se pueden desplegar ahí tal como están | Equipo y Contratos, miércoles 14 | [Sistema de pago](../pagos/sistema-de-pago.md), [stack](../arquitectura/stack.md) |
+| 1 | **Red decidida el 16 de octubre, confirmada por el Área 4:** la competencia corre en Base Sepolia (chainId 84532), donde Safe, Zodiac Roles y Delay se despliegan tal como están. La red cerrada (FISCO BCOS o similar) queda como objetivo del piloto **[PROPUESTA]**. **Sigue abierto el token de pago:** el USDC de prueba de Circle en Base Sepolia o un token de prueba propio declarado como tal | Equipo y Contratos | [Sistema de pago](../pagos/sistema-de-pago.md), [stack](../arquitectura/stack.md) |
 | 2 | **Decidida el 14 de octubre (Área 1, Adrean).** Sí: `fund` recibe el total y paga el anticipo en la misma transacción, sin estado Depositado. Elimina la carrera entre liberar el anticipo y una cancelación ya firmada. | Contratos | [Paso 3](../flujo/paso-3-anticipo.md) |
 | 3 | **Decidida el 14 de octubre por las Áreas 1 y 2.** El `DocumentDecision` es obligatorio, con dos salidas: el importador puede aprobar el saldo a mano (`BalanceApproval`, función `approveBalance`, en cualquier momento) y con una atestación registrada no hay reembolso automático. `releaseBalance` con el `DocumentDecision` se puede llamar solo después de la ventana de disputa. Lo firma el `documentVerifier` fijado en cada orden, que no es ninguna de las partes ni la naviera. Detalle en el [paso 5](../flujo/paso-5-saldo.md). | Motor y Contratos | [Paso 5](../flujo/paso-5-saldo.md), [PDR](../interfaces/pdr.md) |
 | 4 | **[PROPUESTA] Decidida por el Área 1 (Adrean) el 14 de octubre, falta que el equipo la confirme.** `disputeWindow` lo fija cada orden, sin valor por defecto en el contrato; la app sugiere 3 días y la demo usa 2 minutos. | Equipo | [Paso 5](../flujo/paso-5-saldo.md) |
@@ -23,7 +23,7 @@ No resolver ninguna por cuenta propia. Cuando el equipo cierra una, se actualiza
 | 10 | ¿Estado actual de la regulación de stablecoins en Hong Kong y de cripto en China? | Red Team y Evidencia, antes del deck | [Regulación](../pagos/regulacion.md) |
 | 11 | ¿Se puede citar al importador entrevistado, aunque sea de forma anónima? | Quien hizo la entrevista, antes del deck | [Entrevista](../contexto/entrevista-importador.md) |
 | 12 | ¿Se confirman las tareas, las interfaces y el calendario propuestos tras el cambio de rumbo? | | [Trabajo](../trabajo/index.md), [interfaces](../interfaces/index.md) |
-| 13 | ¿Cómo verifica el jurado las transacciones si la red es cerrada? | | [Entregables](../entrega/entregables.md) |
+| 13 | ¿Cómo verifica el jurado las transacciones? Con Base Sepolia (decisión 1) las ve en un explorador público, pero falta confirmar con la organización que una testnet cuenta como "real on-chain transaction hashes" | | [Entregables](../entrega/entregables.md) |
 | 14 | Keel Personal vuelve al alcance: ¿con qué profundidad entra en la entrega (aplicación, contratos, demo) y en qué red y con qué token corre? | | [Keel Personal](../personal/keel-personal.md), [alcance](../flujo/alcance.md) |
 
 Una celda vacía en "quién decide" significa que las fuentes no lo asignan todavía.

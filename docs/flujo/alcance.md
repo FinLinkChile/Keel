@@ -4,13 +4,13 @@ title: "Alcance: dentro, fuera y lo que no prometemos"
 description: "Qué entra en la entrega, qué se declara como trabajo futuro, qué no se promete y la hoja de ruta por fases."
 tags: [alcance, trabajo-futuro, hoja-de-ruta]
 modo: ambos
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T18:00:00Z }
 ---
 
 # Dentro
 
 - Importación de productos desde China por empresas chilenas, con liquidación en el corredor Chile y Hong Kong.
-- Despliegue en una red cerrada, con las partes (importador, exportador, naviera, árbitro) registradas.
+- Despliegue en Base Sepolia, una red de prueba pública, con la naviera, el árbitro y el verificador registrados como terceros de confianza en el gate. La red cerrada es el destino del piloto **[PROPUESTA]**.
 - Firma de la orden de compra por ambas partes.
 - Depósito, bloqueo, anticipo, saldo y reembolso por vencimiento.
 - Atestación de embarque firmada por un tercero (en el prototipo, una llave de prueba).
@@ -44,8 +44,8 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
 
 | Fase | Qué se agrega | Resultado |
 | --- | --- | --- |
-| 0. Competencia | Keel Trade en una red cerrada de prueba, con naviera y árbitro representados por llaves de prueba | Flujo de 6 pasos funcionando, verificable con hashes |
-| 1. Piloto Chile-Hong Kong | Identidad verificada de empresas, una naviera o agente de carga como firmante del embarque, stablecoin regulada | Un importador real con un proveedor real |
+| 0. Competencia | Keel Trade en Base Sepolia, con naviera y árbitro representados por llaves de prueba | Flujo de 6 pasos funcionando, verificable con hashes |
+| 1. Piloto Chile-Hong Kong | Red cerrada con participantes identificados, identidad verificada de empresas, una naviera o agente de carga como firmante del embarque, stablecoin regulada | Un importador real con un proveedor real |
 | 2. Integración bancaria | Banco o proveedor de pagos como riel de liquidación y como financista | Pagos sin exigir cripto a las partes |
 
-La red cerrada y el token de pago están por decidir ([decisión abierta 1](../decisiones/abiertas.md)). Qué se recorta si falta tiempo está en [recortes](../trabajo/recortes.md).
+La red de la competencia es Base Sepolia; el token de pago sigue por decidir ([decisión abierta 1](../decisiones/abiertas.md)). Qué se recorta si falta tiempo está en [recortes](../trabajo/recortes.md).

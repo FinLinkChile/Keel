@@ -1,5 +1,9 @@
 # Historial de la documentación
 
+## 2026-10-16
+
+* **Decisión 1 cerrada (red)**: Keel Trade y Keel Personal corren en la competencia sobre Base Sepolia (chainId 84532), una red de prueba pública con Safe y Zodiac disponibles, RPC y explorador. Lo confirmó el Área 4; lo registró el Área 2 (Darienn). El token de pago sigue abierto (USDC de prueba de Circle o un token propio declarado). **[PROPUESTA]** La red cerrada (FISCO BCOS o similar) pasa a ser el objetivo del piloto, no de la competencia, por lo que cambia la fase 0 de [alcance](flujo/alcance.md). La decisión 13 se simplifica (explorador público) pero sigue abierta hasta que la organización confirme que una testnet cuenta. Conceptos: [decisiones abiertas](decisiones/abiertas.md), [alcance](flujo/alcance.md), [stack](arquitectura/stack.md), [sistema de pago](pagos/sistema-de-pago.md), [Área 1](trabajo/area-1-contratos.md).
+
 ## 2026-10-15
 
 * **Actualización**: ingesta avisa al bot del Área 4 cada resultado y el resumen diario de solicitudes de cambio, por la ruta que propuso el Área 4 (`POST /ingest/outcomes`), sin bloquear nunca el procesamiento. La carga de documentos responde CORS solo para el origen de la app configurado. Se agrega el corpus de Keel Personal (12 legítimas y 26 adversariales que entran por correo autenticado), con lo que T3.8 queda completa. Área 3 (Daniela). Conceptos: [Área 3](trabajo/area-3-ingesta.md), [carga de documentos](interfaces/carga-de-documentos.md).

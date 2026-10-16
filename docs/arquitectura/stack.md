@@ -4,7 +4,7 @@ title: "Stack tecnológico"
 description: "Tecnología de cada componente: cuenta, permisos, escrow, red, token, cliente, simulación, lectura de documentos, aplicación y avisos."
 tags: [stack, tecnologia]
 modo: ambos
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T18:00:00Z }
 ---
 
 | Componente | Tecnología |
@@ -13,8 +13,8 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
 | Permisos del agente | Zodiac Roles Modifier v2 |
 | Espera y veto de cambios | Zodiac Delay Modifier |
 | Escrow | Contrato TradeEscrow (Solidity, Foundry) |
-| Red | Red cerrada compatible con EVM, por definir |
-| Token de pago | Stablecoin disponible en esa red, por definir |
+| Red | Base Sepolia (chainId 84532) en la competencia; red cerrada compatible con EVM en el piloto |
+| Token de pago | USDC de prueba en Base Sepolia o un token de prueba declarado, por definir |
 | Cliente blockchain | viem sobre Node.js |
 | Simulación | `eth_call` en ejecución; Anvil solo para pruebas |
 | Registro de decisión | PDR firmado con EIP-712 (inspirado en PACE) |
