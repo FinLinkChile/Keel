@@ -5,7 +5,7 @@ description: "Objetivo, entregables y tareas T1.0 a T1.11: red y token, Safe, ro
 tags: [area-1, contratos, solidity, foundry, t1]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T23:30:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T01:00:00Z }
 ---
 
 **Perfil sugerido:** quien tenga más experiencia en Solidity y Foundry.
@@ -122,6 +122,7 @@ Agregados por Trade:
 Script de despliegue reproducible y un archivo de direcciones que consumen las demás áreas.
 * **Personal (base):** contratos verificados en el explorador de la red; coordinar con el Área 5 la cuenta de faucet y los fondos de prueba.
 * **Trade (agregado):** coordinar con el Área 5 cómo el jurado puede verificar las transacciones en una red cerrada.
+* **Trade, script (16 de octubre, Área 1):** `contracts/script/DeployTrade.s.sol` despliega en Base Sepolia una Safe 1.4.1 (con el desplegador como dueño temporal), Roles 2.1.1 y Delay 1.1.0 (cooldown 180 s, expiración 1 día, el dueño como módulo del Delay) desde sus masters, `TradeEscrow` y `FundingGate`; aplica `TradeRolesConfig` y entrega la Safe a `OWNER_ADDRESS`. Se usa en tres pasos: simular; enviar con `--broadcast --slow` (cada transacción espera su recibo, así una que falle detiene las siguientes); y `record(safe, deployBlock)`, sin envío, que reconstruye todo desde la Safe en la cadena y comprueba dueños, umbral, módulos exactos de Safe, Roles y Delay, cupos (`maxRefill == refill`), firmantes, que el despliegue esté recién hecho y la membresía de los roles (por simulación). Solo si todo pasa escribe `deployments/84532.json` combinándolo con lo de `DeployPDRGate` (Trade escribe las claves de la raíz; Personal, `pdrGate` y `personal`), con `rolesConfigHash` y `rolesConfigCalls` para que el Área 2 los recalcule. El `policyHash` real lo fija la Safe por el Delay con `SetTradePolicy.s.sol` (el gate nace con uno provisional). Si un envío falla a mitad de camino, se vuelve a desplegar con otro `SALT_NONCE` y la Safe a medias se abandona. Riesgo declarado: en la demo la Safe tiene una sola dueña con umbral 1, y sin ConfigGuard puede llamar `setPolicyHash` directo, saltándose el Delay.
 
 **T1.9 Contrato TradeEscrow (agregada por Trade, es su pieza central).**
 Implementar la máquina de estados y la interfaz de [estados del escrow](../flujo/estados-del-escrow.md) y [datos firmados e interfaz](../flujo/datos-firmados-e-interfaz.md): `open`, `fund` (depósito y anticipo), `submitShipment`, `releaseBalance`, `approveBalance`, `refundAfterDeadline`, `raiseDispute`, `resolve`, `cancel`. El saldo se libera en dos pasos y una orden Embarcado no se reembolsa por vencimiento (decisión 3, [paso 5](../flujo/paso-5-saldo.md)). `open` exige que verificador, naviera y árbitro no sean una parte ni `payoutAddress`. **[HECHO]** en `contracts/src/TradeEscrow.sol`.
