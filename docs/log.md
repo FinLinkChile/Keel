@@ -1,5 +1,9 @@
 # Historial de la documentación
 
+## 2026-10-16
+
+* **Entrega**: el Área 2 (Darienn) aportó los textos en inglés para el informe de seguridad (T5.3, `entrega/area-2-security.md`) y el documento técnico (T5.6, `entrega/area-2-core-algorithm.md`). Son insumos para el Área 5, no los documentos finales. Declaran el estado de los PR abiertos (#51, #54, #60) y lo que espera al despliegue en Base Sepolia. Conceptos: [aporte de seguridad](entrega/area-2-security.md), [aporte del algoritmo](entrega/area-2-core-algorithm.md).
+
 ## 2026-10-15
 
 * **Actualización**: ingesta avisa al bot del Área 4 cada resultado y el resumen diario de solicitudes de cambio, por la ruta que propuso el Área 4 (`POST /ingest/outcomes`), sin bloquear nunca el procesamiento. La carga de documentos responde CORS solo para el origen de la app configurado. Se agrega el corpus de Keel Personal (12 legítimas y 26 adversariales que entran por correo autenticado), con lo que T3.8 queda completa. Área 3 (Daniela). Conceptos: [Área 3](trabajo/area-3-ingesta.md), [carga de documentos](interfaces/carga-de-documentos.md).
