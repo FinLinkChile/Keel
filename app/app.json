@@ -31,7 +31,15 @@
           "backgroundColor": "#000000"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Keel uses the camera to photograph the exporter's proforma.",
+          "photosPermission": false,
+          "microphonePermission": false
+        }
+      ]
     ],
     "scheme": "keel",
     "backgroundColor": "#000000",
