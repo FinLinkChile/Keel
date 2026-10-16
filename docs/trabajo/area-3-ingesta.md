@@ -71,7 +71,8 @@ Sirve al paso 0 del flujo: el agente lee la proforma y propone la orden estructu
 * Acepta PDF y también foto o escaneo (cámara, escáner de Notas), porque la proforma no decide pagos: la lee el extractor en cuarentena, con un esquema sin texto libre.
 * Devuelve solo campos tipados para prellenar la orden en la pantalla de revisión (T4.2): proveedor, número de proforma, monto y moneda, incoterm, códigos arancelarios y fecha de embarque. **Nunca la cuenta de cobro**, que sale del registro del proveedor verificado (principio 1).
 * Sin segundo lector para fotos: la revisión humana antes de firmar cumple ese papel, y lo que vale es la orden firmada, con el hash de la proforma dentro de `termsHash`.
-* No guarda la proforma ni decide nada: solo ayuda a llenar la orden. Antes de implementarla se pasa por `docs/flujo/checklist-componente.md`.
+* No guarda la proforma ni decide nada: solo ayuda a llenar la orden.
+* Implementada en `ingest/src/trade/proforma.ts` (`POST /trade/proforma`): importadores registrados, 20 proformas por importador y día, y la misma lectura sin llamar otra vez al modelo para un archivo repetido. Contrato en [lectura de la proforma](../interfaces/lectura-de-proforma.md).
 
 # Decisiones de implementación en Keel Trade **[PROPUESTA]**
 

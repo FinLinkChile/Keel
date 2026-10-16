@@ -1,5 +1,9 @@
 # Historial de la documentación
 
+## 2026-10-16
+
+* **Actualización (interfaz)**: T3.9 implementada. `POST /trade/proforma` recibe la proforma firmada por un importador registrado (`ProformaUpload(bytes32 fileHash,uint64 issuedAt)`, mismo dominio que la carga de documentos) como PDF, foto o escaneo, y devuelve solo campos tipados para prellenar la orden: número, fecha, moneda, monto, incoterm, códigos HS, fecha de embarque, puertos y anticipo, nunca la cuenta de cobro. Un PDF con texto se lee redactado; una foto o un escaneo van al modelo tal cual, registrados como transferencia sin redactar. Un solo lector, porque la revisión humana antes de firmar cumple el papel del segundo. Área 3 (Daniela), **[PROPUESTA]** hasta que el Área 4 confirme el contrato. Conceptos: [lectura de la proforma](interfaces/lectura-de-proforma.md), [amenazas](flujo/amenazas.md).
+
 ## 2026-10-15
 
 * **Decisión (plan)**: se agrega la tarea T3.9, lectura de la proforma: el importador la sube desde la app (PDF, foto o escaneo) e ingesta devuelve campos tipados para prellenar la orden, nunca la cuenta de cobro. No estaba asignada: el reparto de carpetas la ponía en `ingest/` pero ninguna tarea T3 la pedía, y el Área 4 (Christian) preguntó por el endpoint para la pantalla de nueva orden. La toma el Área 3 (Daniela), **[PROPUESTA]** hasta que el equipo confirme. Concepto: [Área 3](trabajo/area-3-ingesta.md).
