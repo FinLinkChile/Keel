@@ -2,7 +2,7 @@
 // model sees, and the strict validation of whatever comes back. T3.4, issue #21.
 import { z } from "zod";
 import { ALIAS_IDS, InvoiceExtraction } from "@keel/schemas";
-import { normalizeInvoiceNumber, normalizePeriod, normalizeRut } from "../normalize";
+import { foldHomoglyphs, normalizeInvoiceNumber, normalizePeriod, normalizeRut } from "../normalize";
 
 export const EXTRACTION_FAILURES = [
   "unreadable_input",
@@ -24,18 +24,24 @@ export class ExtractionError extends Error {
   }
 }
 
-// What the model receives: the invoice text with personal data and destinations replaced
-// by tokens (privacy.ts). Never the PDF. Hidden runs are included, so the model faces the attack.
-export interface InvoiceDocument {
+// What the model receives: the document text with personal data and destinations replaced
+// by tokens (privacy.ts), wrapped in the fixed prompt of one document type. Never the PDF.
+// Hidden runs are included, so the model faces the attack.
+export interface ExtractionRequest {
   text: string;
+  system: string;
+  user: string;
+  // Name and portable JSON Schema of the structured output
+  schemaName: string;
+  schema: Record<string, unknown>;
 }
 
 // One adapter per LLM vendor. It returns the raw JSON text and nothing else:
-// validation lives here so no adapter can weaken it.
+// validation lives with each document type so no adapter can weaken it.
 export interface ExtractorProvider {
   readonly provider: string;
   readonly model: string;
-  complete(doc: InvoiceDocument): Promise<string>;
+  complete(request: ExtractionRequest): Promise<string>;
 }
 
 // The registered RUTs are deliberately not given to the model: knowing them, it could
@@ -100,8 +106,16 @@ const LlmOutput = z
   })
   .strict();
 
+export const invoiceRequest = (text: string): ExtractionRequest => ({
+  text,
+  system: SYSTEM_PROMPT,
+  user: userMessage(text),
+  schemaName: "invoice_extraction",
+  schema: LLM_OUTPUT_SCHEMA as unknown as Record<string, unknown>,
+});
+
 // Midnight UTC, the same convention as the deterministic parser
-function dueDateToUnix(isoDate: string): number {
+export function isoDateToUnix(isoDate: string): number {
   const [y, m, d] = isoDate.split("-").map(Number) as [number, number, number];
   const ms = Date.UTC(y, m - 1, d);
   const check = new Date(ms);
@@ -113,7 +127,10 @@ function dueDateToUnix(isoDate: string): number {
 
 // Raw model text -> InvoiceExtraction, or ExtractionError("invalid_output").
 // `restore` maps tokens back to the real values; an unknown token fails validation.
-export function toExtraction(raw: string, restore: (value: string) => string = (v) => v): InvoiceExtraction {
+// The values are folded like the parser's text: a model may copy a look-alike character as
+// printed (a superscript digit), and the deception itself is flagged by the parser.
+export function toExtraction(raw: string, rehydrate: (value: string) => string = (v) => v): InvoiceExtraction {
+  const restore = (v: string) => foldHomoglyphs(rehydrate(v)).text;
   try {
     const out = LlmOutput.parse(JSON.parse(raw));
     return InvoiceExtraction.parse({
@@ -121,7 +138,7 @@ export function toExtraction(raw: string, restore: (value: string) => string = (
       issuer_tax_id: normalizeRut(restore(out.issuer_tax_id)),
       invoice_number: normalizeInvoiceNumber(restore(out.invoice_number)),
       period: normalizePeriod(restore(out.period)),
-      due_date: dueDateToUnix(restore(out.due_date)),
+      due_date: isoDateToUnix(restore(out.due_date)),
     });
   } catch (e) {
     if (e instanceof ExtractionError) throw e;

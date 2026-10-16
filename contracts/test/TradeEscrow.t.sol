@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -249,8 +249,9 @@ contract TradeEscrowTest is Test {
         vm.warp(vm.getBlockTimestamp() + WINDOW);
     }
 
+    /// DISPUTED is only reachable from SHIPPED: a dispute cannot block a refund that is due.
     function _disputed() internal returns (PurchaseOrder memory po) {
-        po = _advancePaid();
+        po = _shipped();
         vm.prank(importer);
         escrow.raiseDispute(po.orderId);
     }
@@ -471,6 +472,12 @@ contract TradeEscrowTest is Test {
         _expectInvalidOrder(po);
     }
 
+    function test_revert_InvalidOrder_exporterIsEscrow() public {
+        PurchaseOrder memory po = _po();
+        po.exporter = address(escrow);
+        _expectInvalidOrder(po);
+    }
+
     /// Whoever attests the shipment cannot judge a dispute about it.
     function test_revert_InvalidOrder_carrierIsArbiter() public {
         PurchaseOrder memory po = _po();
@@ -672,6 +679,27 @@ contract TradeEscrowTest is Test {
         assertEq(fee.balanceOf(payout), 0);
     }
 
+    /// Step 7 of PR #49: OrderFunded and AdvanceReleased are emitted only after the deposit
+    /// check, so a short deposit leaves no escrow event behind. Foundry records the logs of a
+    /// reverted call, which is what makes this observable.
+    function test_revert_AmountMismatch_feeOnTransferToken_emitsNoEscrowEvent() public {
+        FeeOnTransferToken fee = new FeeOnTransferToken();
+        TradeEscrow feeEscrow = new TradeEscrow(IERC20(address(fee)), GRACE);
+        PurchaseOrder memory po = _poFor(importer, exporter, address(fee));
+        _openOn(feeEscrow, po);
+        fee.mint(importer, TOTAL);
+        vm.startPrank(importer);
+        fee.approve(address(feeEscrow), TOTAL);
+        vm.recordLogs();
+        vm.expectRevert(ITradeEscrow.AmountMismatch.selector);
+        feeEscrow.fund(po.orderId);
+        vm.stopPrank();
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 k; k < logs.length; k++) {
+            assertTrue(logs[k].emitter != address(feeEscrow), "escrow emitted an event on a reverted fund");
+        }
+    }
+
     function test_revert_InvalidState_fundTwice() public {
         PurchaseOrder memory po = _advancePaid();
         vm.startPrank(importer);
@@ -725,6 +753,62 @@ contract TradeEscrowTest is Test {
         PurchaseOrder memory po = _advancePaid();
         ShipmentAttestation memory att = _att(po.orderId);
         vm.warp(po.shipmentDeadline + 1 hours);
+        escrow.submitShipment(po.orderId, att, _signAtt(carrierPk, att));
+        assertEq(uint8(_state(po.orderId)), uint8(ITradeEscrow.State.SHIPPED));
+    }
+
+    /// Step 2 of PR #49: submitShipment and refundAfterDeadline use the same comparison, so at
+    /// every second exactly one of them is possible. t = shipmentDeadline + refundGrace.
+    function test_submitShipment_oneSecondBeforeRefundWindowEnd() public {
+        PurchaseOrder memory po = _advancePaid();
+        ShipmentAttestation memory att = _att(po.orderId);
+        vm.warp(po.shipmentDeadline + GRACE - 1);
+        escrow.submitShipment(po.orderId, att, _signAtt(carrierPk, att));
+        assertEq(uint8(_state(po.orderId)), uint8(ITradeEscrow.State.SHIPPED));
+    }
+
+    function test_submitShipment_atLastSecondBeforeRefund() public {
+        PurchaseOrder memory po = _advancePaid();
+        ShipmentAttestation memory att = _att(po.orderId);
+        vm.warp(po.shipmentDeadline + GRACE);
+        vm.expectRevert(ITradeEscrow.DeadlineNotReached.selector);
+        escrow.refundAfterDeadline(po.orderId);
+        escrow.submitShipment(po.orderId, att, _signAtt(carrierPk, att));
+        assertEq(uint8(_state(po.orderId)), uint8(ITradeEscrow.State.SHIPPED));
+    }
+
+    function test_revert_DeadlinePassed_shipmentOnceRefundable() public {
+        PurchaseOrder memory po = _advancePaid();
+        ShipmentAttestation memory att = _att(po.orderId);
+        bytes memory sig = _signAtt(carrierPk, att);
+        vm.warp(po.shipmentDeadline + GRACE + 1);
+        vm.expectRevert(ITradeEscrow.DeadlinePassed.selector);
+        escrow.submitShipment(po.orderId, att, sig);
+        escrow.refundAfterDeadline(po.orderId);
+        assertEq(uint8(_state(po.orderId)), uint8(ITradeEscrow.State.REFUNDED));
+    }
+
+    /// Step 3 of PR #49: the goods cannot be on board before the order was funded.
+    function test_revert_InvalidAttestation_onBoardBeforeFunding() public {
+        PurchaseOrder memory po = _opened();
+        vm.warp(vm.getBlockTimestamp() + 1 days);
+        uint64 fundedAt = uint64(vm.getBlockTimestamp());
+        _fund(po);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
+        ShipmentAttestation memory att = _att(po.orderId);
+        att.onBoardDate = fundedAt - 1;
+        vm.expectRevert(ITradeEscrow.InvalidAttestation.selector);
+        escrow.submitShipment(po.orderId, att, _signAtt(carrierPk, att));
+    }
+
+    function test_submitShipment_onBoardAtFundingTime() public {
+        PurchaseOrder memory po = _opened();
+        vm.warp(vm.getBlockTimestamp() + 1 days);
+        uint64 fundedAt = uint64(vm.getBlockTimestamp());
+        _fund(po);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
+        ShipmentAttestation memory att = _att(po.orderId);
+        att.onBoardDate = fundedAt;
         escrow.submitShipment(po.orderId, att, _signAtt(carrierPk, att));
         assertEq(uint8(_state(po.orderId)), uint8(ITradeEscrow.State.SHIPPED));
     }
@@ -1182,8 +1266,46 @@ contract TradeEscrowTest is Test {
 
     // ================================================================== raiseDispute
 
-    function test_raiseDispute_fromAdvancePaidByExporter() public {
+    /// Without a shipment there is nothing to dispute: the exporter cannot freeze a refund
+    /// that is about to be due, even one second before shipmentDeadline + refundGrace.
+    function test_revert_InvalidState_disputeFromAdvancePaid_byExporter() public {
         PurchaseOrder memory po = _advancePaid();
+        vm.warp(po.shipmentDeadline + GRACE - 1);
+        vm.expectRevert(ITradeEscrow.InvalidState.selector);
+        vm.prank(exporter);
+        escrow.raiseDispute(po.orderId);
+    }
+
+    function test_revert_InvalidState_disputeFromAdvancePaid_byImporter() public {
+        PurchaseOrder memory po = _advancePaid();
+        vm.expectRevert(ITradeEscrow.InvalidState.selector);
+        vm.prank(importer);
+        escrow.raiseDispute(po.orderId);
+    }
+
+    /// Requested change of PR #49: the exporter tries to dispute before the deadline and at the
+    /// last second before the refund; both revert, and the importer gets the refund at the first
+    /// second it is due (refundAfterDeadline requires now > shipmentDeadline + refundGrace).
+    function test_dispute_cannotBlockRefundDue() public {
+        PurchaseOrder memory po = _advancePaid();
+        vm.expectRevert(ITradeEscrow.InvalidState.selector);
+        vm.prank(exporter);
+        escrow.raiseDispute(po.orderId);
+
+        vm.warp(po.shipmentDeadline + GRACE);
+        vm.expectRevert(ITradeEscrow.InvalidState.selector);
+        vm.prank(exporter);
+        escrow.raiseDispute(po.orderId);
+
+        vm.warp(po.shipmentDeadline + GRACE + 1);
+        uint256 before = usdc.balanceOf(importer);
+        escrow.refundAfterDeadline(po.orderId);
+        assertEq(usdc.balanceOf(importer) - before, BALANCE);
+        assertEq(uint8(_state(po.orderId)), uint8(ITradeEscrow.State.REFUNDED));
+    }
+
+    function test_raiseDispute_fromShippedByExporter() public {
+        PurchaseOrder memory po = _shipped();
         vm.expectEmit(address(escrow));
         emit ITradeEscrow.DisputeRaised(po.orderId, exporter);
         vm.prank(exporter);
@@ -1191,7 +1313,7 @@ contract TradeEscrowTest is Test {
         assertEq(uint8(_state(po.orderId)), uint8(ITradeEscrow.State.DISPUTED));
     }
 
-    function test_raiseDispute_fromAdvancePaidByImporter() public {
+    function test_raiseDispute_fromShippedByImporter() public {
         PurchaseOrder memory po = _disputed();
         assertEq(uint8(_state(po.orderId)), uint8(ITradeEscrow.State.DISPUTED));
     }
@@ -1239,14 +1361,14 @@ contract TradeEscrowTest is Test {
     }
 
     function test_revert_NotParty_disputeByStranger() public {
-        PurchaseOrder memory po = _advancePaid();
+        PurchaseOrder memory po = _shipped();
         vm.expectRevert(ITradeEscrow.NotParty.selector);
         vm.prank(attacker);
         escrow.raiseDispute(po.orderId);
     }
 
     function test_revert_NotParty_disputeByCarrierOrArbiter() public {
-        PurchaseOrder memory po = _advancePaid();
+        PurchaseOrder memory po = _shipped();
         vm.expectRevert(ITradeEscrow.NotParty.selector);
         vm.prank(carrier);
         escrow.raiseDispute(po.orderId);
@@ -1260,6 +1382,14 @@ contract TradeEscrowTest is Test {
         vm.expectRevert(ITradeEscrow.InvalidState.selector);
         vm.prank(importer);
         escrow.raiseDispute(po.orderId);
+    }
+
+    /// A disputed order is not refunded by the deadline: only the arbiter or both parties move it.
+    function test_revert_InvalidState_refundFromDisputed() public {
+        PurchaseOrder memory po = _disputed();
+        vm.warp(po.shipmentDeadline + GRACE + 1);
+        vm.expectRevert(ITradeEscrow.InvalidState.selector);
+        escrow.refundAfterDeadline(po.orderId);
     }
 
     function test_revert_InvalidState_disputeTwice() public {
@@ -1458,14 +1588,14 @@ contract TradeEscrowTest is Test {
     }
 
     /// The nonce binds the state as well as the version: signatures for "version N in
-    /// ADVANCE_PAID" are rejected by an order that is at version N in DISPUTED.
+    /// SHIPPED" are rejected by an order that is at version N in DISPUTED.
     function test_revert_BadImporterSignature_cancelSameVersionOtherState() public {
         PurchaseOrder memory po = _disputed();
         uint256 v = _version(po.orderId);
-        uint256 nAdvancePaid = _nonceFor(v, ITradeEscrow.State.ADVANCE_PAID);
+        uint256 nShipped = _nonceFor(v, ITradeEscrow.State.SHIPPED);
         assertEq(_cancelNonce(po.orderId), _nonceFor(v, ITradeEscrow.State.DISPUTED));
-        bytes memory cI = _signCancel(importerPk, po.orderId, nAdvancePaid);
-        bytes memory cE = _signCancel(exporterPk, po.orderId, nAdvancePaid);
+        bytes memory cI = _signCancel(importerPk, po.orderId, nShipped);
+        bytes memory cE = _signCancel(exporterPk, po.orderId, nShipped);
         vm.expectRevert(ITradeEscrow.BadImporterSignature.selector);
         escrow.cancel(po.orderId, cI, cE);
     }
@@ -1616,7 +1746,8 @@ contract TradeEscrowTest is Test {
     /// Cross-function reentrancy: the advance payout cannot enter cancel, even with
     /// signatures valid for the state the order has inside the callback.
     /// raiseDispute is guarded too: a payout callback cannot open a dispute in the middle of
-    /// fund (without the guard the call would reach the party check instead).
+    /// fund (without the guard the call would revert with InvalidState, since the order is in
+    /// ADVANCE_PAID inside the callback).
     function test_revert_ReentrancyGuardReentrantCall_disputeFromCallback() public {
         ReentrantToken re = new ReentrantToken();
         TradeEscrow reEscrow = new TradeEscrow(IERC20(address(re)), GRACE);
@@ -1680,8 +1811,11 @@ contract TradeEscrowTest is Test {
         vm.startPrank(importer);
         zr.approve(address(zrEscrow), TOTAL);
         zrEscrow.fund(po.orderId);
-        zrEscrow.raiseDispute(po.orderId);
         vm.stopPrank();
+        ShipmentAttestation memory att = _att(po.orderId);
+        zrEscrow.submitShipment(po.orderId, att, _sign(carrierPk, _digest(address(zrEscrow), KeelHash.hash(att))));
+        vm.prank(importer);
+        zrEscrow.raiseDispute(po.orderId);
 
         bytes memory sig = _sign(
             arbiterPk,

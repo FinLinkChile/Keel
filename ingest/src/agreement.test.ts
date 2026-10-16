@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ALIAS_IDS } from "@keel/schemas";
 import { readInvoice } from "./agreement";
-import { ExtractionError, type ExtractorProvider, type InvoiceDocument } from "./extractor";
+import { ExtractionError, type ExtractorProvider, type ExtractionRequest } from "./extractor";
 import type { AliasTable } from "./parser";
 import { renderInvoice, sampleSpec, type InvoiceSpec } from "./testing/renderInvoice";
 
@@ -9,9 +9,9 @@ const [ALIAS, OTHER_ALIAS] = [ALIAS_IDS[0], ALIAS_IDS[1]];
 const aliases: AliasTable = [{ alias: ALIAS, rut: "761234560", emailDomain: "aduanasperez.cl" }];
 
 // The n-th RUT token in the redacted text: 0 is the issuer, 1 the customer
-const rutToken = (doc: InvoiceDocument, n = 0) => [...doc.text.matchAll(/\[RUT_[0-9a-f]{8}\]/g)][n]![0];
+const rutToken = (doc: ExtractionRequest, n = 0) => [...doc.text.matchAll(/\[RUT_[0-9a-f]{8}\]/g)][n]![0];
 
-const honest = (doc: InvoiceDocument) => ({
+const honest = (doc: ExtractionRequest) => ({
   alias_id: ALIAS,
   issuer_tax_id: rutToken(doc),
   invoice_number: "4521",
@@ -22,7 +22,7 @@ const honest = (doc: InvoiceDocument) => ({
   hidden_text_detected: false,
 });
 
-const model = (reply: (doc: InvoiceDocument) => object): ExtractorProvider => ({
+const model = (reply: (doc: ExtractionRequest) => object): ExtractorProvider => ({
   provider: "fake",
   model: "fake-1",
   complete: async (doc) => JSON.stringify(reply(doc)),

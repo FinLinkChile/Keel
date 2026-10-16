@@ -1,5 +1,5 @@
 import { GoogleGenAI, type GenerateContentResponse } from "@google/genai";
-import { ExtractionError, LLM_OUTPUT_SCHEMA, SYSTEM_PROMPT, userMessage, type ExtractorProvider, type InvoiceDocument } from "../contract";
+import { ExtractionError, type ExtractionRequest, type ExtractorProvider } from "../contract";
 
 const BLOCKED = new Set(["SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "RECITATION", "IMAGE_SAFETY"]);
 
@@ -14,16 +14,16 @@ export class GeminiProvider implements ExtractorProvider {
     this.client = new GoogleGenAI({ apiKey });
   }
 
-  async complete(doc: InvoiceDocument): Promise<string> {
+  async complete(request: ExtractionRequest): Promise<string> {
     let res: GenerateContentResponse;
     try {
       res = await this.client.models.generateContent({
         model: this.model,
-        contents: [{ role: "user", parts: [{ text: userMessage(doc.text) }] }],
+        contents: [{ role: "user", parts: [{ text: request.user }] }],
         config: {
-          systemInstruction: SYSTEM_PROMPT,
+          systemInstruction: request.system,
           responseMimeType: "application/json",
-          responseJsonSchema: LLM_OUTPUT_SCHEMA,
+          responseJsonSchema: request.schema,
           temperature: 0,
         },
       });

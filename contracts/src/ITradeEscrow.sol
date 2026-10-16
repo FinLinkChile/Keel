@@ -86,9 +86,11 @@ interface ITradeEscrow {
     error InvalidOrder();
     /// @dev Proposed: orderId is not keccak256(abi.encode(importer, exporter, nonce)).
     error BadOrderId();
-    /// @dev Proposed: funding at or after shipmentDeadline.
+    /// @dev Proposed: funding at or after shipmentDeadline, or a shipment submitted once the
+    /// refund is due (now > shipmentDeadline + refundGrace).
     error DeadlinePassed();
-    /// @dev Proposed: the attestation is for another order or its on board date is in the future.
+    /// @dev Proposed: the attestation is for another order, or its on board date is in the future
+    /// or before the order was funded.
     error InvalidAttestation();
     /// @dev Proposed: the dispute resolution is not signed by the arbiter of the order.
     error BadArbiterSignature();

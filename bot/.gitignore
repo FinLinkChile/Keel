@@ -1,0 +1,2 @@
+# Real recipient directories (chat ids) stay out of git
+*.local.json
