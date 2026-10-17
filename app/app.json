@@ -5,13 +5,14 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "cl.finlink.keel"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#000000",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -19,7 +20,38 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#000000"
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Keel uses the camera to photograph the exporter's proforma.",
+          "photosPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
+        "react-native-document-scanner-plugin",
+        {
+          "cameraPermission": "Keel uses the camera to scan the exporter's proforma."
+        }
+      ]
+    ],
+    "scheme": "keel",
+    "backgroundColor": "#000000",
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }
