@@ -12,6 +12,7 @@ import {
   differenceWords,
   incotermText,
   payoutHistory,
+  SAFE_NOT_SET_UP,
   SIGNING_NOT_SET_UP,
   signingSetup,
   type OrderCheck,
@@ -59,12 +60,12 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
   useEffect(() => {
     if (!proposal || proposal.status !== 'awaiting_importer') return;
     let live = true;
-    reviewForImporter(proposal, { importer: address, setup, now: Date.now() / 1000 }).then((r) => live && setReview(r));
+    reviewForImporter(proposal, { owner: address, setup, now: Date.now() / 1000 }).then((r) => live && setReview(r));
     return () => {
       live = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proposal, address, setup?.escrow, setup?.chainId]);
+  }, [proposal, address, setup?.escrow, setup?.chainId, setup?.safe]);
 
   if (view === undefined) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   if (view === null || !proposal) {
@@ -84,7 +85,7 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
 
   const checks: OrderCheck[] = review?.checks ?? [];
   const differences = review?.differences ?? [];
-  const canSign = !!setup && !!signer && !!review && checks.length === 0 && ticked && !busy;
+  const canSign = !!setup?.safe && !!signer && !!review && checks.length === 0 && ticked && !busy;
 
   const total = tokenToCents(po.totalAmount);
   const advanceUnits = (po.totalAmount * BigInt(po.advanceBps)) / 10_000n;
@@ -107,13 +108,15 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
 
   const help = !setup
     ? SIGNING_NOT_SET_UP
-    : !review
-      ? 'Checking the order on this phone.'
-      : checks.length > 0
-        ? 'Do not sign this order. Reject it, or ask for a new one.'
-        : !ticked
-          ? 'Tick the box above to sign with your wallet.'
-          : 'Signs with your wallet. The agent deposits after this.';
+    : !setup.safe
+      ? SAFE_NOT_SET_UP
+      : !review
+        ? 'Checking the order on this phone.'
+        : checks.length > 0
+          ? 'Do not sign this order. Reject it, or ask for a new one.'
+          : !ticked
+            ? 'Tick the box above to sign with your wallet.'
+            : 'Signs with your wallet. The agent deposits after this.';
 
   const history_ =
     history.different > 0

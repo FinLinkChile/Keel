@@ -1,7 +1,7 @@
 import type { Hex } from '@keel/schemas';
 import { Link } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { ScrollView, View } from 'react-native';
+import { ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { keccak256, recoverTypedDataAddress, stringToBytes } from 'viem';
 
@@ -24,10 +24,12 @@ const LOCAL_CHAIN_ID = 31337;
 type Result = { message: DocumentUpload; signature: Hex; recovered: Hex; ms: number } | { error: string };
 
 export default function Signature() {
-  const { signer, address, addresses, resetWallet, role } = useSession();
+  const { signer, address, addresses, resetWallet, importKey, role } = useSession();
   // PO-0142 as the connected wallet sees it: its id depends on the wallets of the parties
   const orderId = useData(async (d) => (await d.orders()).find((o) => o.label === 'PO-0142')?.po.orderId, [role, address]);
   const [result, setResult] = useState<Result>();
+  const [keyText, setKeyText] = useState('');
+  const [imported, setImported] = useState<string>();
   const chainId = config.chainId ?? LOCAL_CHAIN_ID;
 
   async function sign() {
@@ -96,6 +98,40 @@ export default function Signature() {
             Keel Ingest, version 1, chain {chainId}
             {config.chainId ? '' : ' (EXPO_PUBLIC_CHAIN_ID not set)'}
           </Text>
+        </Field>
+
+        {/* This screen is development only: the demo keys, as the wallet of the chosen role */}
+        <Field label={`Import test key, ${role}`}>
+          <TextInput
+            value={keyText}
+            onChangeText={setKeyText}
+            placeholder="0x… private key"
+            placeholderTextColor={colors.textFaint}
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry
+            style={{ color: colors.text, fontFamily: 'monospace', fontSize: 14, paddingVertical: 8 }}
+          />
+          <Button
+            label="Import test key"
+            variant="secondary"
+            disabled={!keyText.trim()}
+            onPress={async () => {
+              try {
+                await importKey(role, keyText);
+                setKeyText('');
+                setImported(`Loaded as the ${role} wallet`);
+                setResult(undefined);
+              } catch (e) {
+                setImported(e instanceof Error ? e.message : 'Could not import');
+              }
+            }}
+          />
+          {imported ? (
+            <Text size={13} color="textMuted">
+              {imported}
+            </Text>
+          ) : null}
         </Field>
 
         <Button label="Sign a test upload" onPress={sign} disabled={!signer} />

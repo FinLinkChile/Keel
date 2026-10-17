@@ -1,6 +1,7 @@
 import type { Hex } from '@keel/schemas';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { config } from '@/config';
 import { bindCompany, bindWallets, type Role } from '@/data';
 import { toOnboarding, type Draft, type Onboarding } from '@/data/onboarding';
 import { onboardingStore } from '@/data/onboardingStore';
@@ -23,6 +24,8 @@ type Session = {
   createWallet: () => Promise<void>;
   // Forgets the wallet for this session. The key itself stays on the device.
   disconnect: () => void;
+  // Development only (/dev/signature): loads a demo key as the wallet of a role
+  importKey: (role: Role, privateKey: string) => Promise<void>;
   // Development only (/dev/signature): deletes the key and disconnects
   resetWallet: () => Promise<void>;
 };
@@ -38,7 +41,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   // During render, not in an effect: screens below load their data in their own effects,
   // which run before this provider's, and must already see the wallets.
-  bindWallets(addresses);
+  bindWallets(addresses, config.importerSafe);
   bindCompany(onboarding?.company);
 
   const use = useCallback(async (s: Signers | null) => {
@@ -80,6 +83,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       },
       createWallet: async () => use(await wallets.create()),
       disconnect: () => use(null),
+      importKey: async (r, privateKey) => use(await wallets.importKey(r, privateKey)),
       resetWallet: async () => {
         await wallets.reset();
         await use(null);

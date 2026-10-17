@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 
 import { EIP712_TYPES, OrderTerms, REQUIRED_DOC_TYPES } from '@keel/schemas';
 import { requiredDocsHash, termsHash } from '@keel/schemas/hash';
+import { getAddress } from 'viem';
 import { describe, expect, it } from 'vitest';
 
 import { centsToToken } from '../src/data/amounts';
@@ -157,5 +158,25 @@ describe('inputs', () => {
     await demoData({ exporter: EXPORTER }, botAccounts);
     const { mockData } = await import('../src/data/mock');
     expect((await mockData.party('lingnan'))!.address).not.toBe(EXPORTER);
+  });
+});
+
+describe('demo data with the importer as a Safe', () => {
+  const SAFE = getAddress('0x5afe5afe5afe5afe5afe5afe5afe5afe5afe5afe');
+
+  it('makes the Safe the importer of every order and the owner key the uploader in ingest', async () => {
+    const { ingestOrders, agentOrders } = await demoData({ exporter: EXPORTER, importer: IMPORTER }, botAccounts, { importerSafe: SAFE });
+    expect(agentOrders.every((o) => o.order.importer === SAFE)).toBe(true);
+    expect(agentOrders.every((o) => o.order.orderId === orderIdOf(SAFE, o.order.exporter, o.order.nonce))).toBe(true);
+    const uploaders = ingestOrders.flatMap((e) => e.uploaders);
+    expect(uploaders).toContainEqual({ address: IMPORTER, party: 'importer' });
+    expect(uploaders.some((u) => u.address === SAFE)).toBe(false);
+  });
+
+  it('pays the demo exporter, not a fixed account', async () => {
+    const { agentOrders } = await demoData({ exporter: EXPORTER, importer: IMPORTER }, botAccounts, { importerSafe: SAFE });
+    const lingnan = agentOrders.filter((o) => o.order.exporter === EXPORTER);
+    expect(lingnan.length).toBeGreaterThan(0);
+    expect(lingnan.every((o) => o.order.payoutAddress === EXPORTER)).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import { EIP712_TYPES, keelDomain, type Hex, type OrderTerms, type PurchaseOrder } from '@keel/schemas';
 import { termsHash } from '@keel/schemas/hash';
-import { hexToString, isAddress, recoverTypedDataAddress } from 'viem';
+import { encodeAbiParameters, hashTypedData, hexToString, isAddress, recoverTypedDataAddress } from 'viem';
 
 import type { Signer } from '../wallet/signer';
 
@@ -13,22 +13,27 @@ import { checkOrderShape, orderIdOf, type OrderProblem } from './orderRules';
 
 const ZERO = '0x0000000000000000000000000000000000000000';
 
-// The escrow from EXPO_PUBLIC_ESCROW_ADDRESS. Undefined when it is empty, malformed or the zero
-// address: the app never signs with a placeholder.
+// An address from the environment (EXPO_PUBLIC_ESCROW_ADDRESS, EXPO_PUBLIC_IMPORTER_SAFE).
+// Undefined when it is empty, malformed or the zero address: the app never signs with a placeholder.
 export function escrowFrom(raw: string | undefined): Hex | undefined {
   const value = raw?.trim();
   if (!value || !isAddress(value, { strict: false }) || value.toLowerCase() === ZERO) return undefined;
   return value as Hex;
 }
 
-export type SigningSetup = { chainId: number; escrow: Hex };
+// `safe` is the importer's Safe, which is po.importer: the importer signs through it (ERC-1271).
+// Without it the exporter can still sign, the importer cannot.
+export type SigningSetup = { chainId: number; escrow: Hex; safe?: Hex };
 
 // Without both the chain and the escrow, nothing can be signed
-export function signingSetup(config: { chainId?: number; escrowAddress?: Hex }): SigningSetup | undefined {
-  return config.chainId && config.escrowAddress ? { chainId: config.chainId, escrow: config.escrowAddress } : undefined;
+export function signingSetup(config: { chainId?: number; escrowAddress?: Hex; importerSafe?: Hex }): SigningSetup | undefined {
+  return config.chainId && config.escrowAddress
+    ? { chainId: config.chainId, escrow: config.escrowAddress, ...(config.importerSafe && { safe: config.importerSafe }) }
+    : undefined;
 }
 
 export const SIGNING_NOT_SET_UP = 'Signing orders is not set up yet.';
+export const SAFE_NOT_SET_UP = "The importer's Safe is not set up yet.";
 
 type Order = { po: PurchaseOrder; terms: OrderTerms };
 
@@ -128,6 +133,38 @@ export async function recoverPurchaseOrderSigner(setup: SigningSetup, po: Purcha
       message: po,
       signature,
     });
+  } catch {
+    return undefined;
+  }
+}
+
+// The importer is a Safe, so its signature is the one the Safe's CompatibilityFallbackHandler
+// accepts through ERC-1271: an owner of the Safe signs the EIP-712 SafeMessage (domain: chainId and
+// the Safe; message: abi.encode(purchaseOrderDigest)). The digest is what the escrow hashes.
+const SAFE_MESSAGE_TYPES = { SafeMessage: [{ name: 'message', type: 'bytes' }] } as const;
+
+export function purchaseOrderDigest(setup: SigningSetup, po: PurchaseOrder): Hex {
+  return hashTypedData({ domain: keelDomain(setup.chainId, setup.escrow), types, primaryType: 'PurchaseOrder', message: po });
+}
+
+const safeMessage = (setup: SigningSetup, safe: Hex, po: PurchaseOrder) => ({
+  domain: { chainId: setup.chainId, verifyingContract: safe },
+  types: SAFE_MESSAGE_TYPES,
+  primaryType: 'SafeMessage' as const,
+  message: { message: encodeAbiParameters([{ type: 'bytes32' }], [purchaseOrderDigest(setup, po)]) },
+});
+
+// The signature of an owner of the importer's Safe over this order
+export function signPurchaseOrderAsSafeOwner(signer: Signer, setup: SigningSetup, safe: Hex, po: PurchaseOrder): Promise<Hex> {
+  const m = safeMessage(setup, safe, po);
+  return signer.signTypedData(m.domain, m.types, m.primaryType, m.message);
+}
+
+// The owner key that made a Safe signature of this order. Whether that key is an owner of the
+// Safe is checked by the Safe itself when the escrow opens.
+export async function recoverSafeOwner(setup: SigningSetup, safe: Hex, po: PurchaseOrder, signature: Hex): Promise<Hex | undefined> {
+  try {
+    return await recoverTypedDataAddress({ ...safeMessage(setup, safe, po), signature });
   } catch {
     return undefined;
   }

@@ -3,7 +3,7 @@ import type { Hex } from '@keel/schemas';
 import type { Role } from '../data/types';
 
 import { keyStore } from './keyStore';
-import { ensureKeys, loadKeys, removeKeys, type Keys } from './keys';
+import { ensureKeys, importKey, loadKeys, removeKeys, type Keys } from './keys';
 import { localSigner } from './localSigner';
 import type { Signers, WalletProvider } from './signer';
 
@@ -18,6 +18,10 @@ export const wallets: WalletProvider = {
   load: async () => signersOf(await loadKeys(keyStore)),
   create: async () => signersOf(await ensureKeys(keyStore)) as Required<Signers>,
   reset: () => removeKeys(keyStore),
+  importKey: async (role, privateKey) => {
+    await importKey(keyStore, role, privateKey);
+    return signersOf(await loadKeys(keyStore));
+  },
 };
 
 export const ROLES_WITH_KEY: readonly Role[] = ['importer', 'exporter'];

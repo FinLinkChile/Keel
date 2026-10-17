@@ -35,4 +35,6 @@ export interface WalletProvider {
   create(): Promise<Required<Signers>>;
   // Development only: deletes the test wallet keys from this device
   reset(): Promise<void>;
+  // Development only: loads a key made elsewhere as the wallet of a role and returns the wallets
+  importKey(role: Role, privateKey: string): Promise<Signers>;
 }
