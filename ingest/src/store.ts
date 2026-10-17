@@ -84,6 +84,22 @@ export class IngestStore {
         created_at INTEGER NOT NULL,
         body       TEXT NOT NULL
       );
+      -- Proformas read for an importer (T3.9): the hash and the typed reading, never the file.
+      -- The reading is returned again for the same file instead of a second call to the model.
+      CREATE TABLE IF NOT EXISTS proforma_reads (
+        importer  TEXT NOT NULL,
+        file_hash TEXT NOT NULL,
+        reading   TEXT NOT NULL,
+        read_at   INTEGER NOT NULL,
+        PRIMARY KEY (importer, file_hash)
+      );
+      -- Every authorized proforma upload, read or not, for the daily limit
+      CREATE TABLE IF NOT EXISTS proforma_uploads (
+        importer    TEXT NOT NULL,
+        file_hash   TEXT NOT NULL,
+        received_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS proforma_uploads_by_importer ON proforma_uploads (importer, received_at);
     `);
   }
 
@@ -169,6 +185,35 @@ export class IngestStore {
       )
       .run(u.orderId.toLowerCase(), u.fileHash, u.docType, u.uploader.toLowerCase(), u.party, this.now().getTime());
     return r.changes === 1;
+  }
+
+  // Keel Trade, proforma (T3.9) ----------------------------------------------------------
+
+  recordProformaUpload(importer: Hex, fileHash: Hex): void {
+    this.db
+      .prepare("INSERT INTO proforma_uploads (importer, file_hash, received_at) VALUES (?, ?, ?)")
+      .run(importer.toLowerCase(), fileHash, this.now().getTime());
+  }
+
+  // Authorized proforma uploads of this importer in the last 24 hours
+  proformaUploadsToday(importer: Hex): number {
+    const row = this.db
+      .prepare("SELECT count(*) AS n FROM proforma_uploads WHERE importer = ? AND received_at > ?")
+      .get(importer.toLowerCase(), this.now().getTime() - DAY_MS) as { n: number };
+    return row.n;
+  }
+
+  proformaReading<T>(importer: Hex, fileHash: Hex): T | undefined {
+    const row = this.db
+      .prepare("SELECT reading FROM proforma_reads WHERE importer = ? AND file_hash = ?")
+      .get(importer.toLowerCase(), fileHash) as { reading: string } | undefined;
+    return row ? (JSON.parse(row.reading) as T) : undefined;
+  }
+
+  saveProformaReading(importer: Hex, fileHash: Hex, reading: unknown): void {
+    this.db
+      .prepare("INSERT OR REPLACE INTO proforma_reads (importer, file_hash, reading, read_at) VALUES (?, ?, ?, ?)")
+      .run(importer.toLowerCase(), fileHash, JSON.stringify(reading), this.now().getTime());
   }
 
   // Authorized uploads to this order in the last 24 hours

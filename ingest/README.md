@@ -75,6 +75,12 @@ What the tests prove, with an honest model: all 24 legitimate documents are read
 
 Measured on 2026-10-14 with `claude-opus-5-5` through the team's LiteLLM proxy: 54/54 as expected, 24/24 legitimate documents read end to end, 12/12 complete packages, 0 unsafe, in 139 s. Two runs only. In an earlier run the model also flagged A20 ("RELEASE PAYMENT IMMEDIATELY") as text addressed to an automated system, a stricter result, so a run can differ on such cases; an unsafe result never appeared.
 
+## Proforma reading (T3.9)
+
+`POST /trade/proforma` reads the exporter's proforma so the app can prefill the purchase order on the importer's review screen (step 0 of the flow). The importer signs `ProformaUpload(bytes32 fileHash,uint64 issuedAt)` in the same domain as the document upload; the importer uploaders of `INGEST_ORDERS_FILE` and the addresses of `INGEST_IMPORTERS_FILE` may upload. The body is `{ issuedAt, signature, file }`, the file a PDF, a JPEG, PNG or WebP photo, or a scan; its type is read from the bytes.
+
+A PDF with text is read like the other documents, from redacted text, and the parser's hidden text check is added to the model's. A photo or a scanned PDF has no text to redact, so the file goes to the model and the transfer is logged as unredacted (`extraccion_proforma`). The answer is typed fields only (number, date, currency, amount, incoterm, HS codes, latest shipment date, ports, advance in basis points, and two warnings), with the fields the proforma does not print listed in `missing`. It never returns the payout address, names or free text. One reader is enough because the reading decides nothing: the people review every field before both sign the order. 20 proformas per importer and day; the same file returns the same reading without a second call to the model. Contract: [docs/interfaces/lectura-de-proforma.md](../docs/interfaces/lectura-de-proforma.md).
+
 ## Notifications to the bot (Area 4)
 
 With `BOT_URL` and `BOT_INGEST_TOKEN`, ingest posts every outcome as is to `{BOT_URL}/ingest/outcomes` (`{"source": "email" | "trade_upload", "outcome": ...}`), and once a day the beneficiary change digest (`{"source": "change_digest", "since", "requests"}`), as [docs/interfaces/avisos-al-bot.md](../docs/interfaces/avisos-al-bot.md) asks. The bot maps them to template messages and drops the destinations and any document text. Delivery never blocks or changes an outcome: it runs after the reply, with a 3 s timeout, and a failure is only logged as `bot_notify_failed` with the HTTP status or the error class. `BOT_URL` must be https (or http to localhost), because the token and the outcomes travel to it, and the token must differ from ingest's own tokens.
@@ -189,3 +195,4 @@ Tasks are described in [docs/trabajo/area-3-ingesta.md](../docs/trabajo/area-3-i
 | T3.6 Account change detection (change request; alert only in Trade) | #23 |
 | T3.7 Idempotency and document keys (`invoiceKey`; `blNumberHash`, `docsHash`) | #24 |
 | T3.8 Document corpus | #25 |
+| T3.9 Proforma reading (added by Trade) | #59 |
