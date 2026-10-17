@@ -331,6 +331,8 @@ export const GATE_EVENTS = [
   "ChangeVetoed",
   "SupplierRemoved",
   "ThirdPartyRemoved",
+  // The guardian (pause only) was set, or cleared with the zero address
+  "GuardianSet",
   // Inherited from OpenZeppelin EIP712 (ERC-5267)
   "EIP712DomainChanged",
 ] as const;
@@ -364,6 +366,12 @@ export const GATE_ERRORS = [
   "AllowanceNotConsumed",
   // Registries and pause
   "OnlySafeOrCosigner",
+  // emergencyPause by someone other than the Safe, the cosigner or the guardian
+  "OnlyPauser",
+  // The guardian would be the policy signer, the cosigner or the Safe
+  "InvalidGuardian",
+  // A new policy signer or cosigner would be the guardian
+  "SignerIsGuardian",
   "ChangeNotPending",
   "AlreadyRegistered",
   "NotRegistered",

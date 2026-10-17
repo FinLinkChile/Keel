@@ -3,10 +3,11 @@
 //   GET  /admin/settings  current LLM and DMARC settings         Bearer INGEST_ADMIN_TOKEN
 //   PUT  /admin/settings  change them (audited)                  Bearer INGEST_ADMIN_TOKEN
 //   POST /trade/documents a Keel Trade document from the app       EIP-712 signature of a party
+//   POST /trade/proforma  a proforma to prefill an order (T3.9)    EIP-712 signature of an importer
 // Without a webhook token the server does not start; without an admin token the admin
 // routes do not exist. The two tokens must differ: the forwarder cannot administer.
-// Without an orders file the trade route does not exist. With INGEST_APP_ORIGIN, the trade route
-// answers CORS for that one origin, so the app can upload from the browser; no other route does.
+// Without an orders file the trade routes do not exist. With INGEST_APP_ORIGIN, the trade routes
+// answer CORS for that one origin, so the app can upload from the browser; no other route does.
 import { createHash, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type RequestListener, type Server, type ServerResponse } from "node:http";
@@ -19,6 +20,7 @@ import { receiveEmail, type EmailOutcome } from "./email/receive";
 import type { AliasTable } from "./parser";
 import { MAX_PDF_BYTES } from "./pdf/text";
 import { receiveTradeDocument, type TradeOutcome } from "./trade/receive";
+import { receiveProforma, staticImporters, type ImporterRegistry, type ProformaOutcome } from "./trade/proforma";
 import { staticOrders, type OrderRegistry, type TradeOrderEntry } from "./trade/upload";
 import { baseUrlsFromEnv, initialSettings, keysFromEnv, SettingsError, SettingsStore, type SettingsAudit } from "./settings";
 import { IngestStore } from "./store";
@@ -64,6 +66,17 @@ const TradeUploadBody = z
     file: z.string().max(MAX_TRADE_BODY_BYTES),
   })
   .strict();
+
+const ProformaUploadBody = z
+  .object({
+    issuedAt: z.number().int().positive(),
+    signature: z.string().regex(/^0x[0-9a-fA-F]{130}$/),
+    // The PDF or the image, base64. Its type is read from the bytes.
+    file: z.string().max(MAX_TRADE_BODY_BYTES),
+  })
+  .strict();
+
+const ImportersSchema = z.array(hex(20));
 
 const AliasTableSchema = z.array(
   z
@@ -126,6 +139,14 @@ export interface TradeLogEntry {
   reason?: string;
 }
 
+export interface ProformaLogEntry {
+  at: string;
+  kind: "trade_proforma";
+  fileHash?: string;
+  status: ProformaOutcome["status"];
+  reason?: string;
+}
+
 export interface ServerDeps {
   webhookToken: string;
   adminToken?: string;
@@ -133,14 +154,14 @@ export interface ServerDeps {
   settings: SettingsStore;
   store: IngestStore;
   resolver?: DNSResolver;
-  // Keel Trade uploads. Without it the route does not exist.
-  trade?: { orders: OrderRegistry; chainId: number };
+  // Keel Trade uploads. Without it the routes do not exist.
+  trade?: { orders: OrderRegistry; chainId: number; importers?: ImporterRegistry };
   // The Telegram bot (Area 4). Told after every outcome, without waiting for it.
   bot?: BotNotifier;
-  // The app's origin (Area 4), e.g. https://app.keel.example. Only the trade route answers CORS.
+  // The app's origin (Area 4), e.g. https://app.keel.example. Only the trade routes answer CORS.
   appOrigin?: string;
   // The activity log. Receives typed fields only, never message content.
-  log?: (entry: LogEntry | SettingsAudit | TradeLogEntry) => void;
+  log?: (entry: LogEntry | SettingsAudit | TradeLogEntry | ProformaLogEntry) => void;
 }
 
 const digest = (s: string) => createHash("sha256").update(s).digest();
@@ -246,6 +267,34 @@ export function createHandler(deps: ServerDeps): RequestListener {
     reply(res, 200, outcome);
   };
 
+  // The reading only prefills the order on the importer's screen; nothing is decided here
+  const proformaUpload = async (req: IncomingMessage, res: ServerResponse, trade: NonNullable<ServerDeps["trade"]>) => {
+    const raw = await readBody(req, MAX_TRADE_BODY_BYTES);
+    if (raw === null) return reply(res, 413, { error: "too_large" });
+    let body: z.infer<typeof ProformaUploadBody>;
+    try {
+      body = ProformaUploadBody.parse(JSON.parse(raw.toString("utf8")));
+    } catch {
+      return reply(res, 400, { error: "invalid_request" });
+    }
+    const outcome = await receiveProforma(
+      { issuedAt: body.issuedAt, signature: body.signature as `0x${string}`, file: new Uint8Array(Buffer.from(body.file, "base64")) },
+      trade.importers ?? staticImporters([]),
+      await deps.settings.getExtractor(),
+      { store: deps.store, chainId: trade.chainId },
+    );
+    const reason = "reason" in outcome ? String(outcome.reason) : undefined;
+    const fileHash = "fileHash" in outcome ? outcome.fileHash : undefined;
+    log({ at: new Date().toISOString(), kind: "trade_proforma", fileHash, status: outcome.status, reason });
+    if (outcome.status === "rejected") {
+      const code = { too_large: 413, unsupported_media: 415, bad_signature: 401, stale_signature: 401, not_an_importer: 403, rate_limited: 429 }[
+        outcome.reason
+      ];
+      return reply(res, code, outcome);
+    }
+    reply(res, 200, outcome);
+  };
+
   // The base URL is shown so the admin knows where documents go; it cannot be changed here
   const adminView = () => ({
     ...deps.settings.get(),
@@ -282,7 +331,7 @@ export function createHandler(deps: ServerDeps): RequestListener {
     try {
       if (req.url === "/inbound" && req.method === "POST") return await inbound(req, res);
       if (req.url === "/admin/settings" && deps.adminToken) return await admin(req, res, deps.adminToken);
-      if (req.url === "/trade/documents" && deps.trade) {
+      if ((req.url === "/trade/documents" || req.url === "/trade/proforma") && deps.trade) {
         cors(req, res);
         if (req.method === "OPTIONS" && deps.appOrigin) {
           res.writeHead(204, {
@@ -292,7 +341,8 @@ export function createHandler(deps: ServerDeps): RequestListener {
           });
           return res.end();
         }
-        if (req.method === "POST") return await tradeUpload(req, res, deps.trade);
+        if (req.method === "POST" && req.url === "/trade/documents") return await tradeUpload(req, res, deps.trade);
+        if (req.method === "POST") return await proformaUpload(req, res, deps.trade);
       }
       reply(res, 404, { error: "not_found" });
     } catch (e) {
@@ -303,7 +353,8 @@ export function createHandler(deps: ServerDeps): RequestListener {
 }
 
 // INGEST_WEBHOOK_TOKEN, INGEST_ADMIN_TOKEN (optional), INGEST_ALIASES_FILE (Keel Personal),
-// INGEST_ORDERS_FILE and INGEST_CHAIN_ID (Keel Trade), INGEST_DB_FILE (default ingest.db),
+// INGEST_ORDERS_FILE and INGEST_CHAIN_ID (Keel Trade), INGEST_IMPORTERS_FILE (optional, more
+// importers who may upload a proforma), INGEST_DB_FILE (default ingest.db),
 // INGEST_SETTINGS_FILE (optional), INGEST_HOST (default 127.0.0.1), INGEST_PORT (default 8788),
 // INGEST_APP_ORIGIN (optional, CORS for the trade route), BOT_URL and BOT_INGEST_TOKEN (optional),
 // the per-provider API keys and the initial LLM_* settings.
@@ -319,9 +370,12 @@ export async function startServer(env: Record<string, string | undefined> = proc
     const chainId = Number(env.INGEST_CHAIN_ID);
     if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new ServerConfigError("INGEST_CHAIN_ID must be a positive integer");
     const orders: TradeOrderEntry[] = OrdersSchema.parse(JSON.parse(await readFile(env.INGEST_ORDERS_FILE, "utf8")));
-    trade = { orders: staticOrders(orders), chainId };
+    // A proforma comes before its order: the importers of the orders file, plus any listed apart
+    const extra = env.INGEST_IMPORTERS_FILE ? ImportersSchema.parse(JSON.parse(await readFile(env.INGEST_IMPORTERS_FILE, "utf8"))) : [];
+    const importers = [...orders.flatMap((o) => o.uploaders.filter((u) => u.party === "importer").map((u) => u.address)), ...extra];
+    trade = { orders: staticOrders(orders), chainId, importers: staticImporters(importers) };
   }
-  const log = (entry: LogEntry | SettingsAudit | TradeLogEntry | BotLogEntry) => console.log(JSON.stringify(entry));
+  const log = (entry: LogEntry | SettingsAudit | TradeLogEntry | ProformaLogEntry | BotLogEntry) => console.log(JSON.stringify(entry));
   const bot = botNotifierFromEnv(env, log);
   const settings = await SettingsStore.open({
     fallback: initialSettings(env),

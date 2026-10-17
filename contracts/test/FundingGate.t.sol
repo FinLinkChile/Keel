@@ -503,7 +503,8 @@ contract FundingGateTest is Test {
         FundIntent memory i = _intent(po);
         PolicyDecision memory d = _decision(i, 1);
         bytes memory sig = _sign(policyPk, _pdrDigest(gate, d));
-        vm.expectRevert(abi.encodeWithSelector(MockTradeRoles.ConditionViolation.selector, uint8(17), bytes32(0)));
+        // Same Status and info shape as the real Roles on the fork: AllowanceExceeded with the key
+        vm.expectRevert(abi.encodeWithSelector(MockTradeRoles.ConditionViolation.selector, uint8(17), AGENT));
         gate.execute(i, d, sig, "");
     }
 
@@ -900,10 +901,179 @@ contract FundingGateTest is Test {
         _expectFundRevert(po, 1, IPDRVerifier.GateIsPaused.selector);
     }
 
-    function test_revert_OnlySafeOrCosigner_emergencyPauseByAttacker() public {
-        vm.expectRevert(FundingGate.OnlySafeOrCosigner.selector);
+    function test_revert_OnlyPauser_emergencyPauseByAttacker() public {
+        vm.expectRevert(FundingGate.OnlyPauser.selector);
         vm.prank(attacker);
         gate.emergencyPause();
+    }
+
+    function test_emergencyPause_bySafe() public {
+        vm.prank(address(safe));
+        gate.emergencyPause();
+        assertTrue(gate.paused());
+    }
+
+    // ================================================================== guardian (#57)
+
+    address guardian = makeAddr("guardian");
+
+    function _setGuardian(address g) internal {
+        vm.prank(address(safe));
+        gate.setGuardian(g);
+    }
+
+    function test_guardian_startsUnset() public view {
+        assertEq(gate.guardian(), address(0));
+    }
+
+    function test_setGuardian_bySafeEmits() public {
+        vm.expectEmit(address(gate));
+        emit FundingGate.GuardianSet(address(0), guardian);
+        _setGuardian(guardian);
+        assertEq(gate.guardian(), guardian);
+    }
+
+    function test_guardian_pauses() public {
+        _setGuardian(guardian);
+        vm.expectEmit(address(gate));
+        emit IPDRVerifier.GatePaused(guardian);
+        vm.prank(guardian);
+        gate.emergencyPause();
+        assertTrue(gate.paused());
+        PurchaseOrder memory po = _order();
+        _expectFundRevert(po, 1, IPDRVerifier.GateIsPaused.selector);
+    }
+
+    function test_revert_OnlySafe_guardianCannotUnpause() public {
+        _setGuardian(guardian);
+        vm.prank(guardian);
+        gate.emergencyPause();
+        vm.expectRevert(IPDRVerifier.OnlySafe.selector);
+        vm.prank(guardian);
+        gate.unpause();
+        assertTrue(gate.paused());
+    }
+
+    function test_revert_OnlySafeOrCosigner_guardianCannotVeto() public {
+        _setGuardian(guardian);
+        vm.prank(address(safe));
+        uint256 id = gate.queueSupplier(exporter, makeAddr("p2"));
+        vm.expectRevert(FundingGate.OnlySafeOrCosigner.selector);
+        vm.prank(guardian);
+        gate.vetoPending(id);
+    }
+
+    function test_revert_OnlySafe_guardianCannotQueue() public {
+        _setGuardian(guardian);
+        vm.startPrank(guardian);
+        vm.expectRevert(IPDRVerifier.OnlySafe.selector);
+        gate.queueSupplier(exporter, makeAddr("p2"));
+        vm.expectRevert(IPDRVerifier.OnlySafe.selector);
+        gate.queueThirdParty(makeAddr("c2"), CARRIER);
+        vm.stopPrank();
+    }
+
+    function test_revert_OnlySafe_guardianCannotRemove() public {
+        _setGuardian(guardian);
+        vm.startPrank(guardian);
+        vm.expectRevert(IPDRVerifier.OnlySafe.selector);
+        gate.removeSupplier(exporter, payout);
+        vm.expectRevert(IPDRVerifier.OnlySafe.selector);
+        gate.removeThirdParty(carrier, CARRIER);
+        vm.stopPrank();
+    }
+
+    function test_revert_OnlySafe_guardianCannotConfigure() public {
+        _setGuardian(guardian);
+        vm.startPrank(guardian);
+        vm.expectRevert(IPDRVerifier.OnlySafe.selector);
+        gate.pause();
+        vm.expectRevert(IPDRVerifier.OnlySafe.selector);
+        gate.setGuardian(address(0));
+        vm.expectRevert(IPDRVerifier.OnlySafe.selector);
+        gate.setPolicyHash(bytes32(0));
+        vm.expectRevert(IPDRVerifier.OnlySafe.selector);
+        gate.setPolicySigner(guardian);
+        vm.expectRevert(IPDRVerifier.OnlySafe.selector);
+        gate.setCosigner(guardian);
+        vm.stopPrank();
+    }
+
+    /// A compromised guardian re-pauses after any separate unpause; the Safe clears it and
+    /// unpauses in one transaction (here, one prank as the Safe), and the old key loses the pause.
+    function test_guardian_compromisedRecovery() public {
+        _setGuardian(guardian);
+        vm.prank(guardian);
+        gate.emergencyPause();
+        vm.startPrank(address(safe));
+        gate.setGuardian(address(0));
+        gate.unpause();
+        vm.stopPrank();
+        vm.expectRevert(FundingGate.OnlyPauser.selector);
+        vm.prank(guardian);
+        gate.emergencyPause();
+        assertFalse(gate.paused());
+    }
+
+    function test_revert_OnlySafe_setGuardianByAttackerOrCosigner() public {
+        vm.expectRevert(IPDRVerifier.OnlySafe.selector);
+        vm.prank(attacker);
+        gate.setGuardian(attacker);
+        vm.expectRevert(IPDRVerifier.OnlySafe.selector);
+        vm.prank(cosigner);
+        gate.setGuardian(cosigner);
+    }
+
+    function test_revert_InvalidGuardian_equalToPolicySignerCosignerOrSafe() public {
+        vm.startPrank(address(safe));
+        vm.expectRevert(FundingGate.InvalidGuardian.selector);
+        gate.setGuardian(policySigner);
+        vm.expectRevert(FundingGate.InvalidGuardian.selector);
+        gate.setGuardian(cosigner);
+        vm.expectRevert(FundingGate.InvalidGuardian.selector);
+        gate.setGuardian(address(safe));
+        vm.stopPrank();
+        assertEq(gate.guardian(), address(0));
+    }
+
+    function test_revert_SignerIsGuardian_setPolicySignerOrCosigner() public {
+        _setGuardian(guardian);
+        vm.startPrank(address(safe));
+        vm.expectRevert(FundingGate.SignerIsGuardian.selector);
+        gate.setPolicySigner(guardian);
+        vm.expectRevert(FundingGate.SignerIsGuardian.selector);
+        gate.setCosigner(guardian);
+        vm.stopPrank();
+        assertEq(gate.policySigner(), policySigner);
+        assertEq(gate.cosigner(), cosigner);
+    }
+
+    /// address(0) turns the guardian off: the former guardian loses the pause, and zero never
+    /// counts as a conflict for the signer setters.
+    function test_guardian_zeroDisables() public {
+        _setGuardian(guardian);
+        vm.expectEmit(address(gate));
+        emit FundingGate.GuardianSet(guardian, address(0));
+        _setGuardian(address(0));
+        vm.expectRevert(FundingGate.OnlyPauser.selector);
+        vm.prank(guardian);
+        gate.emergencyPause();
+        vm.prank(address(safe));
+        gate.setPolicySigner(guardian); // allowed again: no guardian to clash with
+        assertEq(gate.policySigner(), guardian);
+    }
+
+    /// Rotating the guardian: the old one loses the pause, the new one has it.
+    function test_guardian_rotation() public {
+        _setGuardian(guardian);
+        address g2 = makeAddr("guardian2");
+        _setGuardian(g2);
+        vm.expectRevert(FundingGate.OnlyPauser.selector);
+        vm.prank(guardian);
+        gate.emergencyPause();
+        vm.prank(g2);
+        gate.emergencyPause();
+        assertTrue(gate.paused());
     }
 
     function test_revert_OnlySafe_cosignerCannotUnpause() public {

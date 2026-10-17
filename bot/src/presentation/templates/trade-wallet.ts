@@ -25,6 +25,19 @@ export const transferBlocked: Render<"transfer_blocked"> = () => ({
   link: { label: "See what happened", path: "/activity" },
 });
 
+// What the monitor cannot repeat at will: it needs a key outside the system. The monitor fires it
+// for a deposit through the gate with a payment request the engine never issued, or for a balance
+// released from the escrow with a decision the engine never signed. The message says what was
+// seen, never what was paid or to whom, and does not claim a pause: that has its own notice, and
+// pausing the gate stops new deposits, not releases from the escrow.
+export const unauthorizedExecution: Render<"unauthorized_execution"> = (_n, r) => ({
+  text:
+    r.role === "cosigner"
+      ? "A payment on one of your orders used an approval Keel's engine never issued. A Keel key may have been used outside the system. If it was not expected, pause new deposits in Keel now."
+      : "A payment on one of your orders used an approval Keel's engine never issued. A Keel key may have been used outside the system. Check it in Keel, and if you did not expect it, tell your cosigner right away.",
+  link: { label: "See what happened", path: "/activity" },
+});
+
 export const agentRevoked: Render<"agent_revoked"> = () => ({
   text: "The Keel agent was turned off. It can no longer pay anything. Payments wait until it is turned back on in Keel.",
   link: { label: "Open agent settings", path: "/agent" },
