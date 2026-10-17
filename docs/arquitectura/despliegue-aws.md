@@ -5,7 +5,7 @@ description: "Cómo se propone correr Keel en AWS sin servidores propios y por d
 tags: [aws, serverless, despliegue, api, waf, throttling]
 modo: trade
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T20:00:00Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-10-17T21:00:00Z }
 ---
 
 **[PROPUESTA]** del Área 2 (Darienn), 17 de octubre de 2026. Falta que el equipo la confirme.
@@ -32,3 +32,11 @@ Reglas para las dos etapas:
 * Los topes se fijan por ruta. `POST /trade/proforma` llama al LLM y lleva el tope más bajo. Los valores de tasa y ráfaga están **[ABIERTO]**.
 * Pasar de HTTP API a REST API no cambia las rutas ni la autenticación: cada ruta sigue exigiendo su firma EIP-712 o su token.
 * La REST API cobra más por petición que la HTTP API, y WAF suma un cobro fijo mensual por reglas más uno por petición.
+
+## El bot solo envía
+
+**[PROPUESTA]** En AWS el bot de Telegram solo envía avisos: el sistema no recibe mensajes desde Telegram. No hay webhook, ni ruta `/telegram`, ni `secret_token`, y la Lambda de avisos solo llama a `sendMessage`. Cualquier mensaje que alguien escriba al bot se ignora.
+
+* Hoy el bot atiende `/start` y `/status` con textos fijos por polling (`bot/src/main.ts`, `bot/src/adapters/telegram/commands.ts`). Esos dos comandos y el polling se retiran.
+* Quien opera el sistema lo hace desde la app, donde firma la billetera. El bot nunca firma ni decide: sus botones abren la app ([principios](../flujo/principios.md)).
+* Afecta al Área 4, que es dueña del bot y debe confirmarlo. Alta de chats y tope por chat siguen como en [avisos al bot](../interfaces/avisos-al-bot.md).
