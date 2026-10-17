@@ -1,5 +1,9 @@
 # Historial de la documentación
 
+## 2026-10-17
+
+* **Actualización (app) [PROPUESTA]**: el importador abre el perfil de cada proveedor desde Suppliers y ve su puntaje, de 0 a 5 estrellas, con el desglose y las órdenes de las que sale: órdenes firmadas, embarques a tiempo contra la fecha límite firmada, saldos liberados, reembolsos y cancelaciones. Sin reseñas de texto, para que nadie lo infle escribiendo, y sin puntaje mientras ninguna orden haya embarcado o se haya reembolsado. **Solo informa**: no cambia a quién ni cuánto se paga, y el agente no ajusta el anticipo con él (la regla de historial del motor sigue siendo la del Área 2). Cuenta solo las órdenes de la empresa; el historial compartido entre empresas de Keel sin nombrarlas queda como trabajo futuro. Es el análisis "Puntaje del proveedor" del documento de negocio, que lo pone en la fase de piloto, fuera del [alcance](flujo/alcance.md) de la competencia. Área 3 (Daniela), como aporte al Área 4.
+
 ## 2026-10-16
 
 * **Actualización (app) [PROPUESTA]**: la app parte vacía, sin las órdenes de relleno del mock (vuelven con `EXPO_PUBLIC_DEMO_SEED=1`), y pide un registro antes de entrar: país (solo Chile), empresa y representante, con los datos que pide un banco chileno (RUT validado con su dígito verificador, razón social, correo, celular y si es persona expuesta políticamente). **La validación de identidad es simulada**: la persona marca que la hizo y no se captura ni se verifica nada; el KYC sigue siendo trabajo futuro ([alcance](flujo/alcance.md)) y la pantalla lo dice. Los datos quedan solo en el teléfono, sin pasar por la ingesta ni por el modelo (Ley 21.719). También: perfil con cierre de sesión (vuelve a elegir rol y conserva la billetera de prueba), Suppliers y Activity con datos reales y el escáner de documentos del iPhone para la proforma. Propuesta del Área 3 (Daniela) como PR al Área 4 (Christian), que decide si lo adopta.

@@ -29,15 +29,16 @@ export default function Connect() {
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
       bounces={false}
+      showsVerticalScrollIndicator={false}
       scrollEnabled={contentHeight > boxHeight}
       onLayout={(e) => setBoxHeight(e.nativeEvent.layout.height)}
       onContentSizeChange={(_, h) => setContentHeight(h)}
       contentContainerStyle={{
         flexGrow: 1,
-        paddingTop: Math.max(56, insets.top + 8),
-        paddingBottom: insets.bottom + 24,
+        paddingTop: Math.max(24, insets.top),
+        paddingBottom: insets.bottom + 8,
         paddingHorizontal: gutter,
-        gap: 22,
+        gap: 16,
       }}
     >
       <Logo />
