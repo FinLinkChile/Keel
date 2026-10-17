@@ -83,6 +83,7 @@ export default function Home() {
         wallet={wallet}
         lockedLabel={role === 'importer' ? 'Locked in orders' : 'Locked for you'}
         onLocked={() => router.navigate('/orders')}
+        onAgent={() => router.navigate('/agent')}
       />
 
       {items.length > 0 ? (
