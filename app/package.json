@@ -43,8 +43,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "demo-data": "tsx scripts/demo-data.ts",
-    "bot-examples": "tsx scripts/bot-examples.ts",
-    "sign-shipment": "tsx scripts/sign-shipment.ts"
+    "bot-examples": "tsx scripts/bot-examples.ts"
   },
   "private": true
 }

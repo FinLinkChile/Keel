@@ -15,14 +15,16 @@ const day = (month: number, date: number) => Date.UTC(2026, month - 1, date) / 1
 // Checksummed, as viem requires to sign or hash an address
 const addr = (a: string): Hex => getAddress(a.toLowerCase());
 
-// The carrier and the arbiter are Area 4 test keys (kept outside the repo, see app/README.md);
-// the verifier is Area 2's policy key. The escrow gate only accepts the ones Area 1 registered.
+// The gate only accepts the carrier, arbiter and verifier that Area 1 registered. The arbiter is an
+// Area 4 test key (kept outside the repo, see app/README.md); the verifier is Area 2's policy key.
 const PARTIES: Party[] = [
   { id: 'acme-imports', short: 'Pacífico', name: 'Pacífico Foods SpA', place: 'Chile', address: addr('0x7A3f91C2b04E6d1A8c3F5e2D9b7A0c4E1f6B55D8'), tint: 3, taxId: '765432103' },
   { id: 'lingnan', short: 'Lingnan', name: 'Lingnan Hydrocolloids', place: 'Hong Kong', address: addr('0x5C1e0a9B7d3F2c6E8a4B1d9F0e7C3a5B2d6E04a1'), tint: 0, bankAccount: '0128 4407 5512 0142' },
   { id: 'kowloon', short: 'Kowloon', name: 'Kowloon Fine Chemicals', place: 'Hong Kong', address: addr('0x9B2d4F6a8C0e1B3d5F7a9C2e4B6d8F0a1C3e7A62'), tint: 1, bankAccount: '0043 6620 1975 0151' },
   { id: 'pearl-delta', short: 'Pearl Delta', name: 'Pearl Delta Ingredients', place: 'Guangzhou', address: addr('0x2E4a6C8e0B1d3F5a7C9e2B4d6F8a0C1e3B5d9F17'), tint: 2, bankAccount: '3602 8815 4420 0139' },
-  { id: 'harbor-line', short: 'Harbor Line', name: 'Harbor Line', place: 'Hong Kong', address: addr('0x6a199224C0C8E2659fA8f626eCD31f3563d52656') },
+  // The demo carrier key, testAccount("demo:carrier:harbor-line") of ingest's corpus: the
+  // attestation of PO-0142 (redteam/corpus/demo) only verifies with this address
+  { id: 'harbor-line', short: 'Harbor Line', name: 'Harbor Line', place: 'Hong Kong', address: addr('0xB4B5591aFF224D76dE4D59F9fD832f5aC26B7708') },
   { id: 'hk-arbitration', short: 'HK Arbitration', name: 'HK Trade Arbitration', place: 'Hong Kong', address: addr('0x21fbA41765a1e643F5b185309d3ea8179341Ac9b') },
   { id: 'keel-verifier', short: 'Keel verifier', name: 'Keel document verifier', place: 'Keel', address: addr('0xc7F2300AD6203D629d71aCe901e1B4e1b923A01C') },
 ];

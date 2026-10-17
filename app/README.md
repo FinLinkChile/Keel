@@ -41,22 +41,9 @@ npm run demo-data -w app -- --exporter 0x… [--importer 0x…] [--out <dir>]
 
 Every order id is computed the way `TradeEscrow.open` checks it, `keccak256(abi.encode(importer, exporter, nonce))`, with the addresses of the wallets given to the script: the same order has another id with other wallets, while its label (PO-0142, the nonce in hex) stays. The generated files all use the same ids. `npm run bot-examples -w app` rewrites the ids of `bot/examples` with the mock's default addresses. The default `--out` is `app/demo-data/`, ignored by git. `scripts/demoData.test.ts` checks the files against the shapes ingest (`TradeOrderEntry`), the agent (`engine/src/agent/store.ts`) and the bot read, and the orders against the checks of `TradeEscrow.open` that can be made off chain.
 
-## Carrier and arbiter test keys
+## Arbiter test key
 
-The on-chain gate only accepts a carrier, an arbiter and a document verifier that Area 1 registered in the Safe; any other address reverts with `untrusted party`. The mock therefore carries real addresses for Harbor Line (carrier) and HK Arbitration (arbiter): they are **test keys** controlled by Area 4, with no value, declared as such. The private keys live outside the repository (`~/keel-carrier.env`, `~/keel-arbiter.env`, `DEMO_<ROLE>_PRIVATE_KEY` and `DEMO_<ROLE>_ADDRESS`) and are never committed, logged or sent to a chat: only the public addresses are shared, and `demo-data` receives nothing else. No engine or agent service holds them. To regenerate, delete the env file, create a new key with viem (`generatePrivateKey`), save both lines in the same file, replace the address in `src/data/mock.ts` and ask Area 1 to register it again.
-
-## Signing the carrier's shipment attestation
-
-The carrier signs a `ShipmentAttestation` (order, bill of lading number hash, on board date, port, document package hash) that `TradeEscrow.submitShipment` checks. For the demo, `sign-shipment` signs it with the carrier test key and writes `shipment.json` next to the order file of the agent:
-
-```sh
-npm run sign-shipment -w app -- --order 0x… --chain-id 84532 --escrow 0xTRADE_ESCROW   --doc T01-bill_of_lading.pdf --doc T01-commercial_invoice.pdf   [--orders app/demo-data/agent/orders] [--bl-number OLSU26104471] [--port CNNGB] [--on-board <unix>]
-```
-
-* The key is read from `KEEL_CARRIER_ENV` (default `~/keel-carrier.env`) and never printed. The script refuses a key that is not the `carrier` of the order.
-* `<orders>/<orderId>/shipment.json` holds `{ attestation, sigCarrier }` in the same canonical JSON as the other files.
-* `--doc` takes the exact files uploaded to ingest: `docsHash` is the hash of their package, so the engine only accepts the attestation if the documents are the same. `--bl-number` and `--port` default to the demo bill of lading `T01-bill_of_lading.pdf` (`OLSU26104471`, `CNNGB`) and must equal what the document says. The number is hashed with the order's carrier, as the engine does, and an escrow accepts each number once per carrier.
-* `--on-board` (default now) must not be after the shipment deadline or in the future, and must not be before the order was funded: the escrow reverts with `InvalidAttestation` or `ShipmentTooLate`. The script checks the first two; the funding time is on chain and is not checked here, so sign after `fund`.
+The on-chain gate only accepts a carrier, an arbiter and a document verifier that Area 1 registered in the Safe; any other address reverts with `UntrustedParty` when the order is funded. The carrier is the demo key of Area 3 (`testAccount("demo:carrier:harbor-line")`, `0xB4B5…7708`), whose `demo-docs` script signs the shipment attestation of PO-0142 (see `redteam/corpus/demo`). The verifier is the policy key of Area 2. The arbiter is a **test key** controlled by Area 4, with no value, declared as such. Its private key lives outside the repository (`~/keel-arbiter.env`, `DEMO_ARBITER_PRIVATE_KEY` and `DEMO_ARBITER_ADDRESS`) and is never committed, logged or sent to a chat: only the public address is shared. No engine or agent service holds it. To regenerate it, delete the env file, create a new key with viem (`generatePrivateKey`), save both lines in the same file, replace the address in `src/data/mock.ts` and ask Area 1 to register it again.
 
 ## Uploading a document from a phone to ingest
 
