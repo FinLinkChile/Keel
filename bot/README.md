@@ -153,6 +153,7 @@ In Trade, `orderRef` is opaque and only builds the app URL; `orderLabel` is what
 | `account_change_attempt` | ingest (Trade) | none. Never the account, the sender or the text |
 | `change_queued` | Delay | `changeKind`, `effectiveAt` |
 | `transfer_blocked` | Roles Modifier revert (act 4) | `txHash` |
+| `unauthorized_execution` | the monitor of Area 2 (T2.8, `POST /notices`): a deposit or a balance release made with an approval the engine never issued | `txHash`. Never an address or an amount |
 | `agent_revoked`, `gate_paused` | `AgentRoleRevoked`, `GatePaused` | none |
 | `payment_held` | engine (T2.6) | `aliasId`, `amountClp`, `dueDate`, `reason` |
 | `payment_deadline` | T2.6 scheduler, at 5, 3 and 1 days (three ids) | `aliasId`, `amountClp`, `dueDate`, `daysLeft` |
@@ -194,6 +195,7 @@ Trade diffs cover the twelve fields ingest compares on a transport document and 
 | `account_change_attempt` | owner, operator | owner | |
 | `change_queued` | cosigner, owner | | |
 | `transfer_blocked`, `agent_revoked`, `gate_paused` | owner, cosigner | | |
+| `unauthorized_execution` | owner, operator, cosigner | | |
 | `dispute_raised`, `dispute_resolved` | owner, operator | owner, operator | owner |
 
 The exporter is never told which control fired: "hidden text" would teach an attacker what is detected. A second document hold on the same order tells the exporter that another document is under review.
@@ -265,7 +267,7 @@ Each notice id is made from the file hash and the reason (the alert's id for an 
 
 Grouping is ingest's job (T3.2, `changeDigest`); the bot sends what arrives. As a safety net, each chat gets at most `BOT_MAX_MESSAGES_PER_CHAT_PER_HOUR` messages per window. Past the cap the chat gets one fixed message ("More alerts arrived this hour. See them in Keel.") and nothing more until the next window; what was not sent is logged and counted.
 
-Chain and engine notices an attacker cannot repeat at will always go out: `operation_held`, `transfer_blocked`, `agent_revoked`, `gate_paused` and `payment_held`. Everything else counts toward the cap, including what is born from emails or documents (`account_change_attempt`, `change_requested`, `invoice_needs_cosign`, `invoice_held`), because an attacker can send hundreds.
+Chain and engine notices an attacker cannot repeat at will always go out: `operation_held`, `transfer_blocked`, `unauthorized_execution`, `agent_revoked`, `gate_paused` and `payment_held`. Everything else counts toward the cap, including what is born from emails or documents (`account_change_attempt`, `change_requested`, `invoice_needs_cosign`, `invoice_held`), because an attacker can send hundreds.
 
 The source decides, not only the kind: `operation_held` is not capped when it comes from the agent or the engine (`POST /notices`), but a hold that ingest produced from a document (`POST /ingest/outcomes`) counts, because an uploader can repeat it. The route says where a notice was born; it is never read from the notice.
 

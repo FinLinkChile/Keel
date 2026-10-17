@@ -183,6 +183,10 @@ const ChangeQueued = z.strictObject({
   effectiveAt: Timestamp,
 });
 const TransferBlocked = z.strictObject({ ...wallet, kind: z.literal("transfer_blocked"), txHash: TxHash });
+// The monitor (T2.8, Area 2) saw money move that the engine never decided: a deposit with no
+// signed payment request of its own, or a balance release nobody approved. Only the transaction,
+// never an address or an amount.
+const UnauthorizedExecution = z.strictObject({ ...wallet, kind: z.literal("unauthorized_execution"), txHash: TxHash });
 const AgentRevoked = z.strictObject({ ...wallet, kind: z.literal("agent_revoked") });
 const GatePaused = z.strictObject({ ...wallet, kind: z.literal("gate_paused") });
 
@@ -300,6 +304,7 @@ export const TradeNotice = z.discriminatedUnion("kind", [
   AccountChangeAttempt,
   ChangeQueued,
   TransferBlocked,
+  UnauthorizedExecution,
   AgentRevoked,
   GatePaused,
 ]);

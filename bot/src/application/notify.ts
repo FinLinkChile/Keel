@@ -14,6 +14,7 @@ import type { ChatId, Clock, Logger, MessageSender, RecipientDirectory, Renderer
 const UNCAPPED: ReadonlySet<NoticeKind> = new Set<NoticeKind>([
   "operation_held",
   "transfer_blocked",
+  "unauthorized_execution",
   "agent_revoked",
   "gate_paused",
   "payment_held",

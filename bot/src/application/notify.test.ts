@@ -71,11 +71,15 @@ describe("NotifyService", () => {
     // Chain and engine notices always go out.
     await service.notify({ ...SAMPLES.transfer_blocked, id: "blocked-1" });
     expect(sender.to(CHATS.acme.owner)).toHaveLength(4);
+    // So does a chain incident the monitor saw, as many as there are
+    await service.notify({ ...SAMPLES.unauthorized_execution, id: "unauthorized-1" });
+    await service.notify({ ...SAMPLES.unauthorized_execution, id: "unauthorized-2" });
+    expect(sender.to(CHATS.acme.owner)).toHaveLength(6);
 
     // The next window starts fresh.
     advance(3_600_000);
     await service.notify({ ...SAMPLES.order_funded, id: "funded-next" });
-    expect(sender.to(CHATS.acme.owner)).toHaveLength(5);
+    expect(sender.to(CHATS.acme.owner)).toHaveLength(7);
   });
 
   it("caps account change attempts: they are born from emails and documents", async () => {
