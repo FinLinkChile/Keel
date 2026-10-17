@@ -120,6 +120,8 @@ Agregado por Trade:
 13. Revocación del rol por el botón de pánico y depósito posterior que revierte.
 14. Disputa resuelta por el árbitro (si T4.10 y la disputa no se recortan).
 
+Parte del Área 1 (17 de octubre): `redteam/src/evidence/area1/` (TypeScript con viem, en `@keel/redteam`) envía los reverts de los registros, del gate y del escrow con gas fijo después de capturar el error con `eth_call`, y deja un JSON por caso con hash, bloque, error esperado y obtenido, y el comando `cast run` para reproducirlo. Cubre los puntos 9, 10, 11 y 12 de Trade, el alta con espera y el veto de proveedor, `UnknownSupplier`, `UntrustedParty`, `NotOwnOrder`, `CalldataMismatch`, `GateIsPaused` y `DeadlinePassed`. El formato del JSON es **[PROPUESTA]**: el Área 5 lo adapta al de `evidence/`. La fase 3 necesita 3 depósitos reales de 1 USDC hechos por el flujo real (Área 2) sobre órdenes abiertas con `open-order`.
+
 **T5.6 Documento técnico y README.**
 * Documento técnico: arquitectura con diagrama, algoritmo central (motor más PDR más gate, y en Trade además el escrow), diseño de seguridad y comparación honesta con el estado del arte (Leash, Coinbase, Cobo, Safe con Roles, PACE).
 * README: qué es, cómo desplegar, cómo correr las pruebas y la batería de red team, y enlaces a la evidencia.
