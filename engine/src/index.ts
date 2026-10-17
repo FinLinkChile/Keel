@@ -5,6 +5,8 @@ export * from "./documents";
 export * from "./funding";
 export * from "./keys";
 export * from "./pdr";
+export * from "./policy";
+export * from "./verify";
 
 export interface RuleResult<R extends string = string, C extends string = string> {
   rule: R;

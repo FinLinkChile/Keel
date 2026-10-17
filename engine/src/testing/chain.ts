@@ -99,8 +99,14 @@ export async function createChain(artifacts: Record<string, Artifact>) {
       const result = await run(from, undefined, encodeDeployData({ abi, bytecode, args }));
       return result.createdAddress!.toString() as Hex;
     },
-    async send(name: string, to: Hex, functionName: string, args: unknown[], from: Hex): Promise<void> {
-      await run(from, to, encodeFunctionData({ abi: artifacts[name]!.abi, functionName, args }));
+    // Returns the logs, in the shape an RPC receipt gives them
+    async send(name: string, to: Hex, functionName: string, args: unknown[], from: Hex) {
+      const result = await run(from, to, encodeFunctionData({ abi: artifacts[name]!.abi, functionName, args }));
+      return (result.execResult.logs ?? []).map(([address, topics, data]) => ({
+        address: bytesToHex(address),
+        topics: topics.map((t) => bytesToHex(t)),
+        data: bytesToHex(data),
+      }));
     },
     async read<T = unknown>(name: string, to: Hex, functionName: string, args: unknown[] = []): Promise<T> {
       const abi = artifacts[name]!.abi;

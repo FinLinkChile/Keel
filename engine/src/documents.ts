@@ -12,7 +12,7 @@ import {
   TransportDocumentExtraction,
 } from "@keel/schemas";
 import { blNumberHash, bytes32Text, docsHash, requiredDocsHash, structHash, termsHash } from "@keel/schemas/hash";
-import { keccak256, toBytes } from "viem";
+import { canonicalHash } from "./canonical";
 
 export type DocumentRule =
   | "attestation-order"
@@ -92,24 +92,9 @@ const result = (rule: DocumentRule, ok: boolean, failure: DocumentReason): Docum
   reason: ok ? "MATCH" : failure,
 });
 
-// Keys sorted at every level and bigints as decimal strings, so the same inputs always hash the same.
-function canonical(value: unknown): unknown {
-  if (typeof value === "bigint") return value.toString();
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.keys(value as object)
-        .sort()
-        .map((k) => [k, canonical((value as Record<string, unknown>)[k])]),
-    );
-  }
-  return value;
-}
-
 // What the decision was made on: both extractions, the terms and the registry data.
 export function documentInputsHash(extractions: DocumentExtractions, context: DocumentContext): Hex {
-  const inputs = { ...extractions, terms: context.terms, importerTaxId: context.importerTaxId, fileHashes: context.fileHashes };
-  return keccak256(toBytes(JSON.stringify(canonical(inputs))));
+  return canonicalHash({ ...extractions, terms: context.terms, importerTaxId: context.importerTaxId, fileHashes: context.fileHashes });
 }
 
 export function evaluateDocuments(
