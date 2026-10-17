@@ -77,7 +77,7 @@ This is the end to end test of the signed upload (step 4 of the flow): the expor
    npm run demo-data -w app -- --exporter 0xTHE_ADDRESS
    ```
 
-7. **Upload.** On Home, tap **Upload** on PO-0142. On the order, tap **Upload** next to **Bill of lading** and choose `redteam/corpus/trade/legit/T01-bill_of_lading.pdf`, then **Upload** next to **Commercial invoice** with `T01-commercial_invoice.pdf` from the same set. Both rows start empty and show only what this phone uploaded. To get the PDF onto the phone, email it to yourself or put it in Drive, and pick it from the file picker. The row should end in **Accepted**.
+7. **Upload.** On Home, tap **Upload** on PO-0142. On the order, tap **Upload** next to **Bill of lading** and choose `redteam/corpus/demo/PO-0142-bill-of-lading.pdf`, then **Upload** next to **Commercial invoice** with `PO-0142-commercial-invoice.pdf` from the same folder (added by Area 3 in #69). They carry the values of PO-0142 and the exporter's registered account, so the invoice raises no account alert and the agent finds them consistent with the order. Both rows start empty and show only what this phone uploaded. To get the PDF onto the phone, email it to yourself or put it in Drive, and pick it from the file picker. The row should end in **Accepted**.
 
 What each outcome means:
 
