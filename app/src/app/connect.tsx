@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import type { ReactNode } from 'react';
+import { Redirect, router } from 'expo-router';
+import { type ReactNode, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -15,31 +15,36 @@ import { colors, gutter, radius } from '@/ui/theme';
 // but disabled until open decision 14 sets its depth.
 export default function Connect() {
   const insets = useSafeAreaInsets();
-  const { signer, address, role, setRole, createWallet, disconnect } = useSession();
+  const { signer, address, role, setRole, createWallet, disconnect, onboarding } = useSession();
   const connected = !!signer && !!address;
+  // The screen is meant to fit without scrolling; it scrolls only on a phone too small for it,
+  // so the button is never cut off
+  const [boxHeight, setBoxHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+
+  // Nobody gets past Connect before signing up
+  if (onboarding === null) return <Redirect href="/onboarding" />;
 
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
+      bounces={false}
+      scrollEnabled={contentHeight > boxHeight}
+      onLayout={(e) => setBoxHeight(e.nativeEvent.layout.height)}
+      onContentSizeChange={(_, h) => setContentHeight(h)}
       contentContainerStyle={{
         flexGrow: 1,
-        // 64 from the top of the frame in the design, status bar included
-        paddingTop: Math.max(64, insets.top + 16),
-        paddingBottom: insets.bottom + 32,
+        paddingTop: Math.max(56, insets.top + 8),
+        paddingBottom: insets.bottom + 24,
         paddingHorizontal: gutter,
-        gap: 28,
+        gap: 22,
       }}
     >
       <Logo />
 
-      <View style={{ gap: 10 }}>
-        <Text size={36} weight={800} leading={1.08} tracking={-1} accessibilityRole="header">
-          Payments that wait for proof.
-        </Text>
-        <Text size={16} leading={1.5} color="textMuted">
-          An agent prepares every payment. A contract releases it only when the agreed conditions are met.
-        </Text>
-      </View>
+      <Text size={28} weight={800} leading={1.1} tracking={-1} accessibilityRole="header">
+        Payments that wait for proof.
+      </Text>
 
       <View
         style={{
@@ -82,8 +87,9 @@ export default function Connect() {
         ) : null}
       </View>
 
-      {/* Development builds only: reach the signature check from Expo Go without typing a URL */}
-      {__DEV__ && connected ? (
+      {/* Development builds, or a test build made with EXPO_PUBLIC_WALLET_CHECK=1: reach the wallet
+          check, where the full address can be copied for ingest's registry */}
+      {(__DEV__ || process.env.EXPO_PUBLIC_WALLET_CHECK === '1') && connected ? (
         <Pressable
           accessibilityRole="link"
           onPress={() => router.push('/dev/signature')}

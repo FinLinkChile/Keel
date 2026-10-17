@@ -1,7 +1,9 @@
 import type { Hex } from '@keel/schemas';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { bindWallets, type Role } from '@/data';
+import { bindCompany, bindWallets, type Role } from '@/data';
+import { toOnboarding, type Draft, type Onboarding } from '@/data/onboarding';
+import { onboardingStore } from '@/data/onboardingStore';
 import { wallets, type Signer, type Signers } from '@/wallet';
 
 type Session = {
@@ -13,6 +15,11 @@ type Session = {
   addresses: Partial<Record<Role, Hex>>;
   role: Role;
   setRole: (role: Role) => void;
+  // The sign-up of this phone: null until it is done, undefined while loading
+  onboarding: Onboarding | null | undefined;
+  completeOnboarding: (draft: Draft) => Promise<void>;
+  // Test builds: forgets the sign-up so it can be done again
+  resetOnboarding: () => Promise<void>;
   createWallet: () => Promise<void>;
   // Forgets the wallet for this session. The key itself stays on the device.
   disconnect: () => void;
@@ -27,10 +34,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [signers, setSigners] = useState<Signers | null>();
   const [addresses, setAddresses] = useState<Partial<Record<Role, Hex>>>({});
   const [role, setRole] = useState<Role>('importer');
+  const [onboarding, setOnboarding] = useState<Onboarding | null>();
 
   // During render, not in an effect: screens below load their data in their own effects,
   // which run before this provider's, and must already see the wallets.
   bindWallets(addresses);
+  bindCompany(onboarding?.company);
 
   const use = useCallback(async (s: Signers | null) => {
     const found: Partial<Record<Role, Hex>> = {};
@@ -46,6 +55,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     wallets.load().then(use);
   }, [use]);
 
+  useEffect(() => {
+    onboardingStore.get().then(setOnboarding, () => setOnboarding(null));
+  }, []);
+
   const signer = signers === undefined ? undefined : (signers?.[role] ?? null);
 
   const value = useMemo<Session>(
@@ -55,6 +68,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       addresses,
       role,
       setRole,
+      onboarding,
+      completeOnboarding: async (draft) => {
+        const done = toOnboarding(draft, Date.now() / 1000);
+        await onboardingStore.save(done);
+        setOnboarding(done);
+      },
+      resetOnboarding: async () => {
+        await onboardingStore.clear();
+        setOnboarding(null);
+      },
       createWallet: async () => use(await wallets.create()),
       disconnect: () => use(null),
       resetWallet: async () => {
@@ -62,7 +85,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         await use(null);
       },
     }),
-    [signer, addresses, role, use],
+    [signer, addresses, role, onboarding, use],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

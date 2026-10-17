@@ -94,6 +94,12 @@ What each outcome means:
 
 Nothing on this screen pays or changes the order: the upload only gives ingest the documents that the engine later compares with the signed order and the carrier's attestation. The screen never shows what ingest read in the file.
 
+## Sign-up
+
+The first time, the app asks for the country (only Chile is available), the company (RUT, legal name, email and a Chilean mobile), and the person who represents it (name, RUT, and whether they are a politically exposed person), the data a Chilean bank asks to open a company account. RUTs are checked with their check digit. The form comes filled with the demo company, Pacífico Foods SpA, because the documents of the test orders carry its RUT.
+
+**The identity validation is simulated.** The last step lists what a bank asks (the ID card, front and back, and a selfie) and the person ticks that it was done; nothing is captured or checked. KYC is future work (`docs/flujo/alcance.md`). The details stay on the phone (`onboarding.json`) and are never sent to ingest or to a model. The company the person signed up replaces the example importer on screen. Logging out from the profile goes back to Connect and keeps the test wallet.
+
 ## The app on a phone with Xcode, without Expo Go
 
 Expo Go cannot run the document scanner of the proforma, so the app is built as a native app. `ios/` is generated and ignored by git, so nothing heavy is committed:
