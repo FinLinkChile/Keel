@@ -15,6 +15,8 @@ const day = (month: number, date: number) => Date.UTC(2026, month - 1, date) / 1
 // Checksummed, as viem requires to sign or hash an address
 const addr = (a: string): Hex => getAddress(a.toLowerCase());
 
+// The gate only accepts the carrier, arbiter and verifier that Area 1 registered. The arbiter is an
+// Area 4 test key (kept outside the repo, see app/README.md); the verifier is Area 2's policy key.
 const PARTIES: Party[] = [
   { id: 'acme-imports', short: 'Pacífico', name: 'Pacífico Foods SpA', place: 'Chile', address: addr('0x7A3f91C2b04E6d1A8c3F5e2D9b7A0c4E1f6B55D8'), tint: 3, taxId: '765432103' },
   { id: 'lingnan', short: 'Lingnan', name: 'Lingnan Hydrocolloids', place: 'Hong Kong', address: addr('0x5C1e0a9B7d3F2c6E8a4B1d9F0e7C3a5B2d6E04a1'), tint: 0, bankAccount: '0128 4407 5512 0142' },
@@ -23,8 +25,8 @@ const PARTIES: Party[] = [
   // The demo carrier key, testAccount("demo:carrier:harbor-line") of ingest's corpus: the
   // attestation of PO-0142 (redteam/corpus/demo) only verifies with this address
   { id: 'harbor-line', short: 'Harbor Line', name: 'Harbor Line', place: 'Hong Kong', address: addr('0xB4B5591aFF224D76dE4D59F9fD832f5aC26B7708') },
-  { id: 'hk-arbitration', short: 'HK Arbitration', name: 'HK Trade Arbitration', place: 'Hong Kong', address: addr('0x6F8b0D2f4C5e7A9b1D3f6C8e0A2b4D5f7C9e3A09') },
-  { id: 'keel-verifier', short: 'Keel verifier', name: 'Keel document verifier', place: 'Keel', address: addr('0x8A0c2E4a6D7f9C1a3E5b8D0f2C4a6E7b9D1f5C33') },
+  { id: 'hk-arbitration', short: 'HK Arbitration', name: 'HK Trade Arbitration', place: 'Hong Kong', address: addr('0x21fbA41765a1e643F5b185309d3ea8179341Ac9b') },
+  { id: 'keel-verifier', short: 'Keel verifier', name: 'Keel document verifier', place: 'Keel', address: addr('0xc7F2300AD6203D629d71aCe901e1B4e1b923A01C') },
 ];
 
 // Payout accounts signed in each order; never taken from a document
@@ -34,7 +36,7 @@ const PAYOUTS: Record<PartyId, Hex> = {
   'pearl-delta': addr('0x7F2aC8e4B1d6F9a03C5e7B2d8F4a1C6e9B3d2A55'),
 };
 
-const USDC: Hex = addr('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48');
+const USDC: Hex = addr('0x036CbD53842c5426634e7929541eC2318f3dCF7e');
 
 // Test wallets stand in for the companies of the demo (importer: Pacífico, exporter: Lingnan),
 // so what they sign matches the orders on screen and in the data files.

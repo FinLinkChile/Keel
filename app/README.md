@@ -41,6 +41,10 @@ npm run demo-data -w app -- --exporter 0x… [--importer 0x…] [--out <dir>]
 
 Every order id is computed the way `TradeEscrow.open` checks it, `keccak256(abi.encode(importer, exporter, nonce))`, with the addresses of the wallets given to the script: the same order has another id with other wallets, while its label (PO-0142, the nonce in hex) stays. The generated files all use the same ids. `npm run bot-examples -w app` rewrites the ids of `bot/examples` with the mock's default addresses. The default `--out` is `app/demo-data/`, ignored by git. `scripts/demoData.test.ts` checks the files against the shapes ingest (`TradeOrderEntry`), the agent (`engine/src/agent/store.ts`) and the bot read, and the orders against the checks of `TradeEscrow.open` that can be made off chain.
 
+## Arbiter test key
+
+The on-chain gate only accepts a carrier, an arbiter and a document verifier that Area 1 registered in the Safe; any other address reverts with `UntrustedParty` when the order is funded. The carrier is the demo key of Area 3 (`testAccount("demo:carrier:harbor-line")`, `0xB4B5…7708`), whose `demo-docs` script signs the shipment attestation of PO-0142 (see `redteam/corpus/demo`). The verifier is the policy key of Area 2. The arbiter is a **test key** controlled by Area 4, with no value, declared as such. Its private key lives outside the repository (`~/keel-arbiter.env`, `DEMO_ARBITER_PRIVATE_KEY` and `DEMO_ARBITER_ADDRESS`) and is never committed, logged or sent to a chat: only the public address is shared. No engine or agent service holds it. To regenerate it, delete the env file, create a new key with viem (`generatePrivateKey`), save both lines in the same file, replace the address in `src/data/mock.ts` and ask Area 1 to register it again.
+
 ## Uploading a document from a phone to ingest
 
 This is the end to end test of the signed upload (step 4 of the flow): the exporter picks a PDF on the phone, the app signs a `DocumentUpload` over the exact bytes with the test wallet and sends them to ingest, and the screen shows only the outcome. You need a computer that runs ingest and the Expo dev server, and a phone with Expo Go on the same Wi-Fi network.
