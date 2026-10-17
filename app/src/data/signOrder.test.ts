@@ -9,9 +9,11 @@ import {
   checkForExporter,
   checkOrder,
   CHECK_WORDS,
+  differenceWords,
   escrowFrom,
   incotermText,
   orderDifferences,
+  payoutHistory,
   recoverPurchaseOrderSigner,
   signingSetup,
   signPurchaseOrder,
@@ -148,5 +150,25 @@ describe('checking an order before signing', () => {
 
   it('has words for every check', () => {
     for (const check of Object.keys(CHECK_WORDS)) expect(CHECK_WORDS[check as keyof typeof CHECK_WORDS].length).toBeGreaterThan(10);
+  });
+});
+
+describe('what the importer compares', () => {
+  it('names the changed fields in words', () => {
+    expect(differenceWords(['payoutAddress', 'totalAmount', 'terms.documentHash', 'somethingNew'])).toEqual([
+      'payout account',
+      'total',
+      'proforma',
+      'somethingNew',
+    ]);
+  });
+
+  it('says whether the payout account is the same as in earlier orders with that supplier', async () => {
+    const o = await order();
+    const other = (payoutAddress: `0x${string}`, orderId = a(0x1)) => ({ po: { orderId, exporter: o.po.exporter, payoutAddress } });
+    expect(payoutHistory([], o.po)).toEqual({ same: 0, different: 0 });
+    expect(payoutHistory([other(o.po.payoutAddress), other(o.po.payoutAddress, a(0x2)), other(a(0x98), a(0x3))], o.po)).toEqual({ same: 2, different: 1 });
+    // The order itself and orders with another supplier do not count
+    expect(payoutHistory([{ po: o.po }, { po: { ...other(a(0x98)).po, exporter: a(0x77) } }], o.po)).toEqual({ same: 0, different: 0 });
   });
 });

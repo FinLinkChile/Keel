@@ -47,7 +47,7 @@ export function orderLine(order: Order, role: Role, counterparty: Party, now: nu
     case 'signed':
       if (order.blockedBy === 'supplier_check')
         return { status: 'Signed', yourTurn: false, detail: [{ text: `${who}, waits for the supplier check` }] };
-      return { status: 'Signed', yourTurn: false, detail: [{ text: `${who}, waits for the deposit` }] };
+      return { status: 'Signed', yourTurn: false, detail: [{ text: `${who}, signed by both, waiting to open` }] };
     case 'advance_paid':
       if (role === 'exporter')
         return { status: 'Ship', yourTurn: mine, detail: [{ text: `${who}, ship by ${deadline}` }] };

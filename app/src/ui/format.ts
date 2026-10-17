@@ -46,6 +46,13 @@ export function formatDay(unixSeconds: number | bigint): string {
   return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
 }
 
+// Unix seconds -> "Oct 14, 09:12" in the phone's time zone: for a signature, which is a moment.
+export function formatLocalDayTime(unixSeconds: number): string {
+  const d = new Date(unixSeconds * 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 // Unix seconds -> "Oct 15" in the phone's time zone: for things people did, like an upload.
 export function formatLocalDay(unixSeconds: number): string {
   const d = new Date(unixSeconds * 1000);

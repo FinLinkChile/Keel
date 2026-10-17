@@ -1,8 +1,7 @@
 import type { Hex } from '@keel/schemas';
 import { router } from 'expo-router';
-import { useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useState } from 'react';
+import { View } from 'react-native';
 
 import { config } from '@/config';
 import { proposals, useData } from '@/data';
@@ -22,11 +21,12 @@ import { BottomSheet } from '@/ui/BottomSheet';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
 import { formatDay, formatMinor } from '@/ui/format';
-import { Icon } from '@/ui/Icon';
 import { MoneySteps } from '@/ui/MoneySteps';
 import { PayoutPanel } from '@/ui/PayoutPanel';
 import { Text } from '@/ui/Text';
-import { colors, gutter } from '@/ui/theme';
+import { colors } from '@/ui/theme';
+
+import { Bullet, Frame, Row, StatusView } from './parts';
 
 // 10a Exporter: review and sign the order. The importer proposed it and the exporter signs first.
 // Reject is the default; Sign waits for the checks, the box and the escrow address.
@@ -55,37 +55,19 @@ export function ExporterReview({ orderId }: { orderId: Hex }) {
   const [problem, setProblem] = useState<string>();
 
   if (view === undefined) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
-  if (view === null) return <Frame label="Order" onBack={back}><Text color="textMuted">This order is not on this phone.</Text></Frame>;
+  if (view === null) return <Frame label="Order"><Text color="textMuted">This order is not on this phone.</Text></Frame>;
   const { proposal, importer, carrier, arbiter, registeredPayout, holder } = view;
   const { po, terms } = proposal;
 
   // Not waiting for this signature any more: say where the order is
   if (proposal.status !== 'awaiting_exporter') {
     const words = {
-      awaiting_importer: ['You signed', `It is with ${importer.short} for the last signature. Nothing is paid until they sign and the escrow opens.`],
-      signed: ['Signed by both', 'The order waits to be opened in the escrow.'],
-      rejected: ['You rejected this order', `${importer.short} sees it as rejected. Nothing was signed or paid.`],
+      awaiting_importer: ['You signed', `It is with ${importer.short} for the last signature. Nothing is paid until they sign and the escrow opens.`, 'done'],
+      signed: ['Signed by both', 'The order waits to be opened in the escrow.', 'done'],
+      rejected: ['You rejected this order', `${importer.short} sees it as rejected. Nothing was signed or paid.`, 'no'],
     } as const;
-    const [title, text] = words[proposal.status as keyof typeof words];
-    return (
-      <Frame label={proposal.label} onBack={back}>
-        <View style={{ alignItems: 'center', gap: 12, paddingVertical: 32 }}>
-          <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: proposal.status === 'rejected' ? colors.surface : colors.moneyMuted, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name={proposal.status === 'rejected' ? 'info' : 'check'} size={28} strokeWidth={3} color={proposal.status === 'rejected' ? 'textMuted' : 'money'} />
-          </View>
-          <Text size={24} weight={800} accessibilityRole="header">
-            {title}
-          </Text>
-          <Text size={15} leading={1.5} color="textMuted" style={{ textAlign: 'center', maxWidth: 300 }}>
-            {text}
-          </Text>
-          <Text size={15} weight={700}>
-            {proposal.goods || proposal.label}
-          </Text>
-        </View>
-        <Button label="Done" onPress={() => router.replace('/home')} />
-      </Frame>
-    );
+    const [title, text, tone] = words[proposal.status as keyof typeof words];
+    return <StatusView label={proposal.label} title={title} text={text} tone={tone} goods={proposal.goods || proposal.label} onDone={() => router.replace('/home')} />;
   }
 
   const setup = signingSetup(config);
@@ -123,7 +105,7 @@ export function ExporterReview({ orderId }: { orderId: Hex }) {
         : 'Signs with your wallet. Nothing is paid yet.';
 
   return (
-    <Frame label={proposal.label} onBack={back}>
+    <Frame label={proposal.label}>
       <View style={{ gap: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Avatar name={importer.name} tint={importer.tint} size={36} />
@@ -243,56 +225,5 @@ export function ExporterReview({ orderId }: { orderId: Hex }) {
         </View>
       </BottomSheet>
     </Frame>
-  );
-}
-
-const back = () => (router.canGoBack() ? router.back() : router.replace('/home'));
-
-// The screen shell: back, the order label in the middle, content, scroll
-function Frame({ label, onBack, children }: { label: string; onBack: () => void; children: ReactNode }) {
-  const insets = useSafeAreaInsets();
-  return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ paddingTop: Math.max(52, insets.top + 8), paddingBottom: insets.bottom + 32, paddingHorizontal: gutter, gap: 26 }}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: -8 }}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name="back" size={22} />
-        </Pressable>
-        <Text mono size={14} color="textMuted" style={{ flex: 1, textAlign: 'center' }}>
-          {label}
-        </Text>
-        <View style={{ width: 44 }} />
-      </View>
-      {children}
-    </ScrollView>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 14, borderTopWidth: 1, borderTopColor: colors.divider }}>
-      <Text size={15} color="textMuted" style={{ flexShrink: 0 }}>
-        {label}
-      </Text>
-      <Text size={15} weight={600} style={{ flexShrink: 1, textAlign: 'right' }}>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-// A thing the contract does (ok) or cannot do
-function Bullet({ ok = false, children }: { ok?: boolean; children: ReactNode }) {
-  return (
-    <View style={{ flexDirection: 'row', gap: 10 }}>
-      <View style={{ marginTop: 2 }}>
-        <Icon name={ok ? 'check' : 'lock'} size={14} strokeWidth={2.6} color={ok ? 'money' : 'textMuted'} />
-      </View>
-      <Text size={14} leading={1.45} color="textSoft" style={{ flex: 1 }}>
-        {children}
-      </Text>
-    </View>
   );
 }

@@ -55,6 +55,7 @@ export type OrderCheck =
   | 'terms_hash'
   | 'order_id'
   | 'changed_since_sent'
+  | 'not_waiting_for_you'
   | 'wrong_exporter'
   | 'wrong_importer'
   | 'payout_not_registered'
@@ -95,6 +96,7 @@ export const CHECK_WORDS: Record<OrderCheck, string> = {
   terms_hash: 'The terms do not match what the order commits to',
   order_id: 'The order id does not match the two companies',
   changed_since_sent: 'This order is not the one that was sent',
+  not_waiting_for_you: 'This order is not waiting for your signature',
   wrong_exporter: 'This order is not addressed to your wallet',
   wrong_importer: 'This order is not from the company you agreed it with',
   payout_not_registered: 'The payout account is not the one registered for your company',
@@ -129,6 +131,45 @@ export async function recoverPurchaseOrderSigner(setup: SigningSetup, po: Purcha
   } catch {
     return undefined;
   }
+}
+
+// The fields that can differ between the order that was sent and the one in front of the
+// importer, in words
+const DIFFERENCE_WORDS: Record<string, string> = {
+  orderId: 'order id',
+  importer: 'buyer',
+  exporter: 'supplier',
+  payoutAddress: 'payout account',
+  token: 'currency of payment',
+  totalAmount: 'total',
+  advanceBps: 'advance',
+  shipmentDeadline: 'ship by date',
+  disputeWindow: 'dispute window',
+  carrier: 'carrier',
+  arbiter: 'arbiter',
+  documentVerifier: 'document verifier',
+  incoterm: 'incoterm',
+  termsHash: 'terms',
+  requiredDocsHash: 'required documents',
+  nonce: 'order version',
+  'terms.orderNumber': 'order number',
+  'terms.currency': 'invoice currency',
+  'terms.invoiceAmountMinor': 'invoice amount',
+  'terms.hsCodes': 'HS codes',
+  'terms.documentHash': 'proforma',
+};
+
+export const differenceWords = (fields: string[]): string[] => fields.map((f) => DIFFERENCE_WORDS[f] ?? f);
+
+// How the payout account compares with the orders the importer already has with this supplier:
+// the same account as before, or another one (which deserves a second look)
+export function payoutHistory(
+  orders: { po: Pick<PurchaseOrder, 'orderId' | 'exporter' | 'payoutAddress'> }[],
+  order: Pick<PurchaseOrder, 'orderId' | 'exporter' | 'payoutAddress'>,
+): { same: number; different: number } {
+  const before = orders.filter((o) => same(o.po.exporter, order.exporter) && !same(o.po.orderId, order.orderId));
+  const sameCount = before.filter((o) => same(o.po.payoutAddress, order.payoutAddress)).length;
+  return { same: sameCount, different: before.length - sameCount };
 }
 
 // "0x43494600…" -> "CIF"

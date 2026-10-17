@@ -23,6 +23,7 @@ export type Proposal = {
   importerSignature?: Hex;
   // Unix seconds
   sentAt: number;
+  exporterSignedAt?: number;
   signedAt?: number;
 };
 
