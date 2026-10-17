@@ -11,7 +11,7 @@ import { pickPdf } from '@/files/pickPdf';
 import type { PickedFile } from '@/files/pickPdf.types';
 import { uploadPreview } from '@/files/uploadPreview';
 import { ExporterReview } from '@/orders/ExporterReview';
-import { ImporterReview } from '@/orders/ImporterReview';
+import { ImporterOrder } from '@/orders/ImporterOrder';
 import { uploadDocument, type UploadResult } from '@/ingest/client';
 import { uploadStatus } from '@/ingest/uploadStatus';
 import { useSession } from '@/session';
@@ -36,7 +36,8 @@ export default function OrderScreen() {
   // An order proposed on this phone is reviewed and signed before it is an order in progress
   const proposed = useData(async () => !!(await proposals.get(orderId)), [orderId]);
   if (proposed === undefined) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
-  if (role === 'importer') return proposed ? <ImporterReview orderId={orderId} /> : <Placeholder title="Order" back />;
+  // The importer sees the same timeline for every order; the review is a step inside it
+  if (role === 'importer') return <ImporterOrder orderId={orderId} />;
   return proposed ? <ExporterReview orderId={orderId} /> : <ExporterOrder orderId={orderId} />;
 }
 

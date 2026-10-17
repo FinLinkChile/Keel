@@ -1,5 +1,5 @@
 import type { Hex } from '@keel/schemas';
-import { router } from 'expo-router';
+import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
@@ -26,7 +26,7 @@ import { PayoutPanel } from '@/ui/PayoutPanel';
 import { Text } from '@/ui/Text';
 import { colors, radius } from '@/ui/theme';
 
-import { Bullet, Frame, Row, StatusView } from './parts';
+import { Bullet, Frame, Row } from './parts';
 
 // 04 Review before you sign. The supplier signed first; the importer reads the order as a
 // document and gives the last signature. Nothing is signed unless the supplier's signature
@@ -77,14 +77,9 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
   const { supplier, carrier, arbiter, history } = view;
   const { po, terms } = proposal;
 
+  // Nothing to sign (signed, rejected, or not signed by the supplier yet): back to the timeline
   if (proposal.status !== 'awaiting_importer') {
-    const words = {
-      awaiting_exporter: ['Sent', `${supplier.short} has to sign first. It comes back to you for the last signature.`, 'wait'],
-      signed: ['Signed by both', 'The order is waiting to be opened in the escrow. Nothing has been paid yet.', 'done'],
-      rejected: ['Rejected', `This order was not signed. ${supplier.short} or you refused it, and nothing was paid.`, 'no'],
-    } as const;
-    const [title, text, tone] = words[proposal.status as keyof typeof words];
-    return <StatusView label={proposal.label} title={title} text={text} tone={tone} goods={proposal.goods || proposal.label} onDone={() => router.replace('/home')} />;
+    return <Redirect href={{ pathname: '/order/[orderId]', params: { orderId } }} />;
   }
 
   const checks: OrderCheck[] = review?.checks ?? [];
