@@ -38,6 +38,9 @@ cast rpc anvil_setBalance "${DEPLOYER_ADDRESS}" 0x8AC7230489E80000 --rpc-url "${
 export FOUNDRY_BROADCAST="${OUT}/broadcast" FOUNDRY_CACHE_PATH="${OUT}/cache"
 # fs_permissions only lets scripts write under contracts/deployments; test-*.json is git-ignored
 FORK_DEPLOYMENTS="deployments/test-evidence-fork-$$.json"
+# The demo Safe has two owners (threshold 1): OWNER_ADDRESS and SECOND_OWNER_ADDRESS, the app key.
+# Without one in .env the fork uses a throwaway address, so the Safe still has two owners.
+export SECOND_OWNER_ADDRESS="${SECOND_OWNER_ADDRESS:-$(cast to-check-sum-address "0x$(od -An -N20 -tx1 /dev/urandom | tr -d ' \n')")}"
 export SALT_NONCE="${SALT_NONCE:-$(od -An -N6 -tu8 /dev/urandom | tr -d ' ')}"
 cd "${ROOT}/contracts"
 echo "== DeployTrade (SALT_NONCE ${SALT_NONCE})"
@@ -55,7 +58,7 @@ cd "${ROOT}"
 
 COMMON=(--rpc-url "${RPC}" --deployments "${KEEL_DEPLOYMENTS_FILE}" --out "${OUT}/evidence")
 
-echo "== fork setup: gas, Safe USDC, second Safe owner"
+echo "== fork setup: gas and Safe USDC"
 "${TSX}" "${PREP}" base --rpc-url "${RPC}" --deployments "${KEEL_DEPLOYMENTS_FILE}"
 
 echo "== phase 1"

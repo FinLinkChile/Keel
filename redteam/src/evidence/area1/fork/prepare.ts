@@ -1,6 +1,6 @@
 // FORK TEST ONLY. Prepares a local anvil fork for the evidence script and refuses any other node.
-//   base      gas for the demo accounts, USDC for the Safe, and a second Safe owner (threshold
-//             stays 1), as the real Safe will have one for Area 4.
+//   base      gas for the demo accounts and USDC for the Safe. The Safe owners (OWNER plus
+//             SECOND_OWNER_ADDRESS, threshold 1) come from DeployTrade, as on the real chain.
 //   deposits  stands in for the real deposit flow: generates a throwaway policy key in memory,
 //             makes it the gate's policy signer through the Safe, opens 3 orders and funds them
 //             through the gate. Writes the orderIds and deposit hashes to <out>/deposits.json.
@@ -46,8 +46,6 @@ async function base(ctx: Ctx) {
   await rpc(ctx, "evm_mine", []);
   const bal = await usdcBalance(ctx, ctx.d.safe);
   if (bal !== want) throw new Error(`USDC balance slot guess failed: Safe has ${bal}`);
-  const second = privateKeyToAccount(generatePrivateKey()).address;
-  await safeExec(ctx, ctx.d.safe, encodeFunctionData({ abi: safeAbi, functionName: "addOwnerWithThreshold", args: [second, 1n] }), `addOwnerWithThreshold(${second}, 1)`);
   const owners = await read<Hex[]>(ctx, ctx.d.safe, safeAbi, "getOwners");
   console.log(`fork base ready: Safe owners ${owners.join(", ")}, threshold ${await read<bigint>(ctx, ctx.d.safe, safeAbi, "getThreshold")}, ${bal} USDC units`);
 }
