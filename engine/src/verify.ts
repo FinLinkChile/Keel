@@ -17,7 +17,7 @@ import {
   type ShipmentAttestation,
 } from "@keel/schemas";
 import { paymentIntentHash, structHash, typedDataDigest } from "@keel/schemas/hash";
-import { decodeEventLog, isAddress, keccak256, parseAbi, recoverTypedDataAddress } from "viem";
+import { decodeEventLog, isAddress, isHash, keccak256, parseAbi, recoverTypedDataAddress } from "viem";
 import { canonical } from "./canonical";
 import { evaluateDocuments } from "./documents";
 import { evaluateFunding } from "./funding";
@@ -41,13 +41,18 @@ export interface ChainLog {
   data: Hex;
 }
 
-// The official addresses of one chain, from contracts/deployments/<chainId>.json (Area 1). Only
-// the contracts a PDR can be anchored to are read.
+// The official addresses of one chain, from contracts/deployments/<chainId>.json (Area 1): the
+// contracts a PDR can be anchored to, and what the agent and the monitor run on.
 export interface Deployment {
   chainId: number;
   pdrGate?: Hex;
   fundingGate?: Hex;
   tradeEscrow?: Hex;
+  safe?: Hex;
+  // The Trade deployment block: the first block worth searching for escrow logs
+  deployBlock?: bigint;
+  agentAllowanceKey?: Hex;
+  cosignedAllowanceKey?: Hex;
 }
 
 // Contract state at the block of the transaction, so a later rotation of a signer does not count.
@@ -178,7 +183,19 @@ export function loadDeployment(dir: string, chainId: number): Deployment | null 
   // A file copied under another chain's name would anchor to addresses of that other chain
   if (raw.chainId !== chainId) throw new Error(`${chainId}.json says chainId ${raw.chainId ?? "(none)"}, not ${chainId}`);
   const pick = (key: string) => (typeof raw[key] === "string" && isAddress(raw[key], { strict: false }) ? low(raw[key]) : undefined);
-  return { chainId, pdrGate: pick("pdrGate"), fundingGate: pick("fundingGate"), tradeEscrow: pick("tradeEscrow") };
+  const word = (v: unknown) => (typeof v === "string" && isHash(v) ? low(v) : undefined);
+  // Large integers may come as decimal strings
+  const block = typeof raw.deployBlock === "number" || (typeof raw.deployBlock === "string" && /^[0-9]+$/.test(raw.deployBlock)) ? BigInt(raw.deployBlock) : undefined;
+  return {
+    chainId,
+    pdrGate: pick("pdrGate"),
+    fundingGate: pick("fundingGate"),
+    tradeEscrow: pick("tradeEscrow"),
+    safe: pick("safe"),
+    deployBlock: block,
+    agentAllowanceKey: word(raw.trade?.agentAllowanceKey),
+    cosignedAllowanceKey: word(raw.trade?.cosignedAllowanceKey),
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -8,7 +8,7 @@ status: draft
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T19:00:00Z }
 ---
 
-El monitor (T2.8, `engine/src/monitor/`) vigila el FundingGate y el TradeEscrow de la Safe de un importador y reacciona cuando llega a la cadena algo que el motor no decidió. Es el cierre del acto 4 (llave robada). Se ejecuta con `npm run keel -- monitor --data <carpeta>`, con `KEEL_RPC_URL`, `KEEL_ESCROW`, `KEEL_SAFE` y `KEEL_FUNDING_GATE`, y opcionalmente `MONITOR_PAUSER_PRIVATE_KEY`, `KEEL_BOT_URL` y `KEEL_BOT_TOKEN`.
+El monitor (T2.8, `engine/src/monitor/`) vigila el FundingGate y el TradeEscrow de la Safe de un importador y reacciona cuando llega a la cadena algo que el motor no decidió. Es el cierre del acto 4 (llave robada). Se ejecuta con `npm run keel -- monitor --data <carpeta>` y `KEEL_RPC_URL`. El escrow, la Safe y el gate salen de `contracts/deployments/<chainId>.json`, como en el [servicio del agente](servicio-del-agente.md), o de `KEEL_ESCROW`, `KEEL_SAFE` y `KEEL_FUNDING_GATE` donde el archivo no los tiene. Opcionalmente `MONITOR_PAUSER_PRIVATE_KEY`, `KEEL_BOT_URL` y `KEEL_BOT_TOKEN`.
 
 # Cuándo actúa
 

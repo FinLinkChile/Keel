@@ -85,8 +85,9 @@ export function requiredDocsHash(docs: readonly RequiredDocType[]): Hex {
 //     keccak256(abi.encodePacked(keccak256(bytes(hsCodes[0])), ..., keccak256(bytes(hsCodes[n])))),
 //     documentHash))
 // with the HS codes deduplicated and sorted ascending first, so their order does not change
-// the hash, and documentHash = keccak256 of the bytes of the full order document. All
-// strings are ASCII, as the schema patterns require. No domain: it is a struct hash.
+// the hash, and documentHash = keccak256 of the bytes of the file the order comes from: when it
+// comes from a proforma, the fileHash that POST /trade/proforma returns (decided by Area 4 in the
+// #66 review). All strings are ASCII, as the schema patterns require. No domain: it is a struct hash.
 export function termsHash(terms: OrderTerms): Hex {
   const parsed = OrderTermsSchema.parse(terms);
   const data = { ...parsed, hsCodes: [...new Set(parsed.hsCodes)].sort() };

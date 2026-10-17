@@ -1,8 +1,8 @@
 // Command line of the engine.
 //   keel verify <txHash> [--rpc <url>] [--evidence <dir>] [--deployments <dir>]   a transaction and every PDR it carries (T2.9)
 //   keel verify --pdr <pdrHash> [--evidence <dir>]                                one PDR from its evidence file, offline
-//   keel agent --data <dir> [--once] [--interval <s>]                             the agent service of one importer Safe (T2.11)
-//   keel monitor --data <dir> [--from-block <n>] [--once] [--interval <s>]        the monitor of one importer Safe (T2.8)
+//   keel agent --data <dir> [--deployments <dir>] [--once] [--interval <s>]       the agent service of one importer Safe (T2.11)
+//   keel monitor --data <dir> [--deployments <dir>] [--from-block <n>] [--once] [--interval <s>]   the monitor (T2.8)
 // verify exits 0 when everything matches and is anchored to the deployed contracts, 1 on any
 // mismatch, 2 on a usage or read error, 3 when the evidence is consistent but not anchored
 // (offline): that proves the file, not that the chain accepted it.
@@ -128,25 +128,44 @@ async function verify(args: string[]): Promise<number> {
   return EXIT[result];
 }
 
-// Configuration from the environment: KEEL_RPC_URL, KEEL_ESCROW, KEEL_SAFE and the keys
-// RELAYER_PRIVATE_KEY and POLICY_SIGNER_PRIVATE_KEY (never in the repository). With KEEL_FUNDING_GATE
-// and the allowance keys KEEL_AGENT_ALLOWANCE_KEY and KEEL_COSIGNED_ALLOWANCE_KEY the gate runs on
+// The addresses and allowance keys of the chain's deployment, from contracts/deployments/<chainId>.json
+// (Area 1, T1.8). The environment fills what the file lacks, as on a local chain, and may not
+// contradict it: a stale KEEL_ESCROW would run the agent on another escrow.
+function deploymentSettings(dir: string, chainId: number) {
+  const file = loadDeployment(dir, chainId);
+  const env = process.env;
+  function setting(name: string, fromFile: Hex | undefined, check: (v: string) => boolean): Hex | undefined {
+    const set = env[name] || undefined;
+    if (set !== undefined && !check(set)) throw new UsageError(`${name} is not valid`);
+    if (fromFile && set && set.toLowerCase() !== fromFile) throw new UsageError(`${name} differs from ${chainId}.json in ${dir} (${fromFile}): unset it`);
+    return fromFile ?? (set as Hex | undefined);
+  }
+  const required = (name: string, fromFile: Hex | undefined, check: (v: string) => boolean): Hex => {
+    const v = setting(name, fromFile, check);
+    if (!v) throw new UsageError(`set ${name}, or deploy and record ${chainId}.json in ${dir}`);
+    return v;
+  };
+  return { file, setting, required };
+}
+
+// Configuration: KEEL_RPC_URL and the keys RELAYER_PRIVATE_KEY and POLICY_SIGNER_PRIVATE_KEY (never
+// in the repository). The escrow, the Safe, the gate and the allowance keys come from the deployment
+// file of the chain, or from KEEL_ESCROW, KEEL_SAFE, KEEL_FUNDING_GATE, KEEL_AGENT_ALLOWANCE_KEY and
+// KEEL_COSIGNED_ALLOWANCE_KEY where it has none. With the gate and the allowance keys the gate runs on
 // the real Zodiac Roles and the rolesConfigHash is computed from the chain; otherwise (the demo on
 // MockTradeRoles, or no gate) KEEL_ROLES_CONFIG_HASH gives it.
 async function agent(args: string[]): Promise<number> {
   const { values } = parseArgs({
     args,
-    options: { data: { type: "string" }, once: { type: "boolean" }, interval: { type: "string" }, evidence: { type: "string" } },
+    options: { data: { type: "string" }, once: { type: "boolean" }, interval: { type: "string" }, evidence: { type: "string" }, deployments: { type: "string" } },
   });
   const env = process.env;
-  const need = (name: string, check: (v: string) => boolean) => {
-    const v = env[name];
-    if (!v || !check(v)) throw new UsageError(`set ${name}`);
-    return v as Hex;
-  };
-  const rpc = need("KEEL_RPC_URL", Boolean);
-  const escrow = need("KEEL_ESCROW", isAddress);
-  const safe = need("KEEL_SAFE", isAddress);
+  const rpc = env.KEEL_RPC_URL;
+  if (!rpc) throw new UsageError("set KEEL_RPC_URL");
+  const chainId = await createPublicClient({ transport: http(rpc) }).getChainId();
+  const { file, setting, required } = deploymentSettings(values.deployments ?? DEFAULT_DEPLOYMENTS, chainId);
+  const escrow = required("KEEL_ESCROW", file?.tradeEscrow, isAddress);
+  const safe = required("KEEL_SAFE", file?.safe, isAddress);
   const data = values.data ?? env.KEEL_DATA_DIR;
   if (!data) throw new UsageError("set --data or KEEL_DATA_DIR");
 
@@ -155,15 +174,14 @@ async function agent(args: string[]): Promise<number> {
   const botToken = env.KEEL_BOT_TOKEN;
   if (Boolean(botUrl) !== Boolean(botToken)) throw new UsageError("set both KEEL_BOT_URL and KEEL_BOT_TOKEN, or neither");
 
-  const chain = rpcChain(rpc, loadRelayer(env));
+  // Escrow logs are searched from the deployment block: many RPC providers cap the range of getLogs
+  const chain = rpcChain(rpc, loadRelayer(env), { fromBlock: file?.deployBlock });
   const store = new FileStore(data);
   // The Trade gate (Area 1). Without it, funding waits with GATE_NOT_DEPLOYED.
-  const gateAddress = env.KEEL_FUNDING_GATE as Hex | undefined;
-  if (gateAddress && !isAddress(gateAddress)) throw new UsageError("KEEL_FUNDING_GATE is not an address");
-  const agentKey = env.KEEL_AGENT_ALLOWANCE_KEY as Hex | undefined;
-  const cosignedKey = env.KEEL_COSIGNED_ALLOWANCE_KEY as Hex | undefined;
+  const gateAddress = setting("KEEL_FUNDING_GATE", file?.fundingGate, isAddress);
+  const agentKey = setting("KEEL_AGENT_ALLOWANCE_KEY", file?.agentAllowanceKey, isHash);
+  const cosignedKey = setting("KEEL_COSIGNED_ALLOWANCE_KEY", file?.cosignedAllowanceKey, isHash);
   if (Boolean(agentKey) !== Boolean(cosignedKey)) throw new UsageError("set both KEEL_AGENT_ALLOWANCE_KEY and KEEL_COSIGNED_ALLOWANCE_KEY, or neither");
-  if (agentKey && !(isHash(agentKey) && isHash(cosignedKey!))) throw new UsageError("the allowance keys are not bytes32");
   const configured = env.KEEL_ROLES_CONFIG_HASH as Hex | undefined;
   if (configured && !isHash(configured)) throw new UsageError("KEEL_ROLES_CONFIG_HASH is not a bytes32");
   let gate: ReturnType<typeof fundingGatePort> | undefined;
@@ -201,7 +219,7 @@ async function agent(args: string[]): Promise<number> {
   }
   if (!rolesConfigHash) throw new UsageError("set KEEL_ROLES_CONFIG_HASH, or KEEL_FUNDING_GATE with the allowance keys");
   const keel = new Agent(
-    { chainId: await chain.chainId(), escrow, safe, policy: tradePolicy(rolesConfigHash), decisionTtlSeconds: 3600, evidenceDir: values.evidence ?? DEFAULT_EVIDENCE },
+    { chainId, escrow, safe, policy: tradePolicy(rolesConfigHash), decisionTtlSeconds: 3600, evidenceDir: values.evidence ?? DEFAULT_EVIDENCE },
     // Each sent step, hold and notice is printed once as a JSON line and, with the bot
     // configured, posted to it.
     {
@@ -226,18 +244,24 @@ async function agent(args: string[]): Promise<number> {
 async function monitor(args: string[]): Promise<number> {
   const { values } = parseArgs({
     args,
-    options: { data: { type: "string" }, once: { type: "boolean" }, interval: { type: "string" }, evidence: { type: "string" }, "from-block": { type: "string" } },
+    options: {
+      data: { type: "string" },
+      once: { type: "boolean" },
+      interval: { type: "string" },
+      evidence: { type: "string" },
+      deployments: { type: "string" },
+      "from-block": { type: "string" },
+    },
   });
   const env = process.env;
-  const need = (name: string, check: (v: string) => boolean) => {
-    const v = env[name];
-    if (!v || !check(v)) throw new UsageError(`set ${name}`);
-    return v as Hex;
-  };
-  const rpc = need("KEEL_RPC_URL", Boolean);
-  const escrow = need("KEEL_ESCROW", isAddress);
-  const safe = need("KEEL_SAFE", isAddress);
-  const gate = need("KEEL_FUNDING_GATE", isAddress);
+  const rpc = env.KEEL_RPC_URL;
+  if (!rpc) throw new UsageError("set KEEL_RPC_URL");
+  const client = createPublicClient({ transport: http(rpc) });
+  const chainId = await client.getChainId();
+  const { file, required } = deploymentSettings(values.deployments ?? DEFAULT_DEPLOYMENTS, chainId);
+  const escrow = required("KEEL_ESCROW", file?.tradeEscrow, isAddress);
+  const safe = required("KEEL_SAFE", file?.safe, isAddress);
+  const gate = required("KEEL_FUNDING_GATE", file?.fundingGate, isAddress);
   const data = values.data ?? env.KEEL_DATA_DIR;
   if (!data) throw new UsageError("set --data or KEEL_DATA_DIR");
   const botUrl = env.KEEL_BOT_URL;
@@ -248,10 +272,9 @@ async function monitor(args: string[]): Promise<number> {
   const chain = rpcMonitorChain(rpc);
   const pauserKey = loadPauser(env);
   const pauser = pauserKey && pauserOn(rpcChain(rpc, pauserKey), pauserKey.address);
-  const client = createPublicClient({ transport: http(rpc) });
   const fromBlock = values["from-block"] !== undefined ? BigInt(values["from-block"]) : (await chain.latestBlock()) + 1n;
   const watch = new Monitor(
-    { chainId: await client.getChainId(), gate, escrow, evidenceDir: values.evidence ?? DEFAULT_EVIDENCE, fromBlock },
+    { chainId, gate, escrow, evidenceDir: values.evidence ?? DEFAULT_EVIDENCE, fromBlock },
     {
       chain,
       pauser,
