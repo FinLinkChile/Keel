@@ -214,6 +214,7 @@ Both HTTP routes share one server on `BOT_HOST:BOT_PORT`, each with its own Bear
 * `POST /ingest/outcomes`: `Authorization: Bearer <BOT_INGEST_TOKEN>`; ingest's own output, which the bot maps (see "For Area 3").
 * `file-source`: `npm run notify -w bot -- <file>`. The examples in `examples/` are the four Trade demo acts and `personal-two-sources.json`, with fictitious accounts and chats. `examples.test.ts` keeps them valid.
 * `ingest-mapper`: turns ingest's `escalated`, `held` and `change_requested` outcomes and `changeDigest` into notices. It imports from `@keel/ingest` with `import type` only, because ingest pulls heavy SDKs. It is written against ingest's types but not wired to ingest: how producers reach the bot is not decided yet, and wiring it is Area 3's side. The personal `accountId` comes from configuration, since ingest knows no accounts.
+* `ingest-trade-mapper`: turns a Trade `TradeOutcome` into zero, one or several notices (see "For Area 3"). It reads the outcome through a copy of its shape that parsing strips down to what is read, so `alert.found` and any other field never exist for the code that builds a notice. A test checks the copy against ingest's types and its constants.
 
 ### For Area 3
 
@@ -238,7 +239,7 @@ Authorization: Bearer <BOT_INGEST_TOKEN>
 * After `receiveEmail`, post its outcome. After `IngestStore.changeDigest(since)`, post the requests with the same `since`.
 * Answers: `401` without the token; `400` with `invalid_body` if the body lacks this shape, `mapper_failed` if the outcome cannot be mapped (only the error class is logged) or `source_disabled` if the source is not configured; `202` with `{ "status": "accepted" | "duplicate" | "rejected" | "ignored" }`. `ignored` is for `quarantined`, `duplicate` and `ready` emails: nothing to tell. `rejected` means the mapped notice did not validate.
 * Posting the same outcome twice is safe: the notice id comes from the message hash or the request id.
-* `trade_upload` answers `501` for now. Its mapper is written once `area3/trade-ingest` is merged, because the `TradeOutcome` type is not on `dev` yet. It needs `BOT_ORDERS_FILE` to turn the `orderId` into a label and accounts. Planned mapping:
+* `trade_upload` needs `BOT_ORDERS_FILE` to turn the `orderId` into a label, the accounts and the shipment deadline; without it the source is disabled (`400 source_disabled`), and an `orderId` that is not in the file gives `400 mapper_failed`. One upload can give several notices, and then the answer is `{ "status": <first of accepted, duplicate, rejected>, "notices": [<each status>] }`. Mapping:
 
 | `TradeOutcome` | Notice |
 |---|---|
@@ -246,9 +247,12 @@ Authorization: Bearer <BOT_INGEST_TOKEN>
 | `held`, `doc_type_mismatch` | `operation_held` `documents_mismatch` |
 | `held`, `bl_used_by_other_order` | `operation_held` `bl_reused` |
 | `held`, `parser_failed` or `extractor_failed` | `operation_held` `document_unreadable` |
-| any reading with `alert` | `account_change_attempt`. The destinations in `found` never reach the chat |
-| `ready` without `alert` | nothing |
-| `rejected`, `quarantined`, `duplicate` | nothing |
+| a reading (`ready` or `disagreement`) with `alert` | `account_change_attempt`, next to the hold if there is one. The destinations in `found`, the triggers and the reminder code never reach the chat: the message already says the account only changes with a new order signed by both sides |
+| a reading (`ready` or `disagreement`) whose extraction has `hidden_text_detected` | `operation_held` `hidden_text`, next to any other hold |
+| `ready` without `alert` or hidden text | nothing |
+| `rejected`, `quarantined`, `duplicate` | nothing (ingest logs them) |
+
+Each notice id is made from the file hash and the reason (the alert's id for an alert), so reporting the same upload twice sends it once. A comparison field that the bot does not know is dropped from `diffs`; the hold still goes out. The currency and amount of a disagreement come from the parser's reading and are used only to show an amount that disagrees.
 
 ### Adding a producer
 
@@ -262,6 +266,8 @@ Authorization: Bearer <BOT_INGEST_TOKEN>
 Grouping is ingest's job (T3.2, `changeDigest`); the bot sends what arrives. As a safety net, each chat gets at most `BOT_MAX_MESSAGES_PER_CHAT_PER_HOUR` messages per window. Past the cap the chat gets one fixed message ("More alerts arrived this hour. See them in Keel.") and nothing more until the next window; what was not sent is logged and counted.
 
 Chain and engine notices an attacker cannot repeat at will always go out: `operation_held`, `transfer_blocked`, `agent_revoked`, `gate_paused` and `payment_held`. Everything else counts toward the cap, including what is born from emails or documents (`account_change_attempt`, `change_requested`, `invoice_needs_cosign`, `invoice_held`), because an attacker can send hundreds.
+
+The source decides, not only the kind: `operation_held` is not capped when it comes from the agent or the engine (`POST /notices`), but a hold that ingest produced from a document (`POST /ingest/outcomes`) counts, because an uploader can repeat it. The route says where a notice was born; it is never read from the notice.
 
 ## Known limits
 

@@ -8,6 +8,9 @@ import type { ChatId, Clock, Logger, MessageSender, RecipientDirectory, Renderer
 // Chain and engine notices an attacker cannot repeat at will: they always go out.
 // Everything else counts toward the cap, including what is born from an email or a document
 // (account_change_attempt among them: an attacker can send hundreds).
+// The kind is not enough for operation_held: the engine holds a deposit, and an uploader can
+// make ingest hold a document as often as it uploads. So the source decides: whatever comes
+// from a document or an email (the ingest route says so) counts toward the cap, whatever its kind.
 const UNCAPPED: ReadonlySet<NoticeKind> = new Set<NoticeKind>([
   "operation_held",
   "transfer_blocked",
@@ -17,6 +20,11 @@ const UNCAPPED: ReadonlySet<NoticeKind> = new Set<NoticeKind>([
 ]);
 
 const HOUR_MS = 3_600_000;
+
+// Where a notice was born. The route that receives it says so; it is never read from the notice.
+// "document": ingest read an email or a document (an uploader can repeat it). "engine": the
+// agent, the engine or the chain, which an attacker cannot repeat at will.
+export type NoticeOrigin = "document" | "engine";
 
 export interface NotifyOptions {
   maxMessagesPerChatPerHour: number;
@@ -75,7 +83,7 @@ export class NotifyService {
     return { ...this.counters };
   }
 
-  async notify(input: unknown): Promise<NotifyResult> {
+  async notify(input: unknown, origin: NoticeOrigin = "engine"): Promise<NotifyResult> {
     const { directory, renderer, sender, clock, logger } = this.deps;
     this.counters.received++;
 
@@ -136,7 +144,7 @@ export class NotifyService {
         if (reached.has(chatId)) continue;
         reached.add(chatId);
 
-        if (!UNCAPPED.has(notice.kind) && !this.admit(chatId, now)) {
+        if ((origin === "document" || !UNCAPPED.has(notice.kind)) && !this.admit(chatId, now)) {
           this.counters.rateLimited++;
           logger.log({ event: "rate_limited", noticeId: notice.id, kind: notice.kind, chatId });
           await this.sendOverflowOnce(chatId);

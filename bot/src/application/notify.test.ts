@@ -132,7 +132,21 @@ describe("NotifyService", () => {
     expect(sender.to(CHATS.acme.owner)[0]?.text).toContain("Port of loading: CNSHA and CNNGB.");
   });
 
-  it("never caps the new document hold reasons", async () => {
+  it("counts a hold born from a document toward the cap, and never one born from the engine", async () => {
+    const { service, sender } = setup(2);
+    const hold = (i: number): Notice => ({ ...SAMPLES.operation_held, id: `doc-${i}`, reason: "bl_reused", orderRef: `po-${i}` });
+    // An uploader repeating holds: the third message of the hour is the single fixed notice
+    for (let i = 0; i < 6; i++) await service.notify(hold(i), "document");
+    expect(sender.to(CHATS.acme.owner)).toHaveLength(3);
+    expect(sender.to(CHATS.acme.owner).at(-1)?.text).toContain("More alerts arrived this hour");
+    expect(service.stats().rateLimited).toBeGreaterThan(0);
+    // The same kind and reason from the engine or the agent still goes out, past the cap
+    for (let i = 10; i < 14; i++) await service.notify({ ...hold(i), reason: "funding_blocked", id: `engine-${i}` });
+    await service.notify({ ...hold(20), id: "engine-same-reason" });
+    expect(sender.to(CHATS.acme.owner)).toHaveLength(3 + 5);
+  });
+
+  it("does not cap a document hold reason that comes from the engine", async () => {
     const { service, sender } = setup(1);
     for (const [i, reason] of (["bl_reused", "document_unreadable", "bl_reused"] as const).entries()) {
       await service.notify({ ...SAMPLES.operation_held, id: `hold-${i}`, reason, orderRef: `po-${i}` });
