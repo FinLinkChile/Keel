@@ -137,24 +137,27 @@ Every notice has `id` (one per event, used to deduplicate), `occurredAt` (Unix s
 
 In Trade, `orderRef` is opaque and only builds the app URL; `orderLabel` is what is shown, `^[A-Z]{1,4}-[0-9]{1,6}$`, so a phone number cannot pass as a label. Order notices carry `parties: { importer, exporter, arbiter? }` with account ids only. Wallet notices carry the `accountId` of the company that owns the wallet.
 
+The Source column says what produces each notice today, and the chain event behind it (names in `docs/interfaces/eventos-y-errores.md`). The agent (T2.6) posts the order notices when it sends the step, not from escrow events; a listener of the escrow events does not exist yet, so a kind that only has an event has no producer.
+
 | kind | Source | Fields |
 |---|---|---|
-| `order_opened` | `OrderOpened` | `amountMinor`, `currency`, `shipmentDeadline` |
-| `order_funded` | `OrderFunded` (not `FundingExecuted`: the same deposit would notify twice) | `amountMinor`, `currency` |
-| `advance_released` | `AdvanceReleased` | `amountMinor`, `currency` |
-| `shipment_accepted` | `ShipmentAccepted`. The order is shipped; the balance does not leave yet | `onBoardDate`, `balanceReleasableAt?` (shipment time plus the order's dispute window, shown as a date when present) |
-| `balance_released` | `BalanceReleased`. Per `area1/trade-escrow`, the balance leaves when the dispute window closes (`releaseBalance`) or earlier if the importer approves it (`approveBalance`) | `amountMinor`, `currency` |
-| `refunded` | `Refunded` | `amountMinor`, `currency` |
-| `order_cancelled` | `OrderCancelled` | `amountMinor`, `currency` |
-| `dispute_raised` | `DisputeRaised` | `raisedBy` |
-| `dispute_resolved` | `DisputeResolved` | `toImporterMinor`, `toExporterMinor`, `currency` |
-| `operation_held` | `OperationHeld` and the monitor | `reason`, `deadline?`, `amountMinor?` with `currency?`, `diffs?` (only with `two_source_mismatch`) |
-| `deadline_approaching` | T2.6 scheduler | `deadline`, `daysLeft` |
-| `account_change_attempt` | ingest (Trade) | none. Never the account, the sender or the text |
-| `change_queued` | Delay | `changeKind`, `effectiveAt` |
-| `transfer_blocked` | Roles Modifier revert (act 4) | `txHash` |
+| `order_opened` | `OrderOpened` of the escrow. No producer yet: the agent does not send it | `amountMinor`, `currency`, `shipmentDeadline` |
+| `order_funded` | The agent, when it sends `fund`. Chain event: `OrderFunded` of the escrow (not `FundingExecuted` of the gate: the same deposit would notify twice) | `amountMinor`, `currency` |
+| `advance_released` | The agent, when it sends `fund` with an advance. Chain event: `AdvanceReleased`, emitted inside `fund` with `OrderFunded` | `amountMinor`, `currency` |
+| `shipment_accepted` | The agent, when it sends `submitShipment`. Chain event: `ShipmentAccepted`. The order is shipped; the balance does not leave yet | `onBoardDate`, `balanceReleasableAt?` (shipment time plus the order's dispute window, shown as a date when present) |
+| `balance_released` | The agent, when it sends `releaseBalance`. Chain event: `BalanceReleased`, which also comes from `approveBalance` (the importer approves it earlier). The balance leaves when the dispute window closes or the importer approves | `amountMinor`, `currency` |
+| `refunded` | The agent, when it sends `refundAfterDeadline`. Chain event: `Refunded` | `amountMinor`, `currency` |
+| `order_cancelled` | `OrderCancelled` of the escrow. No producer yet | `amountMinor`, `currency` |
+| `dispute_raised` | `DisputeRaised` of the escrow. No producer yet | `raisedBy` |
+| `dispute_resolved` | `DisputeResolved` of the escrow. No producer yet | `toImporterMinor`, `toExporterMinor`, `currency` |
+| `operation_held` | Never a chain event: a held operation never reaches the chain, and the gate has no `OperationHeld`. Two producers. The agent (T2.6, `POST /notices`) for `new_supplier_wait`, `over_limit_cosign`, `funding_blocked`, `simulation_failed`, `agent_data_incomplete` and the document reasons it can name (`hidden_text`, `account_change_mention`, `documents_mismatch`). Ingest's `trade_upload` (see "For Area 3") for `two_source_mismatch`, `documents_mismatch`, `bl_reused`, `document_unreadable` and `hidden_text` | `reason`, `deadline?`, `amountMinor?` with `currency?`, `diffs?` (only with `two_source_mismatch`) |
+| `deadline_approaching` | The agent (T2.6), at 5, 3 and 1 days | `deadline`, `daysLeft` |
+| `account_change_attempt` | Ingest's `trade_upload`, from an alert | none. Never the account, the sender or the text |
+| `change_queued` | `ChangeQueued` of the gate (`FundingGate`, the trust registry; not a Delay), posted by the monitor of Area 2 (T2.8, PR #60): `kind` 1 (a supplier pair) is `supplier_added`, `kind` 2 (a third party) is `role_change` | `changeKind`, `effectiveAt` |
+| `transfer_blocked` | A call refused by the Roles Modifier. A revert leaves no event for the bot to read, so there is no producer yet; only the act 4 demo file sends it | `txHash` |
 | `unauthorized_execution` | the monitor of Area 2 (T2.8, `POST /notices`): a deposit or a balance release made with an approval the engine never issued | `txHash`. Never an address or an amount |
-| `agent_revoked`, `gate_paused` | `AgentRoleRevoked`, `GatePaused` | none |
+| `agent_revoked` | `AgentRoleRevoked`, which only `PDRGate` (Personal) has. The Trade gate has no such event, so there is no Trade producer yet | none |
+| `gate_paused` | `GatePaused`, emitted by both gates; the monitor of Area 2 (T2.8, PR #60) posts it | none |
 | `payment_held` | engine (T2.6) | `aliasId`, `amountClp`, `dueDate`, `reason` |
 | `payment_deadline` | T2.6 scheduler, at 5, 3 and 1 days (three ids) | `aliasId`, `amountClp`, `dueDate`, `daysLeft` |
 | `invoice_needs_cosign` | ingest, `escalated` (tier 3) | `aliasId`, `diffs` |
@@ -169,7 +172,7 @@ Enums of the bot. How producers reach the bot is not decided yet: `POST /notices
 
 * `operation_held.reason`: `new_supplier_wait`, `over_limit_cosign`, `documents_mismatch`, `two_source_mismatch`, `hidden_text`, `account_change_mention`, `bl_reused` (the bill of lading already settled another order) and `document_unreadable` (neither reader could read it; the importer is asked to get a clean copy). Three more come from the engine (T2.6): `funding_blocked` (the engine refused the deposit), `simulation_failed` (the step would revert on chain, so nothing was sent) and `agent_data_incomplete` (the agent's data does not match the order). Document reasons are the six from `documents_mismatch` to `document_unreadable`: the exporter gets the generic version.
 * `payment_held.reason`: `issuer_mismatch`, `amount_out_of_range`, `over_period_limit`, `fx_divergence`, `account_change_request`, `hidden_text`, `simulation_failed`.
-* `change_queued.changeKind`: `limit`, `supplier_added`, `role_change`, `policy_signer`. An assumption, to align with what Area 1's Delay queues once it exists.
+* `change_queued.changeKind`: `limit`, `supplier_added`, `role_change`, `policy_signer`. The gate's `ChangeQueued` has two kinds, a supplier pair and a third party, and only they have a producer (`supplier_added`, `role_change`). The gate queues no spending limit, and `PolicySignerSet` is not a queued change, so `limit` and `policy_signer` have none today; the enum values stay until Area 1 and Area 2 say whether they will. `ChangeVetoed` of the gate has no Trade notice: the monitor only logs it.
 * `currency`: `USD`, `EUR`, `CNY`, `HKD`, the commercial invoice enum. Decimals per currency live in `presentation/format.ts`, because the payment token is open decision 1.
 
 ### Two source mismatch (T3.5)

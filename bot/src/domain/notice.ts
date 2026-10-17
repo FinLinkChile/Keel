@@ -82,7 +82,8 @@ const base = { id: NoticeId, occurredAt: Timestamp };
 // About one order: the parties come with the notice, without names.
 const order = { ...base, mode: z.literal("trade"), orderRef: OrderRef, orderLabel: OrderLabel, parties: Parties };
 
-// About the importer's wallet itself (Delay queue, Roles Modifier, gate), not one order.
+// About the importer's wallet itself (the gate and its trust registry, the Roles Modifier, the
+// monitor), not one order.
 // accountId is the company that owns the wallet.
 const wallet = { ...base, mode: z.literal("trade"), accountId: AccountId };
 
@@ -121,7 +122,8 @@ export const DOCUMENT_REASONS = [
 ] as const satisfies readonly HeldReason[];
 export const isDocumentReason = (r: HeldReason): boolean => (DOCUMENT_REASONS as readonly HeldReason[]).includes(r);
 
-// Assumption: aligned with what Area 1's Delay queues once it exists (see bot/README.md).
+// The gate's ChangeQueued has a supplier pair and a third party, which are supplier_added and
+// role_change; the other two have no producer today (see bot/README.md).
 export const CHANGE_KINDS = ["limit", "supplier_added", "role_change", "policy_signer"] as const;
 export type ChangeKind = (typeof CHANGE_KINDS)[number];
 
