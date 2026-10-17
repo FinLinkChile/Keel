@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {MockSafe} from "./Mocks.sol";
+import {ITradeEscrow} from "../../src/ITradeEscrow.sol";
 
 /// @notice Token that burns 1% of every transfer, to show `fund` rejects a short deposit.
 contract FeeOnTransferToken is ERC20 {
@@ -130,5 +132,54 @@ contract OrderingToken is ERC20 {
             depositReceived = true;
             payoutBalanceAtDeposit = balanceOf(payout);
         }
+    }
+}
+
+/// @notice MockSafe (modules, owner calls) that also signs with ERC-1271 through its owner key,
+/// so the importer Safe can sign an order and be funded by the Trade gate through Roles.
+contract MockModuleSafe1271 is MockSafe {
+    constructor(address owner_) MockSafe(owner_) {}
+
+    function isValidSignature(bytes32 h, bytes calldata sig) external view returns (bytes4) {
+        (bytes32 r, bytes32 s, uint8 v) = abi.decode(sig, (bytes32, bytes32, uint8));
+        return ecrecover(h, v, r, s) == owner ? bytes4(0x1626ba7e) : bytes4(0xffffffff);
+    }
+}
+
+/// @notice Token whose transferFrom does not spend the allowance, to show the Trade gate
+/// refuses to leave an approval behind after the deposit (AllowanceNotConsumed).
+contract LeakyAllowanceToken is ERC20 {
+    constructor() ERC20("Leaky Token", "LEAK") {}
+
+    function mint(address to, uint256 amt) external {
+        _mint(to, amt);
+    }
+
+    function transferFrom(address from, address to, uint256 value) public override returns (bool) {
+        if (allowance(from, msg.sender) < value) {
+            revert ERC20InsufficientAllowance(msg.sender, allowance(from, msg.sender), value);
+        }
+        _transfer(from, to, value);
+        return true;
+    }
+}
+
+/// @notice Escrow stand-in that returns whatever order record the test sets, to reach checks of
+/// the Trade gate that the real TradeEscrow makes unreachable (for example, an order whose token
+/// differs from the escrow token, which `open` rejects).
+contract MockEscrowView {
+    address public immutable token;
+    ITradeEscrow.OrderRecord private _record;
+
+    constructor(address token_) {
+        token = token_;
+    }
+
+    function setRecord(ITradeEscrow.OrderRecord calldata r) external {
+        _record = r;
+    }
+
+    function orderOf(bytes32) external view returns (ITradeEscrow.OrderRecord memory) {
+        return _record;
     }
 }

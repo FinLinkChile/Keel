@@ -1,11 +1,11 @@
 ---
 type: Área de trabajo
 title: "Área 3: ingesta de documentos y extracción en cuarentena"
-description: "Objetivo, entregables y tareas T3.1 a T3.8: canal autenticado, protección contra inundación, parser, extractor, concordancia, cambio de cuenta, idempotencia y corpus."
+description: "Objetivo, entregables y tareas T3.1 a T3.9: canal autenticado, protección contra inundación, parser, extractor, concordancia, cambio de cuenta, idempotencia, corpus y lectura de la proforma."
 tags: [area-3, ingesta, extractor, parser, t3]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T03:00:00Z }
 ---
 
 **Perfil sugerido:** backend con experiencia en LLM, parsing de PDF y correo.
@@ -64,6 +64,30 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
   * Legítimos: al menos 12 conjuntos (BL o guía aérea más factura), anonimizados, coherentes con una orden de prueba cada uno.
   * Adversariales: al menos 25 variantes: factura con cuenta de cobro distinta, texto blanco con instrucciones, letra diminuta, homoglifos en el número de BL, fecha *on board* alterada, monto alterado, BL de otra orden, BL repetido con otro píxel, firma escaneada pegada, inyección en el campo del consignatario.
 * Cada caso lleva su resultado esperado. Los corpus los usa el Área 5 para medir.
+
+**T3.9 Lectura de la proforma (agregada por Trade) [PROPUESTA].**
+Sirve al paso 0 del flujo: el agente lee la proforma y propone la orden estructurada; quienes la aprueban y firman son las personas ([paso 0](../flujo/paso-0-negociacion.md)). No estaba asignada: `docs/trabajo/areas-y-carpetas.md` pone la recepción de la proforma en `ingest/`, y T4.9 tiene solo la pantalla del importador. La toma el Área 3 (Daniela) hasta que el equipo confirme.
+* Ruta de ingesta para que el importador suba la proforma desde la app, con la misma firma EIP-712 de billetera que la carga de documentos (T3.1).
+* Acepta PDF y también foto o escaneo (cámara, escáner de Notas), porque la proforma no decide pagos: la lee el extractor en cuarentena, con un esquema sin texto libre.
+* Devuelve solo campos tipados para prellenar la orden en la pantalla de revisión (T4.2): proveedor, número de proforma, monto y moneda, incoterm, códigos arancelarios y fecha de embarque. **Nunca la cuenta de cobro**, que sale del registro del proveedor verificado (principio 1).
+* Sin segundo lector para fotos: la revisión humana antes de firmar cumple ese papel, y lo que vale es la orden firmada, con el hash de la proforma dentro de `termsHash`.
+* No guarda la proforma ni decide nada: solo ayuda a llenar la orden.
+* Implementada en `ingest/src/trade/proforma.ts` (`POST /trade/proforma`): importadores registrados, 20 proformas por importador y día, y la misma lectura sin llamar otra vez al modelo para un archivo repetido. Contrato en [lectura de la proforma](../interfaces/lectura-de-proforma.md).
+
+# Decisiones de implementación en Keel Trade **[PROPUESTA]**
+
+Tomadas por el Área 3 al implementar T3.1 a T3.8. Están por confirmar con las áreas a las que afectan.
+
+* **T3.1:** los documentos se suben firmados con EIP-712 por un representante registrado de la orden. El formato está en [carga de documentos](../interfaces/carga-de-documentos.md) (afecta al Área 4).
+* **T3.1:** el canal de correo de Trade queda recortado, como permite "Si falta tiempo". Solo existe la carga desde la app.
+* **T3.2:** máximo 10 documentos por orden en 24 horas. Solo cuentan las cargas con firma válida, así que nadie puede gastar el cupo de una orden ajena.
+* **T3.5:** se comparan todos los campos tipados, no solo los cuatro de la tarea: también tipo de documento, puertos, número de orden, incoterm, RUT del importador y código arancelario. Todos llegan al motor, así que un modelo que tuerza cualquiera de ellos debe quedar retenido.
+* **T3.6:** la alerta no bloquea la lectura. El documento sigue su curso porque el escrow solo puede pagar a `payoutAddress`, que sale de la orden firmada. Las cuentas registradas del exportador no levantan alerta.
+* **T3.7:** ingesta también rechaza un BL ya aceptado para otra orden, antes de llamar al modelo. El contrato lo vuelve a exigir (T1.9).
+* **T3.8 (Personal):** 12 facturas legítimas (arriendo, luz, internet y gastos comunes, en tres periodos) y 26 variantes adversariales en `redteam/corpus/personal`. Entran por el correo autenticado de verdad, así que también cubren remitente falso, dominio parecido, correo reenviado con el adjunto cambiado, reenvío del mismo correo y una segunda solicitud de cambio con otra pendiente. No hay factura de agua porque no existe ese alias.
+* **Avisos al bot:** ingesta manda cada resultado al bot del Área 4 tal cual, y una vez al día el resumen de solicitudes de cambio, según [avisos al bot](../interfaces/avisos-al-bot.md). Es opcional y nunca bloquea ni cambia un resultado.
+* **CORS:** la ruta de carga responde CORS solo para el origen de la app que se configure (`INGEST_APP_ORIGIN`).
+* **T3.8:** el corpus de Trade tiene 12 conjuntos legítimos y 30 variantes adversariales, en `redteam/corpus/trade`, con `manifest.json` (resultado esperado y si el documento cumple la orden). Se regenera con `npm run corpus -w ingest` y se prueba contra el LLM configurado con `npm run corpus:run -w ingest`.
 
 # Listo cuando
 

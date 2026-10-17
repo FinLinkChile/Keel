@@ -7,7 +7,11 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "serve": "node --env-file-if-exists=../.env --import tsx scripts/serve.ts",
-    "extract": "node --env-file-if-exists=../.env --import tsx scripts/extract.ts"
+    "extract": "node --env-file-if-exists=../.env --import tsx scripts/extract.ts",
+    "corpus": "node --import tsx scripts/corpus.ts",
+    "corpus:run": "node --env-file-if-exists=../.env --import tsx scripts/corpus-run.ts",
+    "proforma:check": "node --env-file-if-exists=../.env --import tsx scripts/proforma-check.ts",
+    "llm:check": "node --env-file-if-exists=../.env --import tsx scripts/llm-check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

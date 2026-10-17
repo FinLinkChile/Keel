@@ -4,7 +4,7 @@ title: "Decisiones transversales D1 a D14"
 description: "Lo que ya se definió para todas las áreas y nadie cambia sin avisar al equipo. Cada decisión con su motivo."
 tags: [decisiones, d1-d14]
 modo: ambos
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T16:30:00Z }
 ---
 
 | # | Decisión | Por qué |
@@ -13,7 +13,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
 | D2 | **No hay LLM operativo.** El flujo queda así: extractor LLM en cuarentena, validador determinista, motor de política, PDR, contrato. Si existe un chat, es de solo lectura (nivel 0) y explica decisiones con plantillas. | Crítica 8: el motor ya es determinista y ese LLM solo agrega superficie de ataque. |
 | D3 | **El esquema de extracción no tiene texto libre.** Solo enums, números y campos validados con expresiones regulares. | Crítica 8. |
 | D4 | **El gate es el único miembro del rol del agente** en el Roles Modifier de cada Safe: PDRGate en Keel Personal y el gate de Trade en Keel Trade (un gate por modo, ver [PDR](../interfaces/pdr.md)). La llave del agente sola no puede mover fondos: solo sirve para pagar gas. | Sin esto, el PDR no se exige en cadena. |
-| D5 | **Los cambios de configuración pasan por el Delay Modifier:** lista blanca de beneficiarios (Personal), proveedores conocidos (Trade), cupos, firmante de la política y miembros de roles. Tienen aviso y ventana de veto. | Hace verificable el nivel 2 y responde a la crítica 16. |
+| D5 | **Los cambios de configuración pasan por el Delay Modifier:** lista blanca de beneficiarios (Personal), cupos, firmante de la política y miembros de roles. Tienen aviso y ventana de veto. **[PROPUESTA del Área 1, 15 de octubre]** Los proveedores conocidos y terceros de confianza de Trade (naviera, árbitro, verificador) no van por el Delay: los registra `FundingGate` con su propia espera (`configDelay`) y veto por cambio, de la Safe o del cosignatario. | Hace verificable el nivel 2 y responde a la crítica 16. En Trade, el veto del Delay (`setTxNonce`) cancela todo lo pendiente en bloque y sin ConfigGuard los dueños pueden saltárselo; la espera del gate la hace cumplir el contrato que paga. |
 | D6 | **El cosignatario no es dueño de la Safe.** Tiene un rol propio que solo le permite vetar, pausar y revocar el rol del agente. | Crítica 15: en una Safe, cualquier dueño puede proponer. |
 | D7 | **La simulación en tiempo de ejecución es `eth_call`.** Anvil se usa solo para las pruebas. | Crítica 18. |
 | D8 | **Fallar cerrado siempre avisa:** todo pago u operación retenida notifica el motivo, la fecha límite y la alternativa manual. | Crítica 19. |
