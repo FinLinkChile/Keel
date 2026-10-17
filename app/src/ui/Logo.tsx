@@ -1,7 +1,6 @@
 import { View } from 'react-native';
 import Svg, { Path, Text as SvgText } from 'react-native-svg';
 
-import { Text } from './Text';
 import { colors, fonts } from './theme';
 
 // The Keel wordmark: a slanted K tab followed by "eel" in Figtree italic. The parts are exported
@@ -34,11 +33,37 @@ export function LogoTile({ scale = 1, part = 'both' }: { scale?: number; part?: 
   );
 }
 
-export function LogoLetter({ char, scale = 1 }: { char: string; scale?: number }) {
+// Figtree ExtraBold Italic in font units (of 1000), read from the font file
+const ADVANCE = { e: 563, l: 258 } as const;
+const ASCENT = 950;
+const DESCENT = 250;
+const SIZE = 52;
+const TRACKING = -2.1;
+const LINE = 40;
+// Where a browser puts the baseline in a 40 line box: the half leading is negative
+const BASELINE = (LINE - ((ASCENT + DESCENT) / 1000) * SIZE) / 2 + (ASCENT / 1000) * SIZE;
+// The italic l leans past its advance
+const SPILL = 6;
+
+export type LogoChar = (typeof LOGO_LETTERS)[number];
+
+// How much room a letter takes in the row
+export function letterWidth(char: LogoChar, scale = 1) {
+  return ((ADVANCE[char] / 1000) * SIZE + TRACKING) * scale;
+}
+
+// SVG like the K: a Text line box shorter than the font is laid out differently on iOS, which
+// also clips the glyph to it
+export function LogoLetter({ char, scale = 1 }: { char: LogoChar; scale?: number }) {
+  const width = letterWidth(char, scale);
   return (
-    <Text size={52 * scale} tracking={-2.1 * scale} style={{ fontFamily: fonts.sansItalic800, lineHeight: 40 * scale }}>
-      {char}
-    </Text>
+    <View style={{ width, height: LINE * scale }}>
+      <Svg width={width + SPILL * scale} height={LINE * scale} style={{ position: 'absolute', left: 0, top: 0 }}>
+        <SvgText x={0} y={BASELINE * scale} fontFamily={fonts.sansItalic800} fontSize={SIZE * scale} fill={colors.text}>
+          {char}
+        </SvgText>
+      </Svg>
+    </View>
   );
 }
 
