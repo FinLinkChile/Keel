@@ -30,15 +30,23 @@ export default function Home() {
       contentContainerStyle={{ paddingTop: Math.max(56, insets.top + 12), paddingHorizontal: gutter, paddingBottom: 48, gap: 24 }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Avatar name={me.name} />
-        <View style={{ flex: 1 }}>
-          <Text size={18} weight={700}>
-            {me.name}
-          </Text>
-          <Text size={14} color="textMuted">
-            {role === 'importer' ? 'Importer' : 'Exporter'}, {account.title}
-          </Text>
-        </View>
+        {/* The company opens the profile: basic data and the way back to Connect */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Profile, ${me.name}`}
+          onPress={() => router.push('/profile')}
+          style={({ pressed }) => ({ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, opacity: pressed ? 0.7 : 1 })}
+        >
+          <Avatar name={me.name} />
+          <View style={{ flex: 1 }}>
+            <Text size={18} weight={700}>
+              {me.name}
+            </Text>
+            <Text size={14} color="textMuted">
+              {role === 'importer' ? 'Importer' : 'Exporter'}, {account.title}
+            </Text>
+          </View>
+        </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={items.length > 0 ? 'Activity, something needs you' : 'Activity'}

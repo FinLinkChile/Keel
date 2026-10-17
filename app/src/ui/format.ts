@@ -38,6 +38,14 @@ export function initials(name: string): string {
     .join('');
 }
 
+// "765432103" -> "76.543.210-3": a Chilean RUT is stored without dots or dash
+export function formatRut(rut: string): string {
+  const clean = rut.replace(/[.\-\s]/g, '').toUpperCase();
+  if (clean.length < 2) return rut;
+  const body = clean.slice(0, -1).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${body}-${clean.slice(-1)}`;
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // Unix seconds -> "Nov 20". Contract dates are UTC days, so the day never shifts with the phone.

@@ -14,6 +14,9 @@ export const config = {
   // TradeEscrow, the contract that checks the signatures of an order. Orders cannot be signed
   // without it, and the app never signs with a placeholder. Undefined when not set.
   escrowAddress: escrowFrom(process.env.EXPO_PUBLIC_ESCROW_ADDRESS),
+  // EXPO_PUBLIC_DEMO_SEED=1 shows the example orders and balances of data/mock.ts. Off, the app
+  // starts empty and shows only what this phone does.
+  demoSeed: process.env.EXPO_PUBLIC_DEMO_SEED === '1',
   // The importer's Safe (contracts/deployments/<chain>.json). It is po.importer: the gate only
   // funds orders whose importer is the Safe. Undefined when not set.
   importerSafe: escrowFrom(process.env.EXPO_PUBLIC_IMPORTER_SAFE),

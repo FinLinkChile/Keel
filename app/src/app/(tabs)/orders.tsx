@@ -119,11 +119,9 @@ function List({ rows, role, now, avatars = false, empty }: { rows: Row[]; role: 
       {rows.map(({ order, counterparty }, i) => {
         const line = orderLine(order, role, counterparty, now);
         return (
-          // The exporter opens its order (10); the importer's order (05) comes later
           <Pressable
             key={order.label}
-            disabled={role !== 'exporter'}
-            accessibilityRole={role === 'exporter' ? 'button' : undefined}
+            accessibilityRole="button"
             onPress={() => router.push({ pathname: '/order/[orderId]', params: { orderId: order.po.orderId } })}
             accessibilityLabel={`${order.goodsShort} ${order.label}, ${line.detail.map((s) => s.text).join('')}, ${line.status}`}
             style={({ pressed }) => ({

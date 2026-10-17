@@ -72,8 +72,8 @@ export const REQUIRED_DOCS: readonly RequiredDocType[] = ['BILL_OF_LADING', 'COM
 // need an exchange rate nobody has agreed on, so it is blocked instead of converted.
 const TOKEN_CURRENCY: Currency = 'USD';
 
-// ASSUMPTION (open point 3 of PR #66, undecided): documentHash is the hash of the proforma file,
-// as ingest returns it, until the team decides what "the full order document" is.
+// documentHash is the fileHash ingest returns for the proforma (decided with PR #66, see
+// docs/interfaces/lectura-de-proforma.md), so the order commits to the exact file that was read.
 export const documentHashOf = (proformaFileHash: Hex): Hex => proformaFileHash.toLowerCase() as Hex;
 
 // ASSUMPTION (pending with Area 2): the shipment deadline is the latest shipment date of the
