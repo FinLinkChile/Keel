@@ -14,6 +14,8 @@ import {
   MAX_PROFORMA_IMAGE_BYTES,
   MAX_PROFORMA_PDF_BYTES,
   PROFORMA_TYPES,
+  pdfHeaderOffset,
+  PROFORMA_FIELDS,
   readProforma,
   readProformaResponse,
   sniffMediaType,
@@ -50,18 +52,40 @@ const read = (fileHash: string = HASH) => ({ status: 'read', fileHash, input: 't
 // The app keeps its own copy of the proforma types (not in schemas/). Once ingest's proforma
 // reading is in the tree (area3/proforma, PR #66), this compares both; until then it is skipped.
 const INGEST = resolve(__dirname, '../../../ingest/src/trade/proforma.ts');
+const INGEST_READING = resolve(__dirname, '../../../ingest/src/extractor/proforma.ts');
 
 describe.skipIf(!existsSync(INGEST))('proforma types match ingest', () => {
   it('has the same ProformaUpload fields and sniffs the same media types', async () => {
     const ingest = await import(/* @vite-ignore */ INGEST);
     expect(PROFORMA_TYPES).toEqual(ingest.PROFORMA_TYPES);
-    for (const file of [PDF, JPEG, new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), new Uint8Array(12)]) {
+    for (const file of [PDF, JPEG, new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), new Uint8Array(12), ...PDFS_WITH_JUNK]) {
       expect(sniffMediaType(file)).toBe(ingest.sniffMediaType(file));
     }
-  });
+    // The fields of a reading, in the same order: `missing` and the count of terms read follow them
+    const reading = await import(/* @vite-ignore */ INGEST_READING);
+    expect(PROFORMA_FIELDS).toEqual(reading.PROFORMA_FIELDS);
+    // The ingest compare imports a lot, so a cold cache can be slow
+  }, 30_000);
 });
 
+// A PDF whose header sits after some bytes, at the edges of the 1024-byte window, and after it
+const withHeaderAt = (offset: number) => {
+  const file = new Uint8Array(offset + PDF.length).fill(0x20);
+  file.set(PDF, offset);
+  return file;
+};
+const PDFS_WITH_JUNK = [withHeaderAt(1), withHeaderAt(100), withHeaderAt(1019), withHeaderAt(1020), withHeaderAt(5000)];
+
 describe('sniffMediaType', () => {
+  it('finds the PDF header anywhere in the first 1024 bytes, as ingest does', () => {
+    expect(sniffMediaType(withHeaderAt(100))).toBe('application/pdf');
+    expect(sniffMediaType(withHeaderAt(1019))).toBe('application/pdf');
+    expect(sniffMediaType(withHeaderAt(1020))).toBeUndefined();
+    expect(sniffMediaType(withHeaderAt(5000))).toBeUndefined();
+    expect(pdfHeaderOffset(withHeaderAt(100))).toBe(100);
+    expect(pdfHeaderOffset(new Uint8Array(10))).toBe(-1);
+  });
+
   it('reads the type from the bytes and refuses HEIC', () => {
     expect(sniffMediaType(PDF)).toBe('application/pdf');
     expect(sniffMediaType(JPEG)).toBe('image/jpeg');
@@ -167,6 +191,15 @@ describe('readProformaResponse', () => {
     });
     const warned = { ...read(), proforma: { ...proforma(), mentions_account_change: true, hidden_text_detected: true } };
     expect(readProformaResponse(200, warned)).toMatchObject({ mentionsAccountChange: true, hiddenTextDetected: true });
+  });
+
+  it('accepts a reading where values that did not normalize came back empty and are listed as missing', () => {
+    const body = { ...read(), proforma: { ...proforma(), amount_minor: null, hs_codes: [], advance_bps: null }, missing: ['amount_minor', 'hs_codes', 'advance_bps', 'port_of_discharge'] };
+    expect(readProformaResponse(200, body)).toMatchObject({
+      kind: 'read',
+      proforma: { amount_minor: null, hs_codes: [], advance_bps: null },
+      missing: ['amount_minor', 'hs_codes', 'advance_bps', 'port_of_discharge'],
+    });
   });
 
   it('keeps only the file hash of an unreadable proforma', () => {

@@ -33,10 +33,21 @@ export const MAX_PROFORMA_PDF_BYTES = 10 * 1024 * 1024;
 
 export type ProformaMediaType = 'application/pdf' | 'image/jpeg' | 'image/png' | 'image/webp';
 
+// The PDF standard lets the %PDF- header appear anywhere in the first 1024 bytes, and some
+// scanners write bytes before it. Same rule as ingest, so a file the app accepts is one ingest
+// reads. -1 when there is no header.
+const PDF_HEADER_WINDOW = 1024;
+const PDF_HEADER = [0x25, 0x50, 0x44, 0x46, 0x2d];
+export function pdfHeaderOffset(file: Uint8Array): number {
+  const last = Math.min(PDF_HEADER_WINDOW, file.length) - PDF_HEADER.length;
+  for (let i = 0; i <= last; i++) if (PDF_HEADER.every((b, j) => file[i + j] === b)) return i;
+  return -1;
+}
+
 // The type is read from the bytes, the way ingest does. HEIC is not accepted: the picker sends JPEG.
 export function sniffMediaType(file: Uint8Array): ProformaMediaType | undefined {
   const starts = (...bytes: number[]) => bytes.every((b, i) => file[i] === b);
-  if (starts(0x25, 0x50, 0x44, 0x46, 0x2d)) return 'application/pdf';
+  if (pdfHeaderOffset(file) >= 0) return 'application/pdf';
   if (starts(0xff, 0xd8, 0xff)) return 'image/jpeg';
   if (starts(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return 'image/png';
   if (starts(0x52, 0x49, 0x46, 0x46) && String.fromCharCode(...file.slice(8, 12)) === 'WEBP') return 'image/webp';
