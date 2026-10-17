@@ -4,7 +4,7 @@ title: "Niveles de permiso (0 a 4)"
 description: "Los cinco niveles, dónde se hace cumplir cada uno y qué nivel tiene cada acción del agente en Keel Trade y en Keel Personal."
 tags: [niveles, permisos, agente, cofirma, delay]
 modo: ambos
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T16:30:00Z }
 ---
 
 | Nivel | Nombre | Dónde se hace cumplir |
@@ -23,7 +23,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
 | Proponer la orden estructurada a partir de la proforma | Agente propone, representantes firman | 0 |
 | Firmar la orden de compra | Representantes de cada empresa | Firma humana |
 | Depositar una orden ya firmada, con proveedor conocido y dentro del cupo | Agente | 1 |
-| Depositar a un proveedor nuevo | Agente propone | 2 |
+| Depositar a un proveedor nuevo | Agente propone; la Safe lo encola en el registro del gate y cuenta tras la espera, con veto | 2 |
 | Depositar por sobre el cupo | Agente propone, cosignatario cofirma | 3 |
 | Verificar documentos contra la orden y emitir el PDR del gatillo 2 | Agente | 1 |
 | Presentar la atestación de embarque al contrato | Agente o cualquiera | 1 |
@@ -34,7 +34,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
 | Cambiar `payoutAddress`, naviera o árbitro de una orden firmada | Nadie: exige una orden nueva | 4 |
 | Enviar fondos fuera del contrato de escrow | Nadie con el rol del agente | 4 |
 
-Cómo se hace cumplir en la cadena: el rol del agente en el Roles Modifier solo permite llamar al contrato de escrow, con cupo por periodo. El único miembro de ese rol es el gate de Trade, que exige un PDR válido. Que el proveedor sea conocido hoy lo revisa solo el motor: Roles no ve la dirección de cobro, porque va dentro de la orden. El Área 1 llevará esa verificación a la cadena en el gate de Trade (T1.11). El nivel 3 de Trade se ejecuta con un segundo rol con cupo mayor, que el gate usa solo con la cofirma, porque la cofirma por sí sola no levanta el cupo de Roles. Cada empresa opera desde su Safe, y cambiar roles o cupos pasa por el Delay.
+Cómo se hace cumplir en la cadena: el rol del agente en el Roles Modifier solo permite llamar al contrato de escrow, con cupo por periodo. El único miembro de ese rol es el gate de Trade, que exige un PDR válido. Roles no ve la dirección de cobro, porque va dentro de la orden; por eso la revisa el gate de Trade: solo deposita si el par (exportador, `payoutAddress`) y la naviera, el árbitro y el verificador de la orden están activos en los registros de la Safe. Agregar uno lo hace solo la Safe y cuenta recién después de una espera que hace cumplir el gate (120 segundos en la demo, 48 horas en producción), durante la cual la Safe o el cosignatario pueden vetar ese cambio. Ese es el nivel 2 de Trade **[PROPUESTA del Área 1]**. El nivel 3 de Trade se ejecuta con un segundo rol con cupo mayor, que el gate usa solo con la cofirma, porque la cofirma por sí sola no levanta el cupo de Roles. Cada empresa opera desde su Safe, y cambiar roles o cupos pasa por el Delay.
 
 Firmar la orden de compra, abrir una disputa y cancelar son siempre actos de personas.
 

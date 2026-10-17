@@ -5,11 +5,13 @@ import { join, resolve } from 'node:path';
 
 import { EIP712_TYPES, OrderTerms, REQUIRED_DOC_TYPES } from '@keel/schemas';
 import { requiredDocsHash, termsHash } from '@keel/schemas/hash';
+import { getAddress } from 'viem';
 import { describe, expect, it } from 'vitest';
 
+import { centsToToken } from '../src/data/amounts';
 import { checkOrderShape, orderIdOf } from '../src/data/orderRules';
 
-import { checkWallet, demoData, toFileText } from './demoData';
+import { checkWallet, compactAccount, demoData, toFileText } from './demoData';
 
 const repo = resolve(__dirname, '../..');
 const json = (path: string) => JSON.parse(readFileSync(join(repo, path), 'utf8'));
@@ -30,12 +32,21 @@ describe('demo data for ingest', () => {
     const labelOf = Object.fromEntries((await demoData({ exporter: EXPORTER }, botAccounts)).agentOrders.map((o) => [o.order.orderId, o.label]));
     expect(file.map((e) => labelOf[e.orderId as string])).toEqual(['PO-0157', 'PO-0142', 'PO-0150']);
     for (const e of file) {
-      expect(Object.keys(e).sort()).toEqual(['carrier', 'orderId', 'payoutAddress', 'uploaders']);
+      expect(Object.keys(e).sort()).toEqual(['carrier', 'knownDestinations', 'orderId', 'payoutAddress', 'uploaders']);
       expect(e.orderId).toMatch(HEX(32));
       expect(e.payoutAddress).toMatch(HEX(20));
       expect(e.carrier).toMatch(HEX(20));
       expect(e.uploaders).toEqual([{ address: EXPORTER, party: 'exporter' }]);
     }
+  });
+
+  it("registers the exporter's bank account as ingest finds it on the invoice", async () => {
+    const { ingestOrders } = await demoData({ exporter: EXPORTER }, botAccounts);
+    for (const e of ingestOrders) expect(e.knownDestinations).toEqual([{ kind: 'bank_account', value: '0128440755120142' }]);
+    // The line the corpus renderer prints, read with ingest's ACCOUNT_RE and compacted
+    const printed = 'A/C No.: 0128 4407 5512 0142';
+    const found = /\b(?:A\/C|ACCOUNT)\s*(?:NO\.?|NUMBER|#)?\s*:?\s*([0-9][0-9\- ]{5,30}[0-9])\b/.exec(printed.toUpperCase())![1]!;
+    expect(compactAccount(found)).toBe(ingestOrders[0]!.knownDestinations![0]!.value);
   });
 
   it('adds the importer wallet to every open order of the importer', async () => {
@@ -73,7 +84,8 @@ describe('demo data for the agent', () => {
 
       expect(order.termsHash).toBe(termsHash(terms));
       expect(order.requiredDocsHash).toBe(requiredDocsHash(['BILL_OF_LADING', 'COMMERCIAL_INVOICE']));
-      expect(order.totalAmount).toBe(terms.invoiceAmountMinor);
+      // Token units (USDC, 6 decimals) for an invoice amount in cents
+      expect(order.totalAmount).toBe(centsToToken(terms.invoiceAmountMinor));
       const others = [order.importer, order.exporter, order.carrier, order.arbiter];
       expect(others).not.toContain(order.documentVerifier);
     }
@@ -90,8 +102,9 @@ describe('demo data for the agent', () => {
     expect(byAccount.lingnan.address).toBe(EXPORTER);
     expect(byAccount['hk-arbitration']).toBeDefined();
     for (const p of file.parties) expect(p.address).toMatch(HEX(20));
-    // PO-0131, settled, 48,000.00, as decimal text under the lowercase exporter address
-    expect(file.history).toEqual({ [EXPORTER.toLowerCase()]: ['4800000'] });
+    // PO-0131, settled, 48,000 USDC in token units, as decimal text under the lowercase exporter
+    // address: the engine compares it with an order's totalAmount
+    expect(file.history).toEqual({ [EXPORTER.toLowerCase()]: ['48000000000'] });
   });
 });
 
@@ -145,5 +158,25 @@ describe('inputs', () => {
     await demoData({ exporter: EXPORTER }, botAccounts);
     const { mockData } = await import('../src/data/mock');
     expect((await mockData.party('lingnan'))!.address).not.toBe(EXPORTER);
+  });
+});
+
+describe('demo data with the importer as a Safe', () => {
+  const SAFE = getAddress('0x5afe5afe5afe5afe5afe5afe5afe5afe5afe5afe');
+
+  it('makes the Safe the importer of every order and the owner key the uploader in ingest', async () => {
+    const { ingestOrders, agentOrders } = await demoData({ exporter: EXPORTER, importer: IMPORTER }, botAccounts, { importerSafe: SAFE });
+    expect(agentOrders.every((o) => o.order.importer === SAFE)).toBe(true);
+    expect(agentOrders.every((o) => o.order.orderId === orderIdOf(SAFE, o.order.exporter, o.order.nonce))).toBe(true);
+    const uploaders = ingestOrders.flatMap((e) => e.uploaders);
+    expect(uploaders).toContainEqual({ address: IMPORTER, party: 'importer' });
+    expect(uploaders.some((u) => u.address === SAFE)).toBe(false);
+  });
+
+  it('pays the demo exporter, not a fixed account', async () => {
+    const { agentOrders } = await demoData({ exporter: EXPORTER, importer: IMPORTER }, botAccounts, { importerSafe: SAFE });
+    const lingnan = agentOrders.filter((o) => o.order.exporter === EXPORTER);
+    expect(lingnan.length).toBeGreaterThan(0);
+    expect(lingnan.every((o) => o.order.payoutAddress === EXPORTER)).toBe(true);
   });
 });

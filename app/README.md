@@ -34,7 +34,7 @@ npm run demo-data -w app -- --exporter 0x… [--importer 0x…] [--out <dir>]
 
 | File | For | Content |
 |---|---|---|
-| `<out>/ingest-orders.json` | ingest, as `INGEST_ORDERS_FILE` | The open orders a test wallet can upload to: `orderId`, `payoutAddress` and `carrier` from the order, and the wallets as `uploaders` |
+| `<out>/ingest-orders.json` | ingest, as `INGEST_ORDERS_FILE` | The open orders a test wallet can upload to: `orderId`, `payoutAddress` and `carrier` from the order, the wallets as `uploaders`, and the exporter's registered bank account as `knownDestinations`, so its own invoice raises no unknown account alert |
 | `<out>/agent/orders/<orderId>/order.json` | the agent (Area 2) | `{ order, terms, label }`: the `PurchaseOrder` with its real `termsHash` and `requiredDocsHash`, the `OrderTerms` and the label of the bot notices |
 | `<out>/agent/registry.json` | the agent | `parties` (address, bot account, the importer's RUT) and `history` (settled amounts by exporter) |
 | `<out>/bot-orders.json` | the bot, as `BOT_ORDERS_FILE` | The label and the bot accounts of each order, by order id |
@@ -94,7 +94,7 @@ This is the end to end test of the signed upload (step 4 of the flow): the expor
    npm run demo-data -w app -- --exporter 0xTHE_ADDRESS
    ```
 
-7. **Upload.** On Home, tap **Upload** on PO-0142. On the order, tap **Upload** next to **Bill of lading** and choose `redteam/corpus/trade/legit/T01-bill_of_lading.pdf`, then **Upload** next to **Commercial invoice** with `T01-commercial_invoice.pdf` from the same set. Both rows start empty and show only what this phone uploaded. To get the PDF onto the phone, email it to yourself or put it in Drive, and pick it from the file picker. The row should end in **Accepted**.
+7. **Upload.** On Home, tap **Upload** on PO-0142. On the order, tap **Upload** next to **Bill of lading** and choose `redteam/corpus/demo/PO-0142-bill-of-lading.pdf`, then **Upload** next to **Commercial invoice** with `PO-0142-commercial-invoice.pdf` from the same folder (added by Area 3 in #69). They carry the values of PO-0142 and the exporter's registered account, so the invoice raises no account alert and the agent finds them consistent with the order. Both rows start empty and show only what this phone uploaded. To get the PDF onto the phone, email it to yourself or put it in Drive, and pick it from the file picker. The row should end in **Accepted**.
 
 What each outcome means:
 
@@ -110,6 +110,23 @@ What each outcome means:
 | Uploads are not set up in this app | not sent | `EXPO_PUBLIC_INGEST_URL` or `EXPO_PUBLIC_CHAIN_ID` is missing; restart with `--clear` after editing `app/.env` |
 
 Nothing on this screen pays or changes the order: the upload only gives ingest the documents that the engine later compares with the signed order and the carrier's attestation. The screen never shows what ingest read in the file.
+
+## Sign-up
+
+The first time, the app asks for the country (only Chile is available), the company (RUT, legal name, email and a Chilean mobile), and the person who represents it (name, RUT, and whether they are a politically exposed person), the data a Chilean bank asks to open a company account. RUTs are checked with their check digit. The form comes filled with the demo company, Pacífico Foods SpA, because the documents of the test orders carry its RUT.
+
+**The identity validation is simulated.** The last step lists what a bank asks (the ID card, front and back, and a selfie) and the person ticks that it was done; nothing is captured or checked. KYC is future work (`docs/flujo/alcance.md`). The details stay on the phone (`onboarding.json`) and are never sent to ingest or to a model. The company the person signed up replaces the example importer on screen. Logging out from the profile goes back to Connect and keeps the test wallet.
+
+## The app on a phone with Xcode, without Expo Go
+
+Expo Go cannot run the document scanner of the proforma, so the app is built as a native app. `ios/` is generated and ignored by git, so nothing heavy is committed:
+
+1. `npm install` at the repository root, and copy `app/.env.example` to `app/.env` (set `EXPO_PUBLIC_INGEST_URL`, `EXPO_PUBLIC_CHAIN_ID` and, for a test build, `EXPO_PUBLIC_WALLET_CHECK=1`).
+2. In `app/`: `npx expo prebuild --platform ios` and `cd ios && pod install` (CocoaPods).
+3. Open `app/ios/Keel.xcworkspace`, choose your team in Signing & Capabilities (a free Apple ID works) and your iPhone.
+4. Edit Scheme, Run, Build Configuration: **Release**, so the app carries its JavaScript and needs no Metro. Press Run. If Xcode says the bundle identifier is taken, change it (`ios.bundleIdentifier` in `app.json`) to one of your own.
+
+The proforma is scanned with the iPhone's document scanner (the one in Notes); the pages are joined into one PDF before they go to ingest.
 
 ## Tasks
 

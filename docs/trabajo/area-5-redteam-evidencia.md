@@ -5,7 +5,7 @@ description: "Objetivo, entregables y tareas T5.1 a T5.7: coordinación, verific
 tags: [area-5, red-team, evidencia, entrega, t5]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T22:00:00Z }
 ---
 
 **Perfil sugerido:** quien coordine, escriba bien en inglés y piense como atacante.
@@ -53,7 +53,7 @@ Confirmar además si se puede citar al importador entrevistado.
 * Lista de riesgos conocidos, sin "ninguno conocido".
   * Comunes: configuración de Roles no auditada por terceros; firmante de política en un servidor; riesgo de emisor del token de pago; Telegram como canal; la bitácora prueba lo registrado, no que nada se haya escapado.
   * **Personal (base):** fuentes del tipo de cambio; puente fiat centralizado.
-  * **Trade (agregado):** contrato de escrow propio, sin auditoría de terceros; naviera y árbitro representados por llaves de prueba; registro de partes administrado por Keel; colusión de exportador y naviera; el anticipo solo se recupera por disputa; verificación pública limitada en una red cerrada.
+  * **Trade (agregado):** contrato de escrow propio, sin auditoría de terceros; naviera y árbitro representados por llaves de prueba; proveedores y terceros de confianza aprobados por la propia empresa en su gate, sin verificación de identidad en la cadena; colusión de exportador y naviera; el anticipo no se recupera en la cadena (la disputa solo reparte el saldo restante y no se abre antes del embarque), solo por acuerdo entre las partes fuera de la cadena; verificación pública limitada en una red cerrada.
 * Tabla de llaves de T2.7.
 
 **T5.4 Batería de red team (40 escenarios mínimo).**

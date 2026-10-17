@@ -3,6 +3,7 @@ import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useData, type Order } from '@/data';
+import { tokenToCents } from '@/data/amounts';
 import { Address } from '@/ui/Address';
 import { Amount } from '@/ui/Amount';
 import { Avatar } from '@/ui/Avatar';
@@ -187,7 +188,7 @@ export default function Components() {
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Amount minor={o.po.totalAmount} currency={o.terms.currency} size={18} weight={500} color="textSoft" currencyColor="textFaint" />
+                  <Amount minor={tokenToCents(o.po.totalAmount)} currency={o.terms.currency} size={18} weight={500} color="textSoft" currencyColor="textFaint" />
                   <Button label="Review" variant="go" />
                 </View>
               </Sheet>

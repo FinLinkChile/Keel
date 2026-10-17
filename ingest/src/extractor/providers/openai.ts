@@ -1,5 +1,14 @@
 import OpenAI from "openai";
-import { ExtractionError, LLM_OUTPUT_SCHEMA, SYSTEM_PROMPT, userMessage, type ExtractorProvider, type InvoiceDocument } from "../contract";
+import { ExtractionError, type ExtractionRequest, type ExtractorProvider } from "../contract";
+
+function attachmentContent(request: ExtractionRequest): OpenAI.Responses.ResponseInputContent[] {
+  const a = request.attachment;
+  if (!a) return [];
+  const url = `data:${a.mediaType};base64,${a.data}`;
+  return a.mediaType === "application/pdf"
+    ? [{ type: "input_file", filename: "document.pdf", file_data: url }]
+    : [{ type: "input_image", image_url: url, detail: "high" }];
+}
 
 export class OpenAIProvider implements ExtractorProvider {
   readonly provider = "openai";
@@ -12,19 +21,19 @@ export class OpenAIProvider implements ExtractorProvider {
     this.client = new OpenAI({ apiKey });
   }
 
-  async complete(doc: InvoiceDocument): Promise<string> {
+  async complete(request: ExtractionRequest): Promise<string> {
     let res: OpenAI.Responses.Response;
     try {
       res = await this.client.responses.create({
         model: this.model,
-        instructions: SYSTEM_PROMPT,
-        input: [{ role: "user", content: [{ type: "input_text", text: userMessage(doc.text) }] }],
+        instructions: request.system,
+        input: [{ role: "user", content: [...attachmentContent(request), { type: "input_text", text: request.user }] }],
         text: {
           format: {
             type: "json_schema",
-            name: "invoice_extraction",
+            name: request.schemaName,
             strict: true,
-            schema: LLM_OUTPUT_SCHEMA as unknown as Record<string, unknown>,
+            schema: request.schema,
           },
         },
       });

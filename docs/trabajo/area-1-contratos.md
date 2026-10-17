@@ -5,7 +5,7 @@ description: "Objetivo, entregables y tareas T1.0 a T1.11: red y token, Safe, ro
 tags: [area-1, contratos, solidity, foundry, t1]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T01:40:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T15:00:00Z }
 ---
 
 **Perfil sugerido:** quien tenga más experiencia en Solidity y Foundry.
@@ -60,7 +60,7 @@ Cada Safe lleva la configuración de su modo: la Safe de una persona no tiene pe
 
 **T1.4 Delay Modifier para cambios de configuración.**
 * Habilitarlo como módulo de la Safe.
-* Todo cambio de lista blanca (Personal), proveedores conocidos (Trade), cupos, firmante de política y membresías se encola ahí, con un enfriamiento de 3 minutos en la demo y 48 horas en el documento de producción, más una ventana de expiración.
+* Todo cambio de lista blanca (Personal), cupos, firmante de política y membresías se encola ahí (los proveedores conocidos y terceros de confianza de Trade tienen su propia espera en el gate, ver T1.11), con un enfriamiento de 3 minutos en la demo y 48 horas en el documento de producción, más una ventana de expiración.
 * Definir con el Área 4 cómo el dueño propone el cambio desde su billetera.
 * Este es el **nivel 2** en cadena.
 
@@ -84,12 +84,14 @@ Cada Safe lleva la configuración de su modo: la Safe de una persona no tiene pe
 
 **Personal (base):** la intención es `PaymentIntent`. El calldata es `abi.encodeCall(IERC20.transfer, (intent.recipient, intent.amountUsdc))`. Antes de ejecutar, verifica y marca `invoiceKey` como pagada (`InvoiceAlreadyPaid`): la idempotencia queda en cadena, así que ni un motor comprometido puede pagar dos veces la misma factura (crítica 11). Emite `PaymentExecuted(intentHash, pdrHash, tier, invoiceKey)`. Este gate ya tiene código y pruebas locales.
 
-**Trade (agregado):** un gate propio, separado de PDRGate (nombre provisional `FundingGate`); su estructura interna la define el Área 1. La intención es `FundIntent`, que trae `orderHash`: el gate lo compara con la orden que guardó el escrow. El gate también verifica en la cadena que `(exporter, payoutAddress)` esté en el registro de proveedores conocidos, que solo cambia por el Delay (T1.11). Para el nivel 3 (depósito sobre el cupo) el gate ejecuta con un segundo rol con cupo mayor (por ejemplo `AGENT_COSIGNED`), que usa solo cuando trae la cofirma. El calldata es la llamada de depósito al escrow. La idempotencia queda en el escrow: una orden solo se deposita una vez (`InvalidState`). Emite `FundingExecuted(intentHash, pdrHash, tier, orderId)`.
+**Trade (agregado):** `FundingGate` (`contracts/src/FundingGate.sol`), separado de PDRGate; los dos heredan `PDRVerifier`, que tiene la pausa, los firmantes, la versión de política, los nonces y la verificación del PDR (PDRGate quedó con el mismo comportamiento y el mismo ABI). La intención es `FundIntent`. `execute` revisa en este orden: pausa; `intentHash`; escrow y token de la intención; la orden guardada en el escrow (Abierta, `orderHash`, token, monto total, importador igual a la Safe); los registros de la Safe (T1.11); el hash del calldata, que el gate arma por dentro como `keccak256(abi.encode(approveData, fundData))` (vista `fundingCalldataOf`); el PDR; `approve` exacto y `fund` por el Roles, con el rol AGENTE en nivel 1 y con `AGENT_COSIGNED` (cupo mayor) en nivel 3 con cofirma; y que no quede aprobación al escrow. La idempotencia queda en el escrow: una orden solo se deposita desde Abierto. Emite `FundingExecuted(intentHash, pdrHash, tier, orderId)`. El cosignatario puede llamar directo `emergencyPause()` (solo pausa; reanudar es de la Safe). **[PROPUESTA del Área 1, pedido del Área 2 en #57]** Un `guardian` opcional, que fija la Safe con `setGuardian` (`address(0)` lo desactiva), también puede llamar `emergencyPause()` y nada más: no reanuda, no veta, no encola, no quita ni configura. Debe ser distinto del firmante de política, del cosignatario y de la Safe, y esos tampoco pueden pasar a ser el guardian. PDRGate no cambia (ABI y almacenamiento idénticos).
 
 `setPolicySigner` y `setPolicyHash` solo pueden llamarse desde la Safe, y solo por el camino del Delay (T1.4). Las Áreas 1 y 2 decidieron un gate por modo ([PDR](../interfaces/pdr.md)).
 
 **T1.7 Batería de pruebas negativas (crítica 14).**
 Con Foundry y la configuración real de Roles. Cada caso debe revertir con el error esperado.
+
+**Trade sobre fork (15 de octubre, Área 1):** `contracts/test/fork/` corre contra Base Sepolia en el bloque 48173000 con una Safe 1.4.1, una instancia del Zodiac Roles v2 real (el master `0xF2964CE6…83D5` es la versión 2.1.1, `gnosisguild/zodiac-modifier-roles` rama `v2`, commit `218a5164`, según su `mastercopies.json` y comparando el bytecode; no es el HEAD "contracts-v3"), USDC real, TradeEscrow y FundingGate. La configuración de los roles sale de `contracts/script/TradeRolesConfig.sol`, la misma fuente que usará el despliegue (T1.8); **[PROPUESTA]** su `configHash` (keccak256 de `abi.encode` de la lista ordenada de llamadas `(address, bytes)[]`, con el destino en cero) sería el `rolesConfigHash` del `policyHash` del Área 2. Es la identidad de la configuración prevista, no una prueba del estado en la cadena: el Roles v2 no permite enumerar destinos ni miembros, así que no cubre llamadas posteriores del dueño. Como incluye la dirección del gate y el gate recibe el `policyHash` en el constructor, al desplegar hay que predecir la dirección del gate o fijar el hash después con `setPolicyHash`. Las pruebas se saltan si falta `BASE_SEPOLIA_RPC_URL`. Diferencias del Roles real con el mock, corregidas en `MockTradeRoles` para los casos que usan las pruebas del gate (lo que el mock sigue sin emular está en su NatSpec): el orden de revisión es destino, función, opciones y condiciones; un spender distinto es `ParameterNotAllowed` (7), no `ParameterNotAMatch`; el `info` lleva el selector (`FunctionNotAllowed`) o la clave del cupo (`AllowanceExceeded`); quien no es módulo habilitado recibe `NotAuthorized(sender)` de Zodiac, no `NoMembership`.
 
 Comunes y de Personal (base):
 
@@ -135,9 +137,15 @@ Implementar la máquina de estados y la interfaz de [estados del escrow](../fluj
 3. Un estado final nunca vuelve a mover fondos.
 4. Un mismo BL nunca liquida dos órdenes.
 
-**T1.11 Registro de partes (agregada por Trade, se recorta si falta tiempo).**
-`PartyRegistry` administrado por Keel: `open` exige que importador, exportador, naviera y árbitro estén registrados. En la demo, la naviera y el árbitro son llaves de prueba, y se declara.
-
+**T1.11 Registro de partes (agregada por Trade). [PROPUESTA del Área 1, 15 de octubre]**
+Cubierta con registros por Safe dentro de `FundingGate`, en vez de un `PartyRegistry` administrado por Keel que revise `open`:
+* Proveedores conocidos: el par (exportador, `payoutAddress`). Terceros de confianza: una dirección con roles NAVIERA (1), ÁRBITRO (2) y VERIFICADOR (4).
+* `queueSupplier` y `queueThirdParty`: solo la Safe. El cambio cuenta desde `block.timestamp + configDelay` (inmutable, al menos `MIN_CONFIG_DELAY` = 60 segundos: 120 segundos en la demo, 48 horas en producción). Cada cambio recibe un `changeId` que es un contador, único para siempre.
+* `vetoPending(changeId)`: la Safe o el cosignatario, solo mientras el cambio no se activa, y sin afectar otros cambios en cola. El cosignatario solo quita, nunca agrega.
+* `removeSupplier` y `removeThirdParty`: solo la Safe, inmediatos.
+* El gate rechaza un depósito cuyo proveedor o cuyos terceros no estén activos, en los dos niveles.
+* Motivo: el veto del Delay (`setTxNonce`) cancela todo lo pendiente en bloque y, sin ConfigGuard, los dueños pueden saltárselo; aquí la espera la hace cumplir el contrato que paga.
+* Fuera del alcance de la cadena: que la naviera y el árbitro sean empresas reales. En la demo son llaves de prueba, y se declara.
 # Listo cuando
 
 * Las pruebas de T1.7 pasan con `forge test`: al menos 25 casos negativos y 2 propiedades fuzz de Personal, y al menos 30 casos negativos de Trade.
@@ -152,4 +160,4 @@ Implementar la máquina de estados y la interfaz de [estados del escrow](../fluj
 
 # Si falta tiempo
 
-Se recorta en este orden: ConfigGuard (se declara el riesgo), recuperación social, registro de partes (queda una lista fija en el despliegue), liberación diferida por ventana de disputa, resolución 2 de 3. **Nunca** se recortan PDRGate, el rol AGENTE, la batería negativa, TradeEscrow con sus cuatro invariantes ni el reembolso por vencimiento.
+Se recorta en este orden: ConfigGuard (se declara el riesgo), recuperación social, liberación diferida por ventana de disputa, resolución 2 de 3. **Nunca** se recortan PDRGate, el rol AGENTE, la batería negativa, TradeEscrow con sus cuatro invariantes ni el reembolso por vencimiento.

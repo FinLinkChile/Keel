@@ -2,8 +2,9 @@ import type { Hex, OrderTerms, RequiredDocType } from '@keel/schemas';
 import { bytes32Text, requiredDocsHash, termsHash } from '@keel/schemas/hash';
 import { getAddress, keccak256, stringToBytes } from 'viem';
 
+import { centsToToken } from './amounts';
 import { orderIdOf } from './orderRules';
-import type { Account, KeelData, NeedsYou, Order, OrderStage, Party, PartyId, Role, Wallet } from './types';
+import type { Account, KeelData, NeedsYou, Order, OrderStage, Party, PartyId, Role, SupplierRecord, Wallet } from './types';
 
 // Test data for the screens and the single source of the demo data files (scripts/demo-data.ts).
 // Order ids, labels and party slugs match bot/examples so the app, the bot, ingest and the agent
@@ -18,16 +19,16 @@ const addr = (a: string): Hex => getAddress(a.toLowerCase());
 // the verifier is Area 2's policy key. The escrow gate only accepts the ones Area 1 registered.
 const PARTIES: Party[] = [
   { id: 'acme-imports', short: 'Pacífico', name: 'Pacífico Foods SpA', place: 'Chile', address: addr('0x7A3f91C2b04E6d1A8c3F5e2D9b7A0c4E1f6B55D8'), tint: 3, taxId: '765432103' },
-  { id: 'lingnan', short: 'Lingnan', name: 'Lingnan Hydrocolloids', place: 'Hong Kong', address: addr('0x5C1e0a9B7d3F2c6E8a4B1d9F0e7C3a5B2d6E04a1'), tint: 0 },
-  { id: 'kowloon', short: 'Kowloon', name: 'Kowloon Fine Chemicals', place: 'Hong Kong', address: addr('0x9B2d4F6a8C0e1B3d5F7a9C2e4B6d8F0a1C3e7A62'), tint: 1 },
-  { id: 'pearl-delta', short: 'Pearl Delta', name: 'Pearl Delta Ingredients', place: 'Guangzhou', address: addr('0x2E4a6C8e0B1d3F5a7C9e2B4d6F8a0C1e3B5d9F17'), tint: 2 },
+  { id: 'lingnan', short: 'Lingnan', name: 'Lingnan Hydrocolloids', place: 'Hong Kong', address: addr('0x5C1e0a9B7d3F2c6E8a4B1d9F0e7C3a5B2d6E04a1'), tint: 0, bankAccount: '0128 4407 5512 0142' },
+  { id: 'kowloon', short: 'Kowloon', name: 'Kowloon Fine Chemicals', place: 'Hong Kong', address: addr('0x9B2d4F6a8C0e1B3d5F7a9C2e4B6d8F0a1C3e7A62'), tint: 1, bankAccount: '0043 6620 1975 0151' },
+  { id: 'pearl-delta', short: 'Pearl Delta', name: 'Pearl Delta Ingredients', place: 'Guangzhou', address: addr('0x2E4a6C8e0B1d3F5a7C9e2B4d6F8a0C1e3B5d9F17'), tint: 2, bankAccount: '3602 8815 4420 0139' },
   { id: 'harbor-line', short: 'Harbor Line', name: 'Harbor Line', place: 'Hong Kong', address: addr('0x6a199224C0C8E2659fA8f626eCD31f3563d52656') },
   { id: 'hk-arbitration', short: 'HK Arbitration', name: 'HK Trade Arbitration', place: 'Hong Kong', address: addr('0x21fbA41765a1e643F5b185309d3ea8179341Ac9b') },
   { id: 'keel-verifier', short: 'Keel verifier', name: 'Keel document verifier', place: 'Keel', address: addr('0xc7F2300AD6203D629d71aCe901e1B4e1b923A01C') },
 ];
 
 // Payout accounts signed in each order; never taken from a document
-const PAYOUT: Record<PartyId, Hex> = {
+const PAYOUTS: Record<PartyId, Hex> = {
   lingnan: addr('0x3E9dA4c7F1b2E8d06C5a9B3f7E1d4C8a2B6f8812'),
   kowloon: addr('0x1C7bE3a9D5f2B8c04E6a1D9f3B7c5E2a8D4f6630'),
   'pearl-delta': addr('0x7F2aC8e4B1d6F9a03C5e7B2d8F4a1C6e9B3d2A55'),
@@ -38,20 +39,24 @@ const USDC: Hex = addr('0x036CbD53842c5426634e7929541eC2318f3dCF7e');
 // Test wallets stand in for the companies of the demo (importer: Pacífico, exporter: Lingnan),
 // so what they sign matches the orders on screen and in the data files.
 let bound: Partial<Record<PartyId, Hex>> = {};
+// The demo exporter is registered as a supplier with its own address as payout account
+let boundPayout: Partial<Record<PartyId, Hex>> = {};
 
-// The app: the connected wallet, for the role chosen at Connect
-export function bindWallet(role: Role, walletAddress: Hex | undefined) {
-  bound = walletAddress ? { [ACCOUNTS[role].party]: addr(walletAddress) } : {};
-}
-
-// The demo data script: both test wallets at once
-export function bindWallets(wallets: Partial<Record<Role, Hex>>) {
+// The app and the demo data script: the test wallets of the device, one per role. The importer is
+// a Safe: when `importerSafe` is given it is the importer's address (po.importer), and the
+// importer wallet is only a key that owns it.
+export function bindWallets(wallets: Partial<Record<Role, Hex>>, importerSafe?: Hex) {
   bound = {};
+  boundPayout = {};
   for (const role of ['importer', 'exporter'] as const) {
     const w = wallets[role];
     if (w) bound[ACCOUNTS[role].party] = addr(w);
   }
+  if (wallets.importer && importerSafe) bound[ACCOUNTS.importer.party] = addr(importerSafe);
+  if (wallets.exporter) boundPayout[ACCOUNTS.exporter.party] = addr(wallets.exporter);
 }
+
+const payoutOf = (party: PartyId): Hex => boundPayout[party] ?? PAYOUTS[party];
 
 const parties = (): Party[] => PARTIES.map((p) => (bound[p.id] ? { ...p, address: bound[p.id]! } : p));
 const address = (party: PartyId) => parties().find((p) => p.id === party)!.address;
@@ -107,9 +112,9 @@ function order(s: Seed): Order {
       orderId: orderIdOf(address('acme-imports'), address(s.exporter), BigInt(s.n)),
       importer: address('acme-imports'),
       exporter: address(s.exporter),
-      payoutAddress: PAYOUT[s.exporter],
+      payoutAddress: payoutOf(s.exporter),
       token: USDC,
-      totalAmount: BigInt(s.totalMinor),
+      totalAmount: centsToToken(BigInt(s.totalMinor)),
       advanceBps: 5000,
       shipmentDeadline: BigInt(s.deadline),
       disputeWindow: 3n * 24n * 3600n,
@@ -166,6 +171,15 @@ const NEEDS_YOU: Record<Role, Pending[]> = {
   exporter: [{ kind: 'upload_documents', label: 'PO-0142' }],
 };
 
+// A supplier is verified once its payout account is registered and no supplier check is pending
+// for it: Kowloon's check is open (PO-0151 waits on it), so it cannot receive a new order yet.
+const verifiedSuppliers = (): SupplierRecord[] => {
+  const pending = new Set(NEEDS_YOU.importer.flatMap((n) => (n.kind === 'verify_supplier' ? [n.party] : [])));
+  return parties()
+    .filter((p) => PAYOUTS[p.id] && !pending.has(p.id))
+    .map((party) => ({ party, payoutAddress: payoutOf(party.id) }));
+};
+
 const idOf = (label: string) => ORDERS().find((o) => o.label === label)!.po.orderId;
 
 export const mockData: KeelData = {
@@ -177,4 +191,11 @@ export const mockData: KeelData = {
   order: async (orderId) => ORDERS().find((o) => o.po.orderId === orderId),
   needsYou: async (role) =>
     NEEDS_YOU[role].map((n): NeedsYou => (n.kind === 'verify_supplier' ? n : { kind: n.kind, orderId: idOf(n.label) })),
+  verifiedSuppliers: async () => verifiedSuppliers(),
+  tradeRegistry: async () => ({
+    token: USDC,
+    carrier: parties().find((p) => p.id === 'harbor-line')!,
+    arbiter: parties().find((p) => p.id === 'hk-arbitration')!,
+    documentVerifier: parties().find((p) => p.id === 'keel-verifier')!,
+  }),
 };

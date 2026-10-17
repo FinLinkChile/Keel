@@ -22,7 +22,12 @@ export type TradeOrderEntry = {
   payoutAddress: Hex;
   carrier: Hex;
   uploaders: { address: Hex; party: Role }[];
+  // The exporter's registered bank account, so its own invoice raises no unknown_destination
+  knownDestinations?: { kind: 'bank_account'; value: string }[];
 };
+
+// As ingest normalizes the account it finds in a document (findTradeDestinations)
+export const compactAccount = (account: string) => account.replace(/[\s-]/g, '');
 
 // agent: orders/<orderId>/order.json
 export type StoredOrder = { order: PurchaseOrder; terms: OrderTerms; label: string };
@@ -93,10 +98,16 @@ async function botOrderBook(orders: Order[], botAccounts: readonly string[]): Pr
 
 // botAccounts: the account slugs of the bot directory (bot/examples/recipients.json)
 // withoutWallets: only for bot/examples, which use the mock's default addresses
-export async function demoData(wallets: Wallets, botAccounts: readonly string[], opts: { withoutWallets?: boolean } = {}): Promise<DemoData> {
+// importerSafe: the importer of every order. The importer wallet is a key that owns it, so the
+// key is the uploader in ingest, not the Safe.
+export async function demoData(
+  wallets: Wallets,
+  botAccounts: readonly string[],
+  opts: { withoutWallets?: boolean; importerSafe?: Hex } = {},
+): Promise<DemoData> {
   if (!opts.withoutWallets && !wallets.exporter && !wallets.importer)
     throw new Error('give at least one test wallet (--exporter or --importer)');
-  bindWallets(wallets);
+  bindWallets(wallets, opts.importerSafe);
   try {
     const all = await mockData.orders();
     // Settled, refunded and cancelled orders only feed the history
@@ -106,12 +117,20 @@ export async function demoData(wallets: Wallets, botAccounts: readonly string[],
     const ingestOrders: TradeOrderEntry[] = [];
     for (const o of orders) {
       const uploaders: TradeOrderEntry['uploaders'] = [];
-      if (wallets.importer && o.po.importer === importer.address) uploaders.push({ address: o.po.importer, party: 'importer' });
+      if (wallets.importer && o.po.importer === importer.address)
+        uploaders.push({ address: getAddress(wallets.importer.toLowerCase()), party: 'importer' });
       if (wallets.exporter && o.po.exporter === getAddress(wallets.exporter.toLowerCase()))
         uploaders.push({ address: o.po.exporter, party: 'exporter' });
       // Only orders a test wallet can upload to; the others have no one to sign
-      if (uploaders.length > 0)
-        ingestOrders.push({ orderId: o.po.orderId, payoutAddress: o.po.payoutAddress, carrier: o.po.carrier, uploaders });
+      if (uploaders.length === 0) continue;
+      const bankAccount = (await mockData.partyByAddress(o.po.exporter))?.bankAccount;
+      ingestOrders.push({
+        orderId: o.po.orderId,
+        payoutAddress: o.po.payoutAddress,
+        carrier: o.po.carrier,
+        uploaders,
+        ...(bankAccount && { knownDestinations: [{ kind: 'bank_account' as const, value: compactAccount(bankAccount) }] }),
+      });
     }
 
     const agentOrders = orders.map((o) => ({ order: o.po, terms: o.terms, label: o.label }));

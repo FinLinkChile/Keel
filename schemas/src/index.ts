@@ -313,9 +313,29 @@ export type KeelDomain = ReturnType<typeof keelDomain>;
 // 2.4 Events and typed errors (fixed names)
 // ---------------------------------------------------------------------------
 
-// Trade gate. The Personal gate (PDRGate) is in ./personal.ts. AgentRoleRevoked is not
-// here: revoking the agent is a Roles event, not a gate event.
-export const GATE_EVENTS = ["FundingExecuted", "OperationHeld", "GatePaused"] as const;
+// Trade gate (FundingGate), as its ABI declares them. engine/src/fundingGate.test.ts checks
+// them against the compiled contract. The Personal gate (PDRGate) is in ./personal.ts.
+// AgentRoleRevoked is not here: revoking the agent is a Roles event, not a gate event. There
+// is no OperationHeld: a held operation never reaches the chain (HOLD_STATES, off-chain).
+export const GATE_EVENTS = [
+  "FundingExecuted",
+  "GatePaused",
+  "GateUnpaused",
+  "PolicySignerSet",
+  "PolicyHashSet",
+  "CosignerSet",
+  // Trust registries of the Safe: changeId, kind (supplier or third party), exporter and
+  // payout (or party and roles) and activatesAt, so the bot can notify without a query
+  "ChangeQueued",
+  // changeId and who vetoed (the Safe or the cosigner)
+  "ChangeVetoed",
+  "SupplierRemoved",
+  "ThirdPartyRemoved",
+  // The guardian (pause only) was set, or cleared with the zero address
+  "GuardianSet",
+  // Inherited from OpenZeppelin EIP712 (ERC-5267)
+  "EIP712DomainChanged",
+] as const;
 export type GateEvent = (typeof GATE_EVENTS)[number];
 
 export const GATE_ERRORS = [
@@ -327,6 +347,43 @@ export const GATE_ERRORS = [
   "Expired",
   "NonceUsed",
   "GateIsPaused",
+  "InvalidTier",
+  "OnlySafe",
+  "ZeroAddress",
+  "SignerIsCosigner",
+  "ExecutionFailed",
+  // The intent or the stored order differ: escrow, token, orderHash or amount
+  "OrderMismatch",
+  // The order is not OPEN (never opened, already funded, or later)
+  "OrderNotOpen",
+  // The importer of the order is not this Safe
+  "NotOwnOrder",
+  // (exporter, payoutAddress) is not an active known supplier
+  "UnknownSupplier",
+  // Carrier, arbiter or document verifier not active with that role
+  "UntrustedParty",
+  // An approval from the Safe to the escrow is left after fund
+  "AllowanceNotConsumed",
+  // Registries and pause
+  "OnlySafeOrCosigner",
+  // emergencyPause by someone other than the Safe, the cosigner or the guardian
+  "OnlyPauser",
+  // The guardian would be the policy signer, the cosigner or the Safe
+  "InvalidGuardian",
+  // A new policy signer or cosigner would be the guardian
+  "SignerIsGuardian",
+  "ChangeNotPending",
+  "AlreadyRegistered",
+  "NotRegistered",
+  "InvalidRoles",
+  // Constructor: configDelay below MIN_CONFIG_DELAY (60 s), or both Roles role keys are the same
+  "InvalidDelay",
+  "SameRoleKey",
+  // Inherited from OpenZeppelin ReentrancyGuard
+  "ReentrancyGuardReentrantCall",
+  // Inherited from OpenZeppelin ShortStrings: only possible at deployment
+  "InvalidShortString",
+  "StringTooLong",
 ] as const;
 export type GateError = (typeof GATE_ERRORS)[number];
 
