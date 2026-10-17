@@ -6,9 +6,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {DeployTrade} from "../../script/DeployTrade.s.sol";
 import {SetTradePolicy} from "../../script/SetTradePolicy.s.sol";
-import {BaseSepolia, ISafe141} from "../../script/KeelExternal.sol";
+import {BaseSepolia, IDelay110, ISafe141} from "../../script/KeelExternal.sol";
 import {IZodiacRolesV2, TradeRolesConfig} from "../../script/TradeRolesConfig.sol";
 import {FundingGate} from "../../src/FundingGate.sol";
+import {PDRVerifier} from "../../src/PDRVerifier.sol";
 import {ITradeEscrow} from "../../src/ITradeEscrow.sol";
 import {KeelHash} from "../../src/KeelHash.sol";
 import {PurchaseOrder, FundIntent, PolicyDecision} from "../../src/KeelTypes.sol";
@@ -496,5 +497,50 @@ contract DeployTradeForkTest is Test {
         SetTradePolicy sp = new SetTradePolicy();
         vm.expectRevert(bytes("the key is not a module of the Delay"));
         sp.queueWith(d.gate, d.delay, keccak256("x"), deployerKey);
+    }
+
+    // ------------------------------------------------------------------ the Delay itself
+
+    // The Delay called directly, without SetTradePolicy's pre-checks: these are the require texts
+    // of Delay 1.1.0 (gnosisguild/zodiac-modifier-delay, tag v1.1.0, commit 515737f6,
+    // contracts/Delay.sol, executeNextTx and setTxNonce).
+
+    /// OWNER_ADDRESS (a Delay module) queues setPolicyHash on the Delay; returns its calldata.
+    function _queuePolicyHash(bytes32 h) internal returns (bytes memory data) {
+        data = abi.encodeCall(PDRVerifier.setPolicyHash, (h));
+        vm.prank(c.owner);
+        assertTrue(d.delay.execTransactionFromModule(address(d.gate), 0, data, 0), "queued");
+        assertEq(d.delay.queueNonce(), 1);
+    }
+
+    function test_fork_delay_executeNextTxRevertsInCooldown() public onlyFork {
+        _deploy();
+        bytes memory data = _queuePolicyHash(keccak256("cooldown"));
+        vm.warp(vm.getBlockTimestamp() + script.DELAY_COOLDOWN() - 1);
+        vm.expectRevert(bytes("Transaction is still in cooldown"));
+        d.delay.executeNextTx(address(d.gate), 0, data, 0);
+        assertEq(d.gate.currentPolicyHash(), c.initialPolicyHash);
+    }
+
+    function test_fork_delay_executeNextTxRevertsOnceExpired() public onlyFork {
+        _deploy();
+        bytes memory data = _queuePolicyHash(keccak256("expired"));
+        vm.warp(vm.getBlockTimestamp() + script.DELAY_COOLDOWN() + script.DELAY_EXPIRATION() + 1);
+        vm.expectRevert(bytes("Transaction expired"));
+        d.delay.executeNextTx(address(d.gate), 0, data, 0);
+        assertEq(d.gate.currentPolicyHash(), c.initialPolicyHash);
+    }
+
+    /// The owner vetoes through the Safe (the Delay's owner): setTxNonce(1) skips the queued
+    /// transaction, so once the cooldown has passed executeNextTx finds the queue empty.
+    function test_fork_delay_ownerVetoesWithSetTxNonce() public onlyFork {
+        _deploy();
+        bytes memory data = _queuePolicyHash(keccak256("vetoed"));
+        _execSafe(address(d.delay), abi.encodeCall(IDelay110.setTxNonce, (1)));
+        assertEq(d.delay.txNonce(), 1, "vetoed");
+        vm.warp(vm.getBlockTimestamp() + script.DELAY_COOLDOWN());
+        vm.expectRevert(bytes("Transaction queue is empty"));
+        d.delay.executeNextTx(address(d.gate), 0, data, 0);
+        assertEq(d.gate.currentPolicyHash(), c.initialPolicyHash);
     }
 }

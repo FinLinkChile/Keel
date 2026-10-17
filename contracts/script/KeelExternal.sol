@@ -119,6 +119,7 @@ interface IDelay110 {
         external
         returns (bool success);
     function executeNextTx(address to, uint256 value, bytes calldata data, uint8 operation) external;
+    function setTxNonce(uint256 _txNonce) external;
 }
 
 /// @dev Circle FiatToken admin functions (USDC proxy on Base Sepolia, version() = "2").
