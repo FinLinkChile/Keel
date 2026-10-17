@@ -2,8 +2,9 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useData, type KeelData, type NeedsYou, type Order, type Party, type Role } from '@/data';
+import { proposals, useData, type KeelData, type Party, type Role } from '@/data';
 import { tokenToCents } from '@/data/amounts';
+import { loadNeedsItems, needsItemHref, type NeedsItem } from '@/data/needsItems';
 import { useSession } from '@/session';
 import { Amount } from '@/ui/Amount';
 import { Avatar } from '@/ui/Avatar';
@@ -47,15 +48,33 @@ export default function Home() {
             </Text>
           </View>
         </Pressable>
+        {/* The bell opens the notifications: what needs you, signatures first */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={items.length > 0 ? 'Activity, something needs you' : 'Activity'}
-          onPress={() => router.navigate('/activity')}
+          accessibilityLabel={items.length > 0 ? `Notifications, ${items.length} need you` : 'Notifications'}
+          onPress={() => router.push('/notifications')}
           style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
         >
           <Icon name="bell" size={24} strokeWidth={1.8} />
           {items.length > 0 ? (
-            <View style={{ position: 'absolute', top: 10, right: 11, width: 7, height: 7, borderRadius: 4, backgroundColor: colors.yourTurn }} />
+            <View
+              style={{
+                position: 'absolute',
+                top: 4,
+                right: 2,
+                minWidth: 18,
+                height: 18,
+                paddingHorizontal: 5,
+                borderRadius: 9,
+                backgroundColor: colors.yourTurn,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text size={11} weight={800} color="onAccent">
+                {items.length > 9 ? '9+' : String(items.length)}
+              </Text>
+            </View>
           ) : null}
         </Pressable>
       </View>
@@ -67,7 +86,7 @@ export default function Home() {
       />
 
       {items.length > 0 ? (
-        <SheetStack title="Needs you" items={items} keyOf={(i) => i.key} render={(i) => <NeedsYouSheet item={i} />} />
+        <SheetStack title="Needs you" items={items} keyOf={(i) => i.key} render={(i) => <NeedsYouSheet item={i} role={role} />} />
       ) : (
         <View style={{ gap: 6 }}>
           <Text size={22} weight={800} accessibilityRole="header">
@@ -82,33 +101,21 @@ export default function Home() {
   );
 }
 
-// What a pending item shows, already resolved from ids to names.
-type Item =
-  | { key: string; kind: 'sign_order'; order: Order; counterparty: Party }
-  | { key: string; kind: 'upload_documents'; order: Order; counterparty: Party }
-  | { key: string; kind: 'verify_supplier'; supplier: Party };
+type Item = NeedsItem;
 
 async function loadHome(d: KeelData, role: Role) {
   const account = await d.account(role);
-  const [me, wallet, needs] = await Promise.all([d.party(account.party), d.wallet(role), d.needsYou(role)]);
-  const items = (await Promise.all(needs.map((n) => resolve(d, role, n)))).filter((i): i is Item => !!i);
+  const [me, wallet, items] = await Promise.all([
+    d.party(account.party),
+    d.wallet(role),
+    loadNeedsItems(d, role, async (id) => !!(await proposals.get(id))),
+  ]);
   return { me: me!, account, wallet, items };
-}
-
-async function resolve(d: KeelData, role: Role, n: NeedsYou): Promise<Item | undefined> {
-  if (n.kind === 'verify_supplier') {
-    const supplier = await d.party(n.party);
-    return supplier && { key: `${n.kind}:${n.party}`, kind: n.kind, supplier };
-  }
-  const order = await d.order(n.orderId);
-  if (!order) return undefined;
-  const counterparty = await d.partyByAddress(role === 'importer' ? order.po.exporter : order.po.importer);
-  return counterparty && { key: `${n.kind}:${n.orderId}`, kind: n.kind, order, counterparty };
 }
 
 const shortName = (p: Party) => p.short;
 
-function NeedsYouSheet({ item }: { item: Item }) {
+function NeedsYouSheet({ item, role }: { item: Item; role: Role }) {
   if (item.kind === 'verify_supplier') {
     const { supplier } = item;
     return (
@@ -167,12 +174,8 @@ function NeedsYouSheet({ item }: { item: Item }) {
           color="textSoft"
           currencyColor="textFaint"
         />
-        {/* Review and Upload both open the order: the review to sign (04, 10a), the upload (10) */}
-        <Button
-          label={signing ? 'Review' : 'Upload'}
-          variant="go"
-          onPress={() => router.push({ pathname: '/order/[orderId]', params: { orderId: order.po.orderId } })}
-        />
+        {/* Review opens the signature (04, 10a); Upload opens the order (10) */}
+        <Button label={signing ? 'Review' : 'Upload'} variant="go" onPress={() => router.push(needsItemHref(item, role))} />
       </View>
     </Sheet>
   );
