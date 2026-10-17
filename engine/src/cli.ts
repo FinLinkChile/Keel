@@ -9,7 +9,7 @@ import { parseArgs } from "node:util";
 import type { Hex } from "@keel/schemas";
 import { createPublicClient, http, isHash, parseAbi } from "viem";
 import { explorerAddressUrl, explorerTxUrl } from "./explorer";
-import { type ChainFacts, type ChainReader, type Check, candidateHashes, emitterOf, loadDeployment, loadEvidence, type Verdict, verdict, verifyEvidence } from "./verify";
+import { type ChainFacts, type ChainReader, type Check, emitterOf, knownLogs, loadDeployment, loadEvidence, type Verdict, verdict, verifyEvidence } from "./verify";
 
 const DEFAULT_EVIDENCE = fileURLToPath(new URL("../../evidence/pdr/", import.meta.url));
 const DEFAULT_DEPLOYMENTS = fileURLToPath(new URL("../../contracts/deployments/", import.meta.url));
@@ -21,7 +21,10 @@ const READS = parseAbi([
   "struct PurchaseOrder { bytes32 orderId; address importer; address exporter; address payoutAddress; address token; uint256 totalAmount; uint16 advanceBps; uint64 shipmentDeadline; uint64 disputeWindow; address carrier; address arbiter; address documentVerifier; bytes32 incoterm; bytes32 termsHash; bytes32 requiredDocsHash; uint256 nonce; }",
   "struct OrderRecord { PurchaseOrder po; uint8 state; uint64 stateVersion; bytes32 orderHash; uint256 paidOut; bytes32 attestationHash; bytes32 docsHash; uint64 shippedAt; bool funded; }",
   "function orderOf(bytes32 orderId) view returns (OrderRecord)",
+  "function safe() view returns (address)",
+  "function hasRole(address party, uint8 role) view returns (bool)",
 ]);
+const VERIFIER_ROLE = 4;
 
 async function readTransaction(rpc: string, hash: Hex, deployments: string): Promise<ChainFacts> {
   const client = createPublicClient({ transport: http(rpc) });
@@ -30,8 +33,11 @@ async function readTransaction(rpc: string, hash: Hex, deployments: string): Pro
     policySigner: (gate, blockNumber) => client.readContract({ address: gate, abi: READS, functionName: "policySigner", blockNumber }),
     async order(escrow, orderId, blockNumber) {
       const r = await client.readContract({ address: escrow, abi: READS, functionName: "orderOf", args: [orderId], blockNumber });
-      return { orderHash: r.orderHash, documentVerifier: r.po.documentVerifier };
+      return { orderHash: r.orderHash, importer: r.po.importer, documentVerifier: r.po.documentVerifier };
     },
+    gateSafe: (gate, blockNumber) => client.readContract({ address: gate, abi: READS, functionName: "safe", blockNumber }),
+    isVerifier: (gate, party, blockNumber) =>
+      client.readContract({ address: gate, abi: READS, functionName: "hasRole", args: [party, VERIFIER_ROLE], blockNumber }),
   };
   return { chainId, status: receipt.status, blockNumber: receipt.blockNumber, logs: receipt.logs, deployment: loadDeployment(deployments, chainId), read };
 }
@@ -58,6 +64,7 @@ async function verify(args: string[]): Promise<number> {
   let facts: ChainFacts | undefined;
   let hashes: Hex[];
   if (values.pdr) {
+    if (tx) throw new UsageError(`pass a transaction hash or --pdr, not both\n${USAGE}`);
     if (!isHash(values.pdr)) throw new UsageError("--pdr takes a 32-byte hash");
     hashes = [values.pdr];
   } else {
@@ -73,19 +80,30 @@ async function verify(args: string[]): Promise<number> {
       console.log(`No ${facts.chainId}.json in ${deployments}: without Keel's official addresses nothing can be anchored`);
       return 1;
     }
-    hashes = candidateHashes(facts);
+    // Every PDR a known event names, even from a contract that is not deployed: if its evidence
+    // exists, the checks say it does not anchor instead of looking like missing evidence
+    hashes = [...new Set(knownLogs(facts).map((l) => l.pdrHash))];
   }
 
   const results: Check[][] = [];
+  const unverified: string[] = [];
   for (const hash of hashes) {
     const evidence = loadEvidence(dir, hash);
-    if (!evidence) continue;
+    if (!evidence) {
+      const anchored = facts && knownLogs(facts).find((l) => l.pdrHash === hash && l.anchored);
+      if (anchored) unverified.push(`  ${hash} (${anchored.eventName} of ${anchored.emitter})`);
+      continue;
+    }
     const checks = await verifyEvidence(evidence, facts);
     print(hash, checks);
     const contract = facts && emitterOf(evidence, facts.deployment);
     const contractUrl = facts && contract ? explorerAddressUrl(facts.chainId, contract) : undefined;
     if (contractUrl) console.log(`  Contract: ${contractUrl}`);
     results.push(checks);
+  }
+  if (unverified.length > 0) {
+    // A balance released by the importer's BalanceApproval names a digest that is not a PDR
+    console.log(`Anchored without an evidence file in ${dir}, not verified (a BalanceApproval of the importer has none):\n${unverified.join("\n")}`);
   }
   if (results.length === 0) {
     console.log(values.pdr ? `No evidence file for ${values.pdr} in ${dir}` : `No PDR of this transaction has evidence in ${dir}`);

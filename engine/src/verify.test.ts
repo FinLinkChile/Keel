@@ -17,6 +17,7 @@ import {
   type ChainReader,
   type Check,
   candidateHashes,
+  knownLogs,
   loadDeployment,
   loadEvidence,
   parseEvidence,
@@ -27,6 +28,8 @@ import {
 const ESCROW = address(0xe5c0);
 const GATE = address(0x6a7e);
 const OTHER = address(0xbad);
+// The Safe the Trade gate serves: the fixture order is its order
+const SAFE = order.importer;
 const verifierKey = privateKeyToAccount(word("test document verifier"));
 const policySigner = privateKeyToAccount(word("test policy signer"));
 const forger = privateKeyToAccount(word("not a key Keel trusts"));
@@ -43,10 +46,17 @@ const roundTrip = (e: PdrEvidence) => parseEvidence(serializeEvidence(e));
 const outcomes = (checks: readonly Check[]) => Object.fromEntries(checks.map((c) => [c.check, c.outcome]));
 const failed = (checks: readonly Check[]) => checks.filter((c) => c.outcome === "mismatch").map((c) => c.check);
 
-// What the chain says at the block of the transaction: the gate's policy signer and the order
-const reader = (over: Partial<{ policySigner: Hex; documentVerifier: Hex }> = {}): ChainReader => ({
+// What the chain says at the block of the transaction: the gate's policy signer, its Safe, the
+// parties it holds as VERIFIER and the order
+const reader = (over: Partial<{ policySigner: Hex; documentVerifier: Hex; gateSafe: Hex; verifiers: Hex[] }> = {}): ChainReader => ({
   policySigner: async () => over.policySigner ?? policySigner.address,
-  order: async () => ({ orderHash: structHash("PurchaseOrder", verifiedOrder), documentVerifier: over.documentVerifier ?? verifierKey.address }),
+  order: async () => ({
+    orderHash: structHash("PurchaseOrder", verifiedOrder),
+    importer: order.importer,
+    documentVerifier: over.documentVerifier ?? verifierKey.address,
+  }),
+  gateSafe: async () => over.gateSafe ?? SAFE,
+  isVerifier: async (_gate, party) => (over.verifiers ?? [verifierKey.address]).some((v) => v.toLowerCase() === party.toLowerCase()),
 });
 
 const trade = (logs: ChainLog[], read = reader()): ChainFacts => ({
@@ -169,7 +179,43 @@ describe("keel verify: document decision of trigger 2", () => {
     expect(candidateHashes(facts)).toEqual([e.pdrHash.toLowerCase()]);
     const checks = await verifyEvidence(roundTrip(e), facts);
     expect(verdict(checks)).toBe("MATCH");
-    expect(outcomes(checks)).toMatchObject({ "verifying contract": "match", event: "match", "event order": "match", "signer on chain": "match", "order on chain": "match" });
+    expect(outcomes(checks)).toMatchObject({
+      "verifying contract": "match",
+      event: "match",
+      "event order": "match",
+      "signer on chain": "match",
+      "order on chain": "match",
+      "importer is the gate's safe": "match",
+      "verifier held by the gate": "match",
+    });
+  });
+
+  it("a self-made order on the real escrow, outside Keel's Safe and with its own verifier, is not a MATCH", async () => {
+    // The re-review's attack: TradeEscrow.open is permissionless, so the order names the
+    // attacker's key as verifier and the escrow accepts its DocumentDecision
+    const selfMade = await documentEvidence(forger);
+    const own = { ...order, documentVerifier: forger.address };
+    const read: ChainReader = {
+      ...reader({ gateSafe: address(0x5afe) }),
+      order: async () => ({ orderHash: structHash("PurchaseOrder", own), importer: order.importer, documentVerifier: forger.address }),
+    };
+    const checks = await verifyEvidence(roundTrip(selfMade), trade([balanceReleased(selfMade.pdrHash)], read));
+    expect(outcomes(checks)).toMatchObject({ "signer on chain": "match", "order on chain": "match" });
+    expect(verdict(checks)).toBe("MISMATCH");
+    expect(failed(checks)).toEqual(["importer is the gate's safe", "verifier held by the gate"]);
+  });
+
+  it("an order of Keel's Safe whose verifier the gate does not hold is not a MATCH", async () => {
+    const e = await documentEvidence();
+    const checks = await verifyEvidence(roundTrip(e), trade([balanceReleased(e.pdrHash)], reader({ verifiers: [] })));
+    expect(failed(checks)).toEqual(["verifier held by the gate"]);
+  });
+
+  it("without the gate in the deployment file a balance release is not Keel's", async () => {
+    const e = await documentEvidence();
+    const facts = trade([balanceReleased(e.pdrHash)]);
+    const checks = await verifyEvidence(roundTrip(e), { ...facts, deployment: { chainId: 1, tradeEscrow: ESCROW } });
+    expect(failed(checks)).toEqual(["keel order"]);
   });
 
   it("a forged file signed by any key, emitted by any contract, is not a MATCH", async () => {
@@ -178,11 +224,14 @@ describe("keel verify: document decision of trigger 2", () => {
     const own = await verifyEvidence(roundTrip(forged), trade([balanceReleased(forged.pdrHash, OTHER)]));
     expect(verdict(own)).toBe("MISMATCH");
     expect(failed(own)).toEqual(["event"]);
+    // It says where the event came from, not that the evidence is missing
+    expect(own.find((c) => c.check === "event")!.note).toContain(`comes from ${OTHER}`);
     expect(candidateHashes(trade([balanceReleased(forged.pdrHash, OTHER)]))).toEqual([]);
 
     // Even through the real escrow, the order it holds names another verifier
     const viaEscrow = await verifyEvidence(roundTrip(forged), trade([balanceReleased(forged.pdrHash)]));
     expect(failed(viaEscrow)).toEqual(["signer on chain", "order on chain"]);
+    expect(knownLogs(trade([balanceReleased(forged.pdrHash, OTHER)]))).toMatchObject([{ pdrHash: forged.pdrHash.toLowerCase(), emitter: OTHER, anchored: false }]);
   });
 
   it("selects the log by emitter and event, not by any word that carries the hash", async () => {
@@ -200,7 +249,7 @@ describe("keel verify: document decision of trigger 2", () => {
 
   it("the replayed order must be the one the escrow holds", async () => {
     const e = await documentEvidence();
-    const facts = trade([balanceReleased(e.pdrHash)], { ...reader(), order: async () => ({ orderHash: word("other order"), documentVerifier: verifierKey.address }) });
+    const facts = trade([balanceReleased(e.pdrHash)], { ...reader(), order: async () => ({ orderHash: word("other order"), importer: order.importer, documentVerifier: verifierKey.address }) });
     expect(failed(await verifyEvidence(roundTrip(e), facts))).toEqual(["order on chain"]);
   });
 });
@@ -247,9 +296,17 @@ describe("keel verify: funding decision", () => {
 describe("keel verify: the deployment file", () => {
   it("reads the official addresses of a chain, and nothing when the file is missing", () => {
     const dir = mkdtempSync(join(tmpdir(), "keel-deployments-"));
-    writeFileSync(join(dir, "84532.json"), JSON.stringify({ pdrGate: GATE, fundingGate: GATE.toUpperCase().replace("0X", "0x"), safe: OTHER, tradeEscrow: "not an address" }));
+    writeFileSync(join(dir, "84532.json"), JSON.stringify({ chainId: 84532, pdrGate: GATE, fundingGate: GATE.toUpperCase().replace("0X", "0x"), safe: OTHER, tradeEscrow: "not an address" }));
     expect(loadDeployment(dir, 84532)).toEqual({ chainId: 84532, pdrGate: GATE, fundingGate: GATE, tradeEscrow: undefined });
     expect(loadDeployment(dir, 1)).toBeNull();
+  });
+
+  it("refuses a file whose chainId is not the one of its name", () => {
+    const dir = mkdtempSync(join(tmpdir(), "keel-deployments-"));
+    writeFileSync(join(dir, "84532.json"), JSON.stringify({ chainId: 8453, fundingGate: GATE }));
+    writeFileSync(join(dir, "1.json"), JSON.stringify({ fundingGate: GATE }));
+    expect(() => loadDeployment(dir, 84532)).toThrow("chainId 8453");
+    expect(() => loadDeployment(dir, 1)).toThrow("chainId (none)");
   });
 });
 
@@ -284,6 +341,8 @@ describe("keel verify: a Keel Personal payment executed by the real PDRGate", ()
   const gateReader = (): ChainReader => ({
     policySigner: (g) => chain.read<Hex>("PDRGate", g, "policySigner"),
     order: () => Promise.reject(new Error("no escrow in Personal")),
+    gateSafe: () => Promise.reject(new Error("no Trade gate in Personal")),
+    isVerifier: () => Promise.reject(new Error("no Trade gate in Personal")),
   });
 
   async function pay(): Promise<{ evidence: PdrEvidence; facts: ChainFacts }> {

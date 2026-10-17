@@ -1,5 +1,9 @@
 # Historial de la documentación
 
+## 2026-10-17
+
+* **Segunda revisión del Área 1 al PR #51, aplicada por el Área 2 (Darienn):** un saldo liberado solo da MATCH si la orden es de Keel. `TradeEscrow.open` no pide permiso, así que cualquiera puede abrir una orden en el escrow real con su propia llave de verificador, y antes `keel verify` daba MATCH. Ahora exige, en el bloque de la transacción, que el `importer` de la orden sea la `safe()` del FundingGate y que el gate tenga al `documentVerifier` con el rol VERIFIER. Si la Safe quita al verificador antes del saldo, el resultado es MISMATCH (límite declarado). También: un evento con el hash de un PDR emitido por un contrato no desplegado da MISMATCH y dice de dónde vino; los PDR anclados sin evidencia se listan; un hash de transacción junto a `--pdr` es error de uso; el archivo de despliegue tiene que traer su `chainId`. Afecta al Área 1: el despliegue debe escribir `chainId` y `fundingGate` (el PR #77 ya lo hace). Ver [verificador](arquitectura/verificador.md).
+
 ## 2026-10-16
 
 * **Actualización del Área 2 (Darienn):** `keel verify` imprime enlaces a sepolia.basescan.org (la transacción y el contrato que emitió cada evento) para que su salida sirva como evidencia de ejecución ante el jurado (elemento 06 de las reglas de la competencia). Ver [verificador](arquitectura/verificador.md).
