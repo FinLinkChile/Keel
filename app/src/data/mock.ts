@@ -14,14 +14,16 @@ const day = (month: number, date: number) => Date.UTC(2026, month - 1, date) / 1
 // Checksummed, as viem requires to sign or hash an address
 const addr = (a: string): Hex => getAddress(a.toLowerCase());
 
+// The carrier and the arbiter are Area 4 test keys (kept outside the repo, see app/README.md);
+// the verifier is Area 2's policy key. The escrow gate only accepts the ones Area 1 registered.
 const PARTIES: Party[] = [
   { id: 'acme-imports', short: 'Pacífico', name: 'Pacífico Foods SpA', place: 'Chile', address: addr('0x7A3f91C2b04E6d1A8c3F5e2D9b7A0c4E1f6B55D8'), tint: 3, taxId: '765432103' },
   { id: 'lingnan', short: 'Lingnan', name: 'Lingnan Hydrocolloids', place: 'Hong Kong', address: addr('0x5C1e0a9B7d3F2c6E8a4B1d9F0e7C3a5B2d6E04a1'), tint: 0 },
   { id: 'kowloon', short: 'Kowloon', name: 'Kowloon Fine Chemicals', place: 'Hong Kong', address: addr('0x9B2d4F6a8C0e1B3d5F7a9C2e4B6d8F0a1C3e7A62'), tint: 1 },
   { id: 'pearl-delta', short: 'Pearl Delta', name: 'Pearl Delta Ingredients', place: 'Guangzhou', address: addr('0x2E4a6C8e0B1d3F5a7C9e2B4d6F8a0C1e3B5d9F17'), tint: 2 },
-  { id: 'harbor-line', short: 'Harbor Line', name: 'Harbor Line', place: 'Hong Kong', address: addr('0x4D6f8B0d2A3c5E7f9B1d4A6c8E0f2B3d5A7c1E88') },
-  { id: 'hk-arbitration', short: 'HK Arbitration', name: 'HK Trade Arbitration', place: 'Hong Kong', address: addr('0x6F8b0D2f4C5e7A9b1D3f6C8e0A2b4D5f7C9e3A09') },
-  { id: 'keel-verifier', short: 'Keel verifier', name: 'Keel document verifier', place: 'Keel', address: addr('0x8A0c2E4a6D7f9C1a3E5b8D0f2C4a6E7b9D1f5C33') },
+  { id: 'harbor-line', short: 'Harbor Line', name: 'Harbor Line', place: 'Hong Kong', address: addr('0x6a199224C0C8E2659fA8f626eCD31f3563d52656') },
+  { id: 'hk-arbitration', short: 'HK Arbitration', name: 'HK Trade Arbitration', place: 'Hong Kong', address: addr('0x21fbA41765a1e643F5b185309d3ea8179341Ac9b') },
+  { id: 'keel-verifier', short: 'Keel verifier', name: 'Keel document verifier', place: 'Keel', address: addr('0xc7F2300AD6203D629d71aCe901e1B4e1b923A01C') },
 ];
 
 // Payout accounts signed in each order; never taken from a document
@@ -31,7 +33,7 @@ const PAYOUT: Record<PartyId, Hex> = {
   'pearl-delta': addr('0x7F2aC8e4B1d6F9a03C5e7B2d8F4a1C6e9B3d2A55'),
 };
 
-const USDC: Hex = addr('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48');
+const USDC: Hex = addr('0x036CbD53842c5426634e7929541eC2318f3dCF7e');
 
 // Test wallets stand in for the companies of the demo (importer: Pacífico, exporter: Lingnan),
 // so what they sign matches the orders on screen and in the data files.
