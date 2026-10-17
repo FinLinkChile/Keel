@@ -60,10 +60,11 @@ Las fuentes de Personal necesitan `BOT_PERSONAL_ACCOUNT_ID`, porque ingesta no c
 | Trade, `held` por `doc_type_mismatch` | `operation_held` con motivo `documents_mismatch` |
 | Trade, `held` por `bl_used_by_other_order` | `operation_held` con motivo `bl_reused` |
 | Trade, `held` por `parser_failed` o `extractor_failed` | `operation_held` con motivo `document_unreadable` |
-| Trade, lectura con `alert` | `account_change_attempt` |
-| Trade, `ready` sin `alert`, `rejected`, `quarantined` o `duplicate` | nada |
+| Trade, lectura (`ready` o `disagreement`) con `alert` | `account_change_attempt`, junto a la retención si la hay. Las cuentas de `found`, los gatillos y el código de recordatorio no llegan al chat |
+| Trade, lectura cuya extracción trae `hidden_text_detected` | `operation_held` con motivo `hidden_text`, junto a cualquier otra retención |
+| Trade, `ready` sin `alert` ni texto oculto, `rejected`, `quarantined` o `duplicate` | nada (la ingesta los registra) |
 
-Las filas de Trade son el mapeo planeado: hoy `trade_upload` responde `501` y su traductor se escribe cuando el código de carga de documentos de Trade del Área 3 llegue a `dev`.
+El traductor de Trade existe (`bot/src/adapters/inbound/ingest-trade-mapper.ts`) y `trade_upload` ya no responde `501`. Una carga puede dar varios avisos; entonces la respuesta es `{ "status": ..., "notices": [...] }` con el estado de cada uno. Una orden que no está en `BOT_ORDERS_FILE` responde `400 mapper_failed`.
 
 Nunca llegan al chat el dominio del remitente, las cuentas encontradas en un documento (`proposed` o `found`) ni texto de un correo o de un documento. De las dos lecturas que no coinciden solo se muestran los valores de forma fija (fechas, montos, monedas, incoterm, puertos, periodo, alias), revalidados. Los identificadores (números de documento, factura u orden, RUT, código arancelario) solo se nombran, porque en ellos cabe un teléfono. Los dos valores están en la app.
 

@@ -2,7 +2,8 @@
 // the PDR back to the same decision. It holds no key and changes nothing: anyone can run it.
 // Nothing in the evidence file is trusted about who signed or where: the transaction must come
 // from a contract of contracts/deployments/<chainId>.json, and the signer must be the one that
-// contract trusted at that block. Without the chain, the result is "evidence only".
+// contract trusted at that block. A balance release also needs an order of the Safe the Trade gate
+// serves, with a verifier the gate holds. Without the chain, the result is "evidence only".
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -52,7 +53,10 @@ export interface Deployment {
 // Contract state at the block of the transaction, so a later rotation of a signer does not count.
 export interface ChainReader {
   policySigner(gate: Hex, blockNumber: bigint): Promise<Hex>;
-  order(escrow: Hex, orderId: Hex, blockNumber: bigint): Promise<{ orderHash: Hex; documentVerifier: Hex }>;
+  order(escrow: Hex, orderId: Hex, blockNumber: bigint): Promise<{ orderHash: Hex; importer: Hex; documentVerifier: Hex }>;
+  // The Safe the Trade gate serves, and whether the gate holds a party as VERIFIER (role 4)
+  gateSafe(gate: Hex, blockNumber: bigint): Promise<Hex>;
+  isVerifier(gate: Hex, party: Hex, blockNumber: bigint): Promise<boolean>;
 }
 
 export interface ChainFacts {
@@ -171,6 +175,8 @@ export function loadDeployment(dir: string, chainId: number): Deployment | null 
     if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw e;
   }
+  // A file copied under another chain's name would anchor to addresses of that other chain
+  if (raw.chainId !== chainId) throw new Error(`${chainId}.json says chainId ${raw.chainId ?? "(none)"}, not ${chainId}`);
   const pick = (key: string) => (typeof raw[key] === "string" && isAddress(raw[key], { strict: false }) ? low(raw[key]) : undefined);
   return { chainId, pdrGate: pick("pdrGate"), fundingGate: pick("fundingGate"), tradeEscrow: pick("tradeEscrow") };
 }
@@ -275,12 +281,15 @@ const EMITTER: Record<KnownEvent, "pdrGate" | "fundingGate" | "tradeEscrow"> = {
   BalanceReleased: "tradeEscrow",
 };
 
-interface AnchoredEvent {
+export interface KnownLog {
   eventName: KnownEvent;
   args: Record<string, unknown>;
   // The PDR the event names: pdrHash, or the authorization digest of a balance release (a
   // DocumentDecision, or the importer's BalanceApproval, which has no evidence file)
   pdrHash: Hex;
+  emitter: Hex;
+  // Emitted by the contract the deployment names for this event
+  anchored: boolean;
 }
 
 function decodeKnownEvent(log: ChainLog): { eventName: KnownEvent; args: Record<string, unknown> } | null {
@@ -291,17 +300,20 @@ function decodeKnownEvent(log: ChainLog): { eventName: KnownEvent; args: Record<
   }
 }
 
-// Only a known event, by its topic0, emitted by the contract the deployment names for it.
-function anchoredEvents(facts: ChainFacts): AnchoredEvent[] {
-  const deployment = facts.deployment;
-  if (!deployment) return [];
+// Every known event of the transaction, by its topic0, whoever emitted it. Only the anchored ones
+// count; the rest let the verifier say why a PDR with evidence does not anchor.
+export function knownLogs(facts: ChainFacts): KnownLog[] {
   return facts.logs.flatMap((log) => {
     const event = decodeKnownEvent(log);
-    if (!event || deployment[EMITTER[event.eventName]] !== low(log.address)) return [];
+    if (!event) return [];
     const named = event.eventName === "BalanceReleased" ? event.args.authorizationDigest : event.args.pdrHash;
-    return [{ ...event, pdrHash: low(named as Hex) }];
+    const emitter = low(log.address);
+    const anchored = !!facts.deployment && facts.deployment[EMITTER[event.eventName]] === emitter;
+    return [{ ...event, pdrHash: low(named as Hex), emitter, anchored }];
   });
 }
+
+const anchoredEvents = (facts: ChainFacts): KnownLog[] => knownLogs(facts).filter((e) => e.anchored);
 
 // The PDR hashes a transaction carries, from the known events of the deployed contracts.
 export const candidateHashes = (facts: ChainFacts): Hex[] => [...new Set(anchoredEvents(facts).map((e) => e.pdrHash))];
@@ -328,8 +340,15 @@ async function chainChecks(e: PdrEvidence, facts: ChainFacts, recovered: Hex | n
     return [...checks, holds("deployment", false, `no ${key} in deployments/${facts.chainId}.json: nothing ties this transaction to Keel's contracts`)];
   }
   checks.push(compare("verifying contract", contract, low(e.domain.verifyingContract)));
-  const event = anchoredEvents(facts).find((x) => x.eventName === eventName && x.pdrHash === low(e.pdrHash));
-  if (!event) return [...checks, holds("event", false, `no ${eventName} of ${contract} in this transaction names the PDR hash`)];
+  const named = knownLogs(facts).filter((x) => x.eventName === eventName && x.pdrHash === low(e.pdrHash));
+  const event = named.find((x) => x.anchored);
+  if (!event) {
+    const foreign = named[0];
+    const note = foreign
+      ? `the ${eventName} that names the PDR hash comes from ${foreign.emitter}, not from the ${key} of deployments/${facts.chainId}.json (${contract})`
+      : `no ${eventName} of ${contract} in this transaction names the PDR hash`;
+    return [...checks, holds("event", false, note)];
+  }
   checks.push({ check: "event", outcome: "match" });
 
   const d = e.decision;
@@ -343,6 +362,22 @@ async function chainChecks(e: PdrEvidence, facts: ChainFacts, recovered: Hex | n
         ? compare("order on chain", order.orderHash, structHash("PurchaseOrder", e.replay.order))
         : skipped("order on chain", "the evidence carries no inputs"),
     );
+    // TradeEscrow.open is permissionless: anyone can open an order on the real escrow that names
+    // their own key as verifier, and the escrow accepts that key. The decision is Keel's only when
+    // the order is of the Safe the Trade gate serves and the gate holds its verifier as VERIFIER.
+    const gate = facts.deployment?.fundingGate;
+    if (!gate) {
+      checks.push(holds("keel order", false, `no fundingGate in deployments/${facts.chainId}.json: nothing says the order is Keel's`));
+    } else {
+      const [safe, trusted] = await Promise.all([
+        facts.read.gateSafe(gate, facts.blockNumber),
+        facts.read.isVerifier(gate, order.documentVerifier, facts.blockNumber),
+      ]);
+      checks.push(
+        compare("importer is the gate's safe", low(safe), low(order.importer)),
+        holds("verifier held by the gate", trusted, `the gate ${gate} does not hold ${low(order.documentVerifier)} as VERIFIER at that block`),
+      );
+    }
   } else {
     checks.push(compare("event intent hash", d.intentHash, event.args.intentHash), compare("event tier", d.tier, event.args.tier));
     if (eventName === "FundingExecuted") checks.push(compare("event order", (e.intent as FundIntent).orderId, event.args.orderId));
