@@ -4,7 +4,7 @@ title: "Amenazas que el flujo debe resistir"
 description: "Modelo de amenazas de Keel Trade: cada amenaza con su ejemplo, la defensa y el riesgo residual declarado."
 tags: [amenazas, seguridad, riesgo-residual]
 modo: trade
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T21:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T15:30:00Z }
 ---
 
 | Amenaza | Ejemplo | Defensa | Riesgo residual |
@@ -16,6 +16,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T21:00:00Z }
 | Agencia excesiva (OWASP LLM06) | El agente intenta una acción fuera de su tarea | Rol Zodiac limitado al escrow, con cupo | Acciones dentro del rol siguen siendo posibles |
 | Mismo BL para dos órdenes | Cobrar dos veces con un embarque | Registro de `blNumberHash` usados, en ingesta y en el contrato | Depende de normalizar bien el número |
 | Documento subido por quien no es parte | Un tercero sube un BL o una factura a una orden ajena | Solo se lee lo que firma con EIP-712 un representante registrado de la orden, sobre el hash exacto del archivo ([carga de documentos](../interfaces/carga-de-documentos.md)) | Llave de un representante robada: puede subir documentos, pero no cambia la orden ni el destino del pago |
+| Proforma manipulada para prellenar la orden | Una proforma con un monto, un incoterm o una cuenta distintos, o con instrucciones para el modelo | La lectura solo devuelve campos tipados, nunca la cuenta de cobro; cada campo lo revisan las personas antes de firmar, y el motor compara la factura con la orden firmada ([lectura de la proforma](../interfaces/lectura-de-proforma.md)) | Una persona que firma sin revisar acepta el valor prellenado; la foto de una proforma va al modelo sin redactar |
 | Inundación de documentos | Cientos de cargas para cansar al importador o gastar llamadas al LLM | Máximo 10 cargas firmadas por orden y por día, duplicados descartados por hash y alertas agrupadas en un resumen | |
 | Llave del agente o del relayer robada | Intento de mover fondos | Sin PDR válido no pasa por el gate de Trade; el rol solo permite llamar al escrow, con cupo | Ninguna autoridad propia; puede gastar gas |
 | Llave de política robada | PDR falsos | El Roles limita destino y cupo; el escrow solo paga a las partes de la orden; el gate de Trade solo deposita órdenes cuyo proveedor (exportador y `payoutAddress`) y cuyos naviera, árbitro y verificador están activos en los registros de la Safe, que solo la Safe agrega, con espera y veto (`FundingGate`) | Puede depositar, dentro del cupo, órdenes firmadas por ambas partes con proveedor y terceros ya aprobados, y aprobar documentos no conformes de las órdenes que nombran a esa llave como verificador. Con la llave del cosignatario además (nivel 3), lo mismo con el cupo mayor; nunca a una cuenta de cobro nueva (pruebas `test_goal_*` de `FundingGate.t.sol`) |
@@ -25,6 +26,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T21:00:00Z }
 | Colusión de exportador y naviera | Atestación de un embarque que no ocurrió | Ventana de disputa, árbitro, reputación e identidad verificada | Riesgo residual declarado |
 | Árbitro corrupto | Reparte a favor de una parte | Solo puede repartir entre las partes; opción de 2 de 3 | Reparto injusto |
 | Proveedor o naviera que la empresa no aprobó | Orden firmada por ambas partes con una cuenta de cobro nueva o con una naviera que controla el exportador | El gate de Trade exige proveedor y terceros activos en el registro de la Safe; agregar uno espera `configDelay` con veto por cambio | Los propios dueños de la Safe pueden encolar y esperar; la defensa es el aviso y el veto del cosignatario |
+| Llave del guardian robada | Pausar el gate de Trade una y otra vez | El guardian solo puede llamar `emergencyPause`: no reanuda, no veta, no encola, no paga; la Safe lo quita con `setGuardian(address(0))` y reanuda en la misma transacción | Detiene depósitos hasta que la Safe lo quite; si eso pasa por el Delay, durante esa espera |
 | Llave del cosignatario robada | Vetar toda alta de proveedor y pausar el gate de Trade | El cosignatario solo puede vetar cambios en cola y pausar: no agrega, no reanuda, no paga; la Safe lo reemplaza con `setCosigner` | Demora las altas y los depósitos hasta que la Safe lo rote |
 | Decisión de documentos vieja | Un `DocumentDecision` firmado con una versión anterior de las reglas se usa para liberar el saldo | Ata la orden, la atestación aceptada y los documentos; vence en `expiresAt`; el saldo solo va al `payoutAddress` firmado | **Riesgo aceptado:** el escrow no lleva registro de política, así que no rechaza una versión vieja de `policyHash`; la limita solo `expiresAt`, y el verificador queda fijado en la orden (no se rota) |
 | Exportador bloquea el reembolso con una disputa | Disputa abierta antes del embarque para congelar el saldo | `raiseDispute` solo desde Embarcado; sin embarque el reembolso sale tras el plazo | |

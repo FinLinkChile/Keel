@@ -59,13 +59,16 @@ export interface TransportSpec {
   seed?: string;
   // Overrides the title printed at the top
   title?: string;
+  // Overrides the carrier printed in the header and the signature line of its layout
+  company?: string;
 }
 
 export async function renderTransport(spec: TransportSpec): Promise<Uint8Array> {
   const notes = spec.notes ?? [];
   if (spec.layout === "oceanlink") {
+    const company = spec.company ?? "OCEANLINK SHIPPING CO., LTD.";
     return render(
-      { company: "OCEANLINK SHIPPING CO., LTD.", title: spec.title ?? "BILL OF LADING" },
+      { company, title: spec.title ?? "BILL OF LADING" },
       [
         `B/L No.: ${spec.number}`,
         `Shipper: ${spec.shipper}`,
@@ -78,7 +81,7 @@ export async function renderTransport(spec: TransportSpec): Promise<Uint8Array> 
         "Freight: PREPAID",
         `Shipped on Board Date: ${spec.onBoardDate}`,
         ...notes,
-        "Signed for the carrier OCEANLINK SHIPPING CO., LTD. as carrier",
+        `Signed for the carrier ${company} as carrier`,
       ],
       spec.extra,
       spec.seed,
@@ -86,7 +89,7 @@ export async function renderTransport(spec: TransportSpec): Promise<Uint8Array> 
   }
   if (spec.layout === "pacific") {
     return render(
-      { company: "PACIFIC STAR LINES", title: spec.title ?? "BILL OF LADING FOR OCEAN TRANSPORT" },
+      { company: spec.company ?? "PACIFIC STAR LINES", title: spec.title ?? "BILL OF LADING FOR OCEAN TRANSPORT" },
       [
         `BILL OF LADING NUMBER ${spec.number}`,
         [`SHIPPER: ${spec.shipper}`, `CONSIGNEE: ${spec.consignee}`],
@@ -101,7 +104,7 @@ export async function renderTransport(spec: TransportSpec): Promise<Uint8Array> 
     );
   }
   return render(
-    { company: "SKYBRIDGE CARGO AIRLINES", title: spec.title ?? "AIR WAYBILL" },
+    { company: spec.company ?? "SKYBRIDGE CARGO AIRLINES", title: spec.title ?? "AIR WAYBILL" },
     [
       `AWB No.: ${spec.number}`,
       `Shipper: ${spec.shipper}`,
@@ -128,7 +131,8 @@ export interface CommercialInvoiceSpec {
   // Printed after "Terms of Delivery:", e.g. "FOB NINGBO"
   terms: string;
   currency: string;
-  items: { description: string; hs: string; qty: number; unitPrice: string; amount: string }[];
+  // `unit` is printed after the quantity, PCS when omitted
+  items: { description: string; hs: string; qty: number; unitPrice: string; amount: string; unit?: string }[];
   // Overrides the computed total line(s)
   totalLines?: string[];
   bankLines?: string[];
@@ -139,7 +143,7 @@ export interface CommercialInvoiceSpec {
 
 export async function renderCommercialInvoice(spec: CommercialInvoiceSpec): Promise<Uint8Array> {
   const items = spec.items.map(
-    (i) => `${i.description}  ${i.qty} PCS  ${spec.currency} ${i.unitPrice}  ${spec.currency} ${i.amount}  HS Code: ${i.hs}`,
+    (i) => `${i.description}  ${i.qty} ${i.unit ?? "PCS"}  ${spec.currency} ${i.unitPrice}  ${spec.currency} ${i.amount}  HS Code: ${i.hs}`,
   );
   const total = spec.items.reduce((sum, i) => sum + Number(i.amount.replace(/,/g, "")), 0);
   const totalText = total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -159,5 +163,39 @@ export async function renderCommercialInvoice(spec: CommercialInvoiceSpec): Prom
     ],
     spec.extra,
     spec.seed,
+  );
+}
+
+// A proforma invoice as an exporter sends it before the order (T3.9). Fictitious companies.
+export interface ProformaSpec {
+  number: string;
+  date: string;
+  currency: string;
+  terms: string;
+  items: { description: string; hs: string; qty: number; unitPrice: string; amount: string }[];
+  total: string;
+  shipment: string;
+  payment: string;
+  bankLines?: string[];
+  notes?: string[];
+  extra?: ExtraText[];
+}
+
+export async function renderProforma(spec: ProformaSpec): Promise<Uint8Array> {
+  return render(
+    { company: "NINGBO LINGNAN HYDROCOLLOIDS CO., LTD.", title: "PROFORMA INVOICE" },
+    [
+      `Proforma No.: ${spec.number}`,
+      `Date: ${spec.date}`,
+      "Buyer: ACME IMPORTS SPA, SANTIAGO, CHILE",
+      `Terms of Delivery: ${spec.terms}`,
+      ...spec.items.map((i) => `${i.description}  ${i.qty} PCS  ${spec.currency} ${i.unitPrice}  ${spec.currency} ${i.amount}  HS Code: ${i.hs}`),
+      `TOTAL AMOUNT: ${spec.currency} ${spec.total}`,
+      `Latest Shipment: ${spec.shipment}`,
+      `Payment: ${spec.payment}`,
+      ...(spec.bankLines ?? []),
+      ...(spec.notes ?? []),
+    ],
+    spec.extra,
   );
 }

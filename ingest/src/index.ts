@@ -24,7 +24,7 @@ export {
 } from "./email/auth";
 export { MIME_FAILURES, type MimeFailure } from "./email/mime";
 export { receiveEmail, type EmailOutcome, type QuarantineReason } from "./email/receive";
-export { createHandler, ServerConfigError, startServer, type LogEntry, type TradeLogEntry } from "./server";
+export { createHandler, ServerConfigError, startServer, type LogEntry, type ProformaLogEntry, type TradeLogEntry } from "./server";
 export {
   BotConfigError,
   botNotifierFromEnv,
@@ -118,6 +118,19 @@ export {
   type TradeParseFailure,
 } from "./trade/parser";
 export { receiveTradeDocument, type TradeOutcome, type TradeQuarantineReason } from "./trade/receive";
+export {
+  MAX_PROFORMAS_PER_IMPORTER_PER_DAY,
+  PROFORMA_REJECTIONS,
+  PROFORMA_TYPES,
+  receiveProforma,
+  sniffMediaType,
+  staticImporters,
+  type ImporterRegistry,
+  type ProformaOutcome,
+  type ProformaRejection,
+} from "./trade/proforma";
+export { extractProforma, MAX_IMAGE_BYTES, MIN_PROFORMA_TEXT_CHARS, type ProformaExtraction } from "./extractor";
+export { missingFields, PROFORMA_FIELDS, type ProformaReading } from "./extractor/proforma";
 export {
   authorizeUpload,
   fileHash,
