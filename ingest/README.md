@@ -81,6 +81,15 @@ Measured on 2026-10-14 with `claude-opus-5-5` through the team's LiteLLM proxy: 
 
 A PDF with text is read like the other documents, from redacted text, and the parser's hidden text check is added to the model's. A photo or a scanned PDF has no text to redact, so the file goes to the model and the transfer is logged as unredacted (`extraccion_proforma`). The answer is typed fields only (number, date, currency, amount, incoterm, HS codes, latest shipment date, ports, advance in basis points, and two warnings), with the fields the proforma does not print listed in `missing`. It never returns the payout address, names or free text. One reader is enough because the reading decides nothing: the people review every field before both sign the order. 20 proformas per importer and day; the same file returns the same reading without a second call to the model. Contract: [docs/interfaces/lectura-de-proforma.md](../docs/interfaces/lectura-de-proforma.md).
 
+## Demo documents of PO-0142
+
+The bill of lading, the commercial invoice and the carrier's attestation of the order of act 1 of
+the demo, with the values of PO-0142 in `app/src/data/mock.ts`. The PDFs are in
+`redteam/corpus/demo/`; `npm run demo-docs -w ingest -- --importer 0x... --exporter 0x... --out
+app/demo-data --escrow 0x...` writes, in the folder layout of the agent, what ingest reads
+(`documents.json`) and the attestation signed with the demo carrier key (`shipment.json`).
+See `redteam/corpus/demo/README.md`.
+
 ## Notifications to the bot (Area 4)
 
 With `BOT_URL` and `BOT_INGEST_TOKEN`, ingest posts every outcome as is to `{BOT_URL}/ingest/outcomes` (`{"source": "email" | "trade_upload", "outcome": ...}`), and once a day the beneficiary change digest (`{"source": "change_digest", "since", "requests"}`), as [docs/interfaces/avisos-al-bot.md](../docs/interfaces/avisos-al-bot.md) asks. The bot maps them to template messages and drops the destinations and any document text. Delivery never blocks or changes an outcome: it runs after the reply, with a 3 s timeout, and a failure is only logged as `bot_notify_failed` with the HTTP status or the error class. `BOT_URL` must be https (or http to localhost), because the token and the outcomes travel to it, and the token must differ from ingest's own tokens.
