@@ -301,7 +301,7 @@ function UploadBlock({ notice, disabled, onPick }: { notice?: string; disabled: 
       ) : null}
       <View style={{ flexDirection: 'row', gap: 10, alignSelf: 'stretch', marginTop: 8 }}>
         <PillButton label="Choose file" icon="orders" filled disabled={disabled} onPress={() => onPick('file')} />
-        <PillButton label="Take photo" icon="camera" disabled={disabled} onPress={() => onPick('camera')} />
+        <PillButton label="Scan" icon="camera" disabled={disabled} onPress={() => onPick('camera')} />
       </View>
       <Text size={13} color="textFaint">
         PDF up to 10 MB, photo up to 5 MB

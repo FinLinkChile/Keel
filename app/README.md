@@ -94,6 +94,17 @@ What each outcome means:
 
 Nothing on this screen pays or changes the order: the upload only gives ingest the documents that the engine later compares with the signed order and the carrier's attestation. The screen never shows what ingest read in the file.
 
+## The app on a phone with Xcode, without Expo Go
+
+Expo Go cannot run the document scanner of the proforma, so the app is built as a native app. `ios/` is generated and ignored by git, so nothing heavy is committed:
+
+1. `npm install` at the repository root, and copy `app/.env.example` to `app/.env` (set `EXPO_PUBLIC_INGEST_URL`, `EXPO_PUBLIC_CHAIN_ID` and, for a test build, `EXPO_PUBLIC_WALLET_CHECK=1`).
+2. In `app/`: `npx expo prebuild --platform ios` and `cd ios && pod install` (CocoaPods).
+3. Open `app/ios/Keel.xcworkspace`, choose your team in Signing & Capabilities (a free Apple ID works) and your iPhone.
+4. Edit Scheme, Run, Build Configuration: **Release**, so the app carries its JavaScript and needs no Metro. Press Run. If Xcode says the bundle identifier is taken, change it (`ios.bundleIdentifier` in `app.json`) to one of your own.
+
+The proforma is scanned with the iPhone's document scanner (the one in Notes); the pages are joined into one PDF before they go to ingest.
+
 ## Tasks
 
 Tasks are described in [docs/trabajo/area-4-producto.md](../docs/trabajo/area-4-producto.md) (tasks T4.x). A task that exists in both modes keeps one number: its base text is Keel Personal and Keel Trade adds to it.
