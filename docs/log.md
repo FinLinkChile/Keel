@@ -1,5 +1,9 @@
 # Historial de la documentación
 
+## 2026-10-17
+
+* **Despliegue de Keel Trade con guardian y hasta dos dueños extra, Área 1 (Adrean):** `DeployTrade` fija el guardian de `FundingGate` (`GUARDIAN_ADDRESS`) y agrega como dueñas de la Safe (umbral 1) a `SECOND_OWNER_ADDRESS` y `THIRD_OWNER_ADDRESS`, las llaves de importador de las apps de las áreas 4 y 3, cada una opcional; `deployments/84532.json` suma `guardian` y `owners` con los dueños exactos. **Riesgo declarado:** con umbral 1, cualquiera de los dueños (hasta tres en la demo, todos llaves de prueba) controla la Safe y sus fondos, puede quitar a los otros y desactivar el Delay, y firma por el importador en el escrow; las dueñas extra deben ser llaves del dispositivo, nunca de servidor ([custodia de llaves](arquitectura/custodia-de-llaves.md)). **Afecta a las áreas 4 y 3:** cada llave firma órdenes por ERC-1271 de la Safe (probado sobre fork para las dos) y, como dueña, también puede mover los fondos y reconfigurar todo ([Área 1](trabajo/area-1-contratos.md)).
+
 ## 2026-10-16
 
 * **Actualización (demo) [PROPUESTA]**: los documentos de PO-0142, la orden del acto 1, quedan generados con los valores de `app/src/data/mock.ts`: el BL y la factura (`redteam/corpus/demo/`) y, con `npm run demo-docs -w ingest`, el `documents.json` que lee el agente y el `shipment.json` con la atestación firmada por la naviera. Para que esa firma valga, la dirección de Harbor Line en `mock.ts` tiene que ser la de la llave de naviera de la demo, `testAccount("demo:carrier:harbor-line")` (`0xb4b5591aff224d76de4d59f9fd832f5ac26b7708`): la orden nombra esa dirección como naviera. Lo pidió el Área 4 (Christian) en el PR #56; lo generó el Área 3 (Daniela). Afecta al Área 4 (la dirección de Harbor Line) y al Área 2 (el agente lee estos archivos mientras no se cierre la decisión abierta 15, que el Área 2 propone en `area2/agent-service`).

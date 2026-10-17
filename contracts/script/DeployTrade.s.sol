@@ -34,9 +34,10 @@ import {DeploymentsFile} from "./DeploymentsFile.sol";
 ///      file: a simulated or half-sent run must not publish addresses to the other areas.
 ///
 /// Env (from .env, never in the repo): DEPLOYER_PRIVATE_KEY, DEPLOYER_ADDRESS (must match the key),
-/// OWNER_ADDRESS, POLICY_SIGNER_ADDRESS, COSIGNER_ADDRESS, RELAYER_ADDRESS (all required, all
+/// OWNER_ADDRESS, POLICY_SIGNER_ADDRESS, COSIGNER_ADDRESS, RELAYER_ADDRESS, GUARDIAN_ADDRESS (all required, all
 /// distinct), REFUND_GRACE, CONFIG_DELAY, AGENT_CAP, COSIGNED_CAP, ALLOWANCE_PERIOD, and optionally
-/// INITIAL_POLICY_HASH, SALT_NONCE, KEEL_DEPLOYMENTS_FILE (default ./deployments/84532.json).
+/// SECOND_OWNER_ADDRESS and THIRD_OWNER_ADDRESS (optional extra Safe owners), INITIAL_POLICY_HASH, SALT_NONCE,
+/// KEEL_DEPLOYMENTS_FILE (default ./deployments/84532.json).
 ///
 /// @dev Path "temporary owner = deployer": the Safe is created with the deployer as its only owner,
 /// so the deployer can sign (v = 1, msg.sender is the owner) the Safe transactions that enable Roles
@@ -53,9 +54,18 @@ import {DeploymentsFile} from "./DeploymentsFile.sol";
 /// the real value is set afterwards by the Safe through the Delay (SetTradePolicy.s.sol). Until then
 /// every PDR signed for another hash reverts with StalePolicy.
 ///
-/// Declared risk (demo): the Safe has a single owner and threshold 1. A stolen owner key controls
-/// the Safe (it can reconfigure Roles, the gate registries and the policy hash); production uses
-/// 2 of 3. Without a ConfigGuard (T1.5) that owner can also skip the Delay.
+/// Declared risk (demo): the Safe has OWNER_ADDRESS plus SECOND_OWNER_ADDRESS and THIRD_OWNER_ADDRESS
+/// when set (the importer keys of the apps of Area 4 and Area 3, which sign orders through
+/// ERC-1271), up to three owners, all test keys, with threshold 1. Any one of them alone controls
+/// the Safe: it reconfigures Roles, the gate registries, the guardian and the policy hash, moves
+/// the Safe's USDC directly, removes the other owners and disables the Delay; through the Safe's
+/// ERC-1271 it also signs for the importer everywhere TradeEscrow checks po.importer (open,
+/// approveBalance, cancel). Production uses a higher threshold. Without a ConfigGuard (T1.5) any
+/// owner skips the Delay with a direct Safe transaction; OWNER_ADDRESS being the only Delay module
+/// is not a mitigation. The extra owners must be keys generated on the user's device (the apps'
+/// local signers), never server keys (docs/flujo/principios.md); nothing here can enforce that.
+/// The JSON lists owners as [OWNER_ADDRESS, SECOND_OWNER_ADDRESS, THIRD_OWNER_ADDRESS] (those set);
+/// Safe.getOwners() returns them in another order (addOwnerWithThreshold inserts at the head).
 contract DeployTrade is Script {
     bytes32 public constant AGENT = keccak256("AGENT");
     bytes32 public constant AGENT_COSIGNED = keccak256("AGENT_COSIGNED");
@@ -77,6 +87,12 @@ contract DeployTrade is Script {
         uint64 period;
         bytes32 initialPolicyHash;
         uint256 saltNonce;
+        /// @dev Pause-only key of the gate (FundingGate.setGuardian), set before the owner handover.
+        address guardian;
+        /// @dev Optional extra Safe owners (the importer keys of the apps of Area 4 and Area 3);
+        /// address(0) for none. Each one is optional on its own.
+        address secondOwner;
+        address thirdOwner;
     }
 
     struct Deployed {
@@ -171,6 +187,9 @@ contract DeployTrade is Script {
         c.period = _u64(vm.envUint("ALLOWANCE_PERIOD"), "ALLOWANCE_PERIOD");
         c.initialPolicyHash = vm.envOr("INITIAL_POLICY_HASH", keccak256("keel-trade/initial-policy-placeholder"));
         c.saltNonce = vm.envOr("SALT_NONCE", uint256(keccak256(abi.encode(declared, "keel-trade"))));
+        c.guardian = vm.envAddress("GUARDIAN_ADDRESS");
+        c.secondOwner = vm.envOr("SECOND_OWNER_ADDRESS", address(0));
+        c.thirdOwner = vm.envOr("THIRD_OWNER_ADDRESS", address(0));
     }
 
     function _u64(uint256 v, string memory name) private pure returns (uint64) {
@@ -206,6 +225,11 @@ contract DeployTrade is Script {
         );
         d.safe = ISafe141(
             ISafeProxyFactory141(BaseSepolia.SAFE_FACTORY).createProxyWithNonce(BaseSepolia.SAFE_L2, init, c.saltNonce)
+        );
+        // Clear message instead of a GS013 from setGuardian or addOwnerWithThreshold later on
+        require(
+            c.guardian != address(d.safe) && c.secondOwner != address(d.safe) && c.thirdOwner != address(d.safe),
+            "the guardian and the extra owners cannot be the Safe"
         );
 
         // 2. Roles and Delay from their master copies: owner = avatar = target = Safe
@@ -248,8 +272,17 @@ contract DeployTrade is Script {
             _exec(d.safe, d.deployer, address(d.roles), cfg[i].data);
         }
         _exec(d.safe, d.deployer, address(d.delay), abi.encodeCall(IDelay110.enableModule, (c.owner)));
+        _exec(d.safe, d.deployer, address(d.gate), abi.encodeCall(FundingGate.setGuardian, (c.guardian)));
+        // Extra owners are added while the deployer can still sign. addOwnerWithThreshold inserts at
+        // the head of the Safe's owner list, so the first one added stays right before the deployer:
+        // it is the previous entry swapOwner needs (SENTINEL when there is none).
+        address[] memory extra = extraOwnersOf(c);
+        address prevOfDeployer = extra.length == 0 ? BaseSepolia.SENTINEL : extra[0];
+        for (uint256 i; i < extra.length; i++) {
+            _exec(d.safe, d.deployer, s, abi.encodeCall(ISafe141.addOwnerWithThreshold, (extra[i], 1)));
+        }
         // Last: hand the Safe to its real owner; the deployer keeps no right
-        _exec(d.safe, d.deployer, s, abi.encodeCall(ISafe141.swapOwner, (BaseSepolia.SENTINEL, d.deployer, c.owner)));
+        _exec(d.safe, d.deployer, s, abi.encodeCall(ISafe141.swapOwner, (prevOfDeployer, d.deployer, c.owner)));
         vm.stopBroadcast();
 
         checkDeployment(c, d);
@@ -287,11 +320,17 @@ contract DeployTrade is Script {
     // ================================================================== checks
 
     function _validate(Config memory c, address deployer) private pure {
-        address[5] memory a = [deployer, c.owner, c.policySigner, c.cosigner, c.relayer];
-        string[5] memory n = ["deployer", "owner", "policy signer", "cosigner", "relayer"];
-        for (uint256 i; i < 5; i++) {
+        // Every role is a different address; the extra owners are optional (zero means none)
+        address[8] memory a =
+            [deployer, c.owner, c.secondOwner, c.thirdOwner, c.policySigner, c.cosigner, c.relayer, c.guardian];
+        string[8] memory n =
+            ["deployer", "owner", "second owner", "third owner", "policy signer", "cosigner", "relayer", "guardian"];
+        for (uint256 i; i < 8; i++) {
+            bool optional = i == 2 || i == 3;
+            if (optional && a[i] == address(0)) continue;
             require(a[i] != address(0), string.concat(n[i], " address is zero"));
-            for (uint256 j = i + 1; j < 5; j++) {
+            for (uint256 j = i + 1; j < 8; j++) {
+                if ((j == 2 || j == 3) && a[j] == address(0)) continue;
                 require(a[i] != a[j], string.concat(n[i], " and ", n[j], " must be different addresses"));
             }
         }
@@ -322,6 +361,14 @@ contract DeployTrade is Script {
     /// never sent.
     function checkDeployment(Config memory c, Deployed memory d) public {
         address s = address(d.safe);
+        // The same distinctness and bounds as deploy(): record() gets its config from the env, and
+        // a repeated address there (for example SECOND_OWNER_ADDRESS = OWNER_ADDRESS) would let the
+        // owner check pass while hiding a real owner from the deployments file.
+        _validate(c, d.deployer);
+        require(
+            c.guardian != s && c.secondOwner != s && c.thirdOwner != s,
+            "the guardian and the extra owners cannot be the Safe"
+        );
 
         // Roles and Delay are owned by, and act on, the Safe
         require(d.roles.owner() == s && d.roles.avatar() == s && d.roles.target() == s, "Roles owner/avatar/target");
@@ -334,8 +381,12 @@ contract DeployTrade is Script {
 
         // The Safe: exactly Roles and Delay as modules, owner and threshold, no guard, the handler
         _requireModules(_modules(s), address(d.roles), address(d.delay), "Safe modules must be exactly Roles and Delay");
-        address[] memory owners = d.safe.getOwners();
-        require(owners.length == 1 && owners[0] == c.owner, "Safe owners must be exactly OWNER_ADDRESS");
+        // Exact set: same size and every configured owner is one (they are distinct, see _validate)
+        address[] memory expectedOwners = ownersOf(c);
+        require(d.safe.getOwners().length == expectedOwners.length, "Safe owners must be exactly the configured owners");
+        for (uint256 i; i < expectedOwners.length; i++) {
+            require(d.safe.isOwner(expectedOwners[i]), "Safe owners must be exactly the configured owners");
+        }
         require(d.safe.getThreshold() == 1, "Safe threshold must be 1");
         require(!d.safe.isOwner(d.deployer), "deployer is still an owner");
         require(_slot(d.safe, BaseSepolia.GUARD_SLOT) == address(0), "Safe has a guard");
@@ -354,13 +405,22 @@ contract DeployTrade is Script {
             "gate escrow/token"
         );
         require(d.gate.configDelay() == c.configDelay, "gate configDelay");
+        // The guardian: the configured one, and a key that holds no other role here
+        address g = d.gate.guardian();
+        require(g == c.guardian, "gate guardian is not GUARDIAN_ADDRESS");
+        require(
+            g != s && g != c.policySigner && g != c.cosigner && g != c.relayer && g != d.deployer,
+            "guardian must differ from the Safe, the signers, the relayer and the deployer"
+        );
         require(d.gate.agentRoleKey() == AGENT && d.gate.cosignedRoleKey() == AGENT_COSIGNED, "gate role keys");
         require(!d.gate.paused(), "gate paused");
         // Fresh deployment: nothing happened after the script (record runs right after the send)
         require(d.gate.currentPolicyHash() == c.initialPolicyHash, "gate policy hash is not the initial one");
         require(d.gate.changeCount() == 0, "gate registries already used");
         require(d.delay.queueNonce() == 0 && d.delay.txNonce() == 0, "Delay queue not empty");
-        require(d.safe.nonce() == 15, "Safe nonce: unexpected Safe transactions");
+        // 2 enableModule + 11 Roles calls + Delay enableModule + setGuardian + swapOwner + one
+        // addOwnerWithThreshold per extra owner
+        require(d.safe.nonce() == 16 + extraOwnersOf(c).length, "Safe nonce: unexpected Safe transactions");
         // Roles 2.1.1 and Delay 1.1.0 sit on the zodiac 3.4.1 Module, which is only FactoryFriendly
         // (no Guardable): they have no guard to check, unlike the Safe.
         require(address(d.escrow.token()) == BaseSepolia.USDC && d.escrow.refundGrace() == c.refundGrace, "escrow");
@@ -371,7 +431,7 @@ contract DeployTrade is Script {
         bytes memory probe = abi.encodeCall(ITradeEscrow.fund, (bytes32(0)));
         bytes memory otherSpender = abi.encodeCall(IERC20.approve, (c.relayer, 1));
         bytes32[2] memory keys = [AGENT, AGENT_COSIGNED];
-        address[3] memory outsiders = [c.relayer, c.cosigner, d.deployer];
+        address[4] memory outsiders = [c.relayer, c.cosigner, d.deployer, c.guardian];
         for (uint256 k; k < 2; k++) {
             vm.prank(address(d.gate));
             bool ok = d.roles.execTransactionWithRole(address(d.escrow), 0, probe, 0, keys[k], false);
@@ -389,7 +449,7 @@ contract DeployTrade is Script {
                     "approve probe reverted for another reason"
                 );
             }
-            for (uint256 o; o < 3; o++) {
+            for (uint256 o; o < 4; o++) {
                 vm.prank(outsiders[o]);
                 try d.roles.execTransactionWithRole(address(d.escrow), 0, probe, 0, keys[k], false) {
                     revert("an outsider is a member of a Trade role");
@@ -401,6 +461,25 @@ contract DeployTrade is Script {
                     );
                 }
             }
+        }
+    }
+
+    /// @notice The extra owners that are set, in order: SECOND_OWNER_ADDRESS, THIRD_OWNER_ADDRESS.
+    function extraOwnersOf(Config memory c) public pure returns (address[] memory list) {
+        uint256 n = (c.secondOwner == address(0) ? 0 : 1) + (c.thirdOwner == address(0) ? 0 : 1);
+        list = new address[](n);
+        uint256 i;
+        if (c.secondOwner != address(0)) list[i++] = c.secondOwner;
+        if (c.thirdOwner != address(0)) list[i++] = c.thirdOwner;
+    }
+
+    /// @notice The Safe owners the deployment ends with: OWNER_ADDRESS, then each extra owner set.
+    function ownersOf(Config memory c) public pure returns (address[] memory list) {
+        address[] memory extra = extraOwnersOf(c);
+        list = new address[](1 + extra.length);
+        list[0] = c.owner;
+        for (uint256 i; i < extra.length; i++) {
+            list[i + 1] = extra[i];
         }
     }
 
@@ -473,6 +552,8 @@ contract DeployTrade is Script {
         vm.serializeAddress(root, "fundingGate", address(d.gate));
         vm.serializeAddress(root, "policySigner", c.policySigner);
         vm.serializeAddress(root, "cosigner", c.cosigner);
+        vm.serializeAddress(root, "guardian", c.guardian);
+        vm.serializeAddress(root, "owners", ownersOf(c));
         vm.serializeUint(root, "refundGrace", c.refundGrace);
         vm.serializeUint(root, "configDelay", c.configDelay);
         vm.serializeBytes32(root, "rolesConfigHash", TradeRolesConfig.configHash(d.params));

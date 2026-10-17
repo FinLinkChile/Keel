@@ -67,6 +67,7 @@ interface ISafe141 {
         view
         returns (address[] memory array, address next);
     function swapOwner(address prevOwner, address oldOwner, address newOwner) external;
+    function addOwnerWithThreshold(address owner, uint256 threshold) external;
     function getOwners() external view returns (address[] memory);
     function getThreshold() external view returns (uint256);
     function isOwner(address owner) external view returns (bool);
