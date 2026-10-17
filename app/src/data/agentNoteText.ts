@@ -6,6 +6,14 @@ import { WARNING_ACCOUNT_CHANGE, WARNING_HIDDEN_TEXT } from './newOrderForm';
 // The words of each note: fixed templates that only take the numbers and supplier names of the
 // note. Nothing a document prints reaches the screen through here.
 
+const BASIS: Record<string, (n: string | number) => string> = {
+  supplier: (n) => `what you agreed in your last ${n} orders with them`,
+  first_orders: (n) => `what you agreed on first orders with ${n} suppliers`,
+  company: (n) => `your usual advance over ${n} orders`,
+  lowest: (n) => `the lowest advance in your ${n} orders`,
+  default: () => 'a cautious default, until you have more orders',
+};
+
 const usd = (cents: string | number) => `USD ${formatMinor(BigInt(Math.round(Number(cents))))}`;
 const pct = (value: string | number) => `${Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 })}%`;
 
@@ -17,11 +25,15 @@ export function agentNoteText(note: AgentNote): string {
     case 'hidden_text':
       return WARNING_HIDDEN_TEXT;
     case 'new_supplier_advance':
-      return `First order with ${f.supplier}: a ${pct(f.advancePct!)} advance puts ${usd(f.atRiskCents!)} at risk before anything ships. Suggest ${pct(f.suggestedPct!)} (${usd(f.suggestedCents!)}).`;
+      return `First order with ${f.supplier}: a ${pct(f.advancePct!)} advance puts ${usd(f.atRiskCents!)} at risk before anything ships. Suggest ${pct(f.suggestedPct!)} (${usd(f.suggestedCents!)}), ${BASIS[f.basis!]!(f.basisOrders!)}.`;
     case 'low_score_advance':
-      return `${f.supplier} shipped on time in ${f.onTime} of ${f.rated} orders. Suggest a ${pct(f.suggestedPct!)} advance (${usd(f.suggestedCents!)} instead of ${usd(f.atRiskCents!)}).`;
+      return `${f.supplier} shipped on time in ${f.onTime} of ${f.rated} orders. Suggest ${pct(f.suggestedPct!)} (${usd(f.suggestedCents!)} instead of ${usd(f.atRiskCents!)}), ${BASIS[f.basis!]!(f.basisOrders!)}.`;
+    case 'advance_above_usual':
+      return `This order asks a ${pct(f.advancePct!)} advance. With ${f.supplier} you usually agree ${pct(f.suggestedPct!)}, ${BASIS[f.basis!]!(f.basisOrders!)}.`;
     case 'amount_out_of_range':
-      return `The total is ${f.pct}% ${f.direction} your average with ${f.supplier} (${usd(f.averageCents!)}, ${f.orders} orders). The agent will hold the deposit for your approval.`;
+      return `The total is ${f.pct}% ${f.direction} your average with ${f.supplier} (${usd(f.averageCents!)}; your ${f.orders} orders ranged ${usd(f.minCents!)} to ${usd(f.maxCents!)}). The agent will hold the deposit for your approval.`;
+    case 'amount_above_history':
+      return `This is your largest order with ${f.supplier}: your ${f.orders} earlier orders ranged ${usd(f.minCents!)} to ${usd(f.maxCents!)}.`;
     case 'deadline_soon':
       return `The ship-by date is in ${f.days} ${f.days === 1 ? 'day' : 'days'}. Check that the supplier can make it.`;
     case 'incoterm_changed':

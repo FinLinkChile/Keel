@@ -17,7 +17,9 @@ export type NoteRule =
   | 'hidden_text'
   | 'new_supplier_advance'
   | 'low_score_advance'
+  | 'advance_above_usual'
   | 'amount_out_of_range'
+  | 'amount_above_history'
   | 'deadline_soon'
   | 'incoterm_changed';
 
@@ -33,8 +35,9 @@ export type AgentNote = {
 };
 
 export const DEFAULT_NOTE_POLICY = {
-  // The advance suggested when the supplier has no record or a weak one
-  safeAdvanceBps: 3000,
+  // The advance suggested for a new or weak supplier only when the company has no history to
+  // learn it from
+  fallbackAdvanceBps: 3000,
   // Below this many stars a supplier's record is weak
   minStars: 3,
   // Comparisons need at least this many earlier orders
@@ -83,36 +86,60 @@ export function agentNotes(input: NotesInput, policy = DEFAULT_NOTE_POLICY): Age
       (!input.excludeOrderId || o.po.orderId.toLowerCase() !== input.excludeOrderId.toLowerCase()),
   );
 
-  // The advance is paid before anything ships: with no record, or a weak one, less is at risk
-  if (total !== null && total > 0 && advance !== null && advance > policy.safeAdvanceBps) {
+  // The advance is paid before anything ships. The suggestion is learned from the company's own
+  // orders: what it usually pays this supplier, what it agreed on first orders with new
+  // suppliers, or its usual advance overall. The fixed fallback is used only without history.
+  if (total !== null && total > 0 && advance !== null) {
     const score = supplierScore(history, supplier.address);
-    const atRisk = (total * advance) / 10_000;
-    const atRiskSuggested = (total * policy.safeAdvanceBps) / 10_000;
-    const base = {
+    const signedAll = input.orders.filter(
+      (o) => !UNSIGNED.has(o.stage) && (!input.excludeOrderId || o.po.orderId.toLowerCase() !== input.excludeOrderId.toLowerCase()),
+    );
+    const usual = learnedAdvance(signedAll, history, policy);
+    const facts = (target: number, basis: AdvanceBasis, basisOrders: number) => ({
       supplier: supplier.name,
       advancePct: advance / 100,
-      atRiskCents: Math.round(atRisk),
-      suggestedPct: policy.safeAdvanceBps / 100,
-      suggestedCents: Math.round(atRiskSuggested),
-    };
-    const suggestion = { field: 'advanceBps' as const, value: policy.safeAdvanceBps };
+      atRiskCents: Math.round((total * advance) / 10_000),
+      suggestedPct: target / 100,
+      suggestedCents: Math.round((total * target) / 10_000),
+      basis,
+      basisOrders,
+    });
+    const suggest = (value: number) => ({ field: 'advanceBps' as const, value });
+
     if (score.stars === null) {
-      notes.push({ rule: 'new_supplier_advance', tone: 'caution', facts: base, suggestion });
+      const { bps, basis, orders } = usual.firstOrders ?? usual.company ?? { bps: policy.fallbackAdvanceBps, basis: 'default' as const, orders: 0 };
+      if (advance > bps) notes.push({ rule: 'new_supplier_advance', tone: 'caution', facts: facts(bps, basis, orders), suggestion: suggest(bps) });
     } else if (score.stars < policy.minStars) {
-      notes.push({ rule: 'low_score_advance', tone: 'caution', facts: { ...base, onTime: score.shippedOnTime, rated: score.rated }, suggestion });
+      // A weak record gets the lowest advance the company has agreed, never more than the fallback
+      const lowest = usual.lowest && usual.lowest.bps < policy.fallbackAdvanceBps ? usual.lowest : { bps: policy.fallbackAdvanceBps, basis: 'default' as const, orders: 0 };
+      if (advance > lowest.bps) {
+        notes.push({
+          rule: 'low_score_advance',
+          tone: 'caution',
+          facts: { ...facts(lowest.bps, lowest.basis, lowest.orders), onTime: score.shippedOnTime, rated: score.rated },
+          suggestion: suggest(lowest.bps),
+        });
+      }
+    } else if (usual.supplier && advance > usual.supplier.bps) {
+      notes.push({ rule: 'advance_above_usual', tone: 'info', facts: facts(usual.supplier.bps, 'supplier', usual.supplier.orders), suggestion: suggest(usual.supplier.bps) });
     }
   }
 
-  // Same comparison as the engine's amount-in-range rule, in cents
+  // Two comparisons with the orders placed with this supplier. Out of the engine's range (same
+  // rule and tolerance as amount-in-range), the agent will hold the deposit; inside it but above
+  // every earlier order, it is only worth a look.
   if (total !== null && total > 0 && history.length >= policy.minHistory) {
     const amounts = history.map((o) => Number(tokenToCents(o.po.totalAmount)));
     const average = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+    const range = { minCents: Math.min(...amounts), maxCents: Math.max(...amounts) };
     if (average > 0 && Math.abs(total - average) * 10_000 > average * policy.amountToleranceBps) {
       notes.push({
         rule: 'amount_out_of_range',
         tone: 'caution',
-        facts: { supplier: supplier.name, pct: Math.round((Math.abs(total - average) / average) * 100), direction: total > average ? 'above' : 'below', averageCents: Math.round(average), orders: amounts.length },
+        facts: { supplier: supplier.name, pct: Math.round((Math.abs(total - average) / average) * 100), direction: total > average ? 'above' : 'below', averageCents: Math.round(average), orders: amounts.length, ...range },
       });
+    } else if (total > range.maxCents) {
+      notes.push({ rule: 'amount_above_history', tone: 'info', facts: { supplier: supplier.name, orders: amounts.length, ...range } });
     }
   }
 
@@ -126,6 +153,34 @@ export function agentNotes(input: NotesInput, policy = DEFAULT_NOTE_POLICY): Age
   }
 
   return sorted(notes);
+}
+
+export type AdvanceBasis = 'supplier' | 'first_orders' | 'company' | 'lowest' | 'default';
+type Learned = { bps: number; basis: AdvanceBasis; orders: number };
+
+const median = (values: number[]) => {
+  const v = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(v.length / 2);
+  return v.length % 2 ? v[mid]! : Math.round((v[mid - 1]! + v[mid]!) / 2);
+};
+
+// The advances the company has agreed, as medians so one unusual order does not move them
+export function learnedAdvance(signed: readonly Order[], withSupplier: readonly Order[], policy = DEFAULT_NOTE_POLICY) {
+  const enough = (orders: readonly Order[]) => orders.length >= policy.minHistory;
+  const firsts = new Map<string, Order>();
+  for (const o of [...signed].sort((a, b) => (a.signedAt ?? 0) - (b.signedAt ?? 0))) {
+    const key = o.po.exporter.toLowerCase();
+    if (!firsts.has(key)) firsts.set(key, o);
+  }
+  const first = [...firsts.values()];
+  const learned = (orders: readonly Order[], basis: AdvanceBasis): Learned | undefined =>
+    enough(orders) ? { bps: median(orders.map((o) => o.po.advanceBps)), basis, orders: orders.length } : undefined;
+  return {
+    supplier: learned(withSupplier, 'supplier'),
+    firstOrders: learned(first, 'first_orders'),
+    company: learned(signed, 'company'),
+    lowest: enough(signed) ? { bps: Math.min(...signed.map((o) => o.po.advanceBps)), basis: 'lowest' as const, orders: signed.length } : undefined,
+  };
 }
 
 const sorted = (notes: AgentNote[]) => [...notes].sort((a, b) => TONE_ORDER[a.tone] - TONE_ORDER[b.tone]);
