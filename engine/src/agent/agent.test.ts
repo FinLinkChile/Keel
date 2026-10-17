@@ -132,19 +132,25 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
     );
 
   // What `keel verify` reads from the chain, taken from the test chain: the signer the gate
-  // trusts and the order record of the escrow (the block does not matter on a single test chain)
+  // trusts and the order record of the escrow (the block does not matter on a single test chain).
+  // The balance path deploys no gate: a stand-in serves this Safe and holds the policy signer as
+  // VERIFIER, as the deployed gate does
+  const STAND_IN_GATE = address(0x6a7e);
   const factsOf = (logs: ChainLog[], gate?: Hex): ChainFacts => ({
     chainId: 1,
     status: "success",
     blockNumber: 1n,
     logs,
-    deployment: { chainId: 1, ...(gate ? { fundingGate: low(gate) } : {}), tradeEscrow: low(escrow) },
+    deployment: { chainId: 1, fundingGate: low(gate ?? STAND_IN_GATE), tradeEscrow: low(escrow) },
     read: {
       policySigner: (g) => chain.read<Hex>("FundingGate", g, "policySigner"),
       order: async (_escrow, orderId) => {
         const r = await recordOf(orderId);
-        return { orderHash: r.orderHash, documentVerifier: r.po.documentVerifier };
+        return { orderHash: r.orderHash, importer: r.po.importer, documentVerifier: r.po.documentVerifier };
       },
+      gateSafe: async (g) => (gate ? chain.read<Hex>("FundingGate", g, "safe") : safe),
+      isVerifier: async (g, party) =>
+        gate ? chain.read<boolean>("FundingGate", g, "hasRole", [party, 4]) : low(party) === low(policySigner.address),
     },
   });
 

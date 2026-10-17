@@ -35,11 +35,11 @@ describe("monitor notices for the bot (T2.8)", () => {
     expect(Notice.safeParse(fromLog[0]).success).toBe(true);
   });
 
-  it("an incident names the transaction; its notice kind is a proposal the bot does not accept yet", () => {
+  it("an incident names the transaction in an unauthorized_execution notice the bot accepts", () => {
     const [alert] = toMonitorNotices(event({ kind: "incident", reason: "UNKNOWN_DOCUMENT_DECISION", action: "alerted" }), "acme-imports", GATE, AT);
     expect(alert).toEqual({ id: `${TX}:unauthorized`, occurredAt: AT, mode: "trade", accountId: "acme-imports", kind: "unauthorized_execution", txHash: TX });
-    // [PROPUESTA] to Area 4: when the bot adds the kind, flip this expectation
-    expect(Notice.safeParse(alert).success).toBe(false);
+    // Adopted by Area 4 in #76
+    expect(Notice.safeParse(alert).success).toBe(true);
   });
 
   it("changes no bot notice fits are only logged", () => {

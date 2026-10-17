@@ -5,7 +5,7 @@ description: "Qué vigila el monitor (T2.8), cuándo pausa el gate de Trade y co
 tags: [monitor, t2-8, panico, pausa, llaves, acto-4]
 modo: trade
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T18:30:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T19:00:00Z }
 ---
 
 El monitor (T2.8, `engine/src/monitor/`) vigila el FundingGate y el TradeEscrow de la Safe de un importador y reacciona cuando llega a la cadena algo que el motor no decidió. Es el cierre del acto 4 (llave robada). Se ejecuta con `npm run keel -- monitor --data <carpeta>`, con `KEEL_RPC_URL`, `KEEL_ESCROW`, `KEEL_SAFE` y `KEEL_FUNDING_GATE`, y opcionalmente `MONITOR_PAUSER_PRIVATE_KEY`, `KEEL_BOT_URL` y `KEEL_BOT_TOKEN`.
@@ -38,9 +38,9 @@ Cada evento sale como una línea JSON. Con el bot configurado, además se envía
 | Proveedor en cola | `change_queued` con `supplier_added` y la fecha en que cuenta |
 | Tercero en cola | `change_queued` con `role_change` |
 | Pausa (del monitor o de otro) | `gate_paused`, un solo aviso por transacción de pausa |
-| Incidente | `unauthorized_execution` con el hash de la transacción **[PROPUESTA]** |
+| Incidente | `unauthorized_execution` con el hash de la transacción |
 
-**[PROPUESTA] al Área 4:** el bot no tiene un aviso para una ejecución que el motor no decidió. Se propone `unauthorized_execution` (cuenta del importador y `txHash`). Hasta que exista, el bot lo rechaza y el incidente queda en el registro del monitor y, si hubo pausa, en el aviso `gate_paused`. Los avisos se comprueban contra el esquema `Notice` del bot (`engine/src/monitor/notices.test.ts`).
+El aviso `unauthorized_execution` (cuenta del importador y `txHash`) lo propuso el Área 2 y lo adoptó el Área 4 en el PR #76: el bot lo acepta y lo envía al dueño, al operador y al cosignatario del importador. Los avisos se comprueban contra el esquema `Notice` del bot (`engine/src/monitor/notices.test.ts`).
 
 # Límites
 
