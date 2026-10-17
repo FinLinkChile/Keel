@@ -5,11 +5,12 @@ import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { config } from '@/config';
-import { useData, type Order, type OrderDocument, type Party } from '@/data';
+import { proposals, useData, type Order, type OrderDocument, type Party } from '@/data';
 import { tokenToCents } from '@/data/amounts';
 import { pickPdf } from '@/files/pickPdf';
 import type { PickedFile } from '@/files/pickPdf.types';
 import { uploadPreview } from '@/files/uploadPreview';
+import { ExporterReview } from '@/orders/ExporterReview';
 import { uploadDocument, type UploadResult } from '@/ingest/client';
 import { uploadStatus } from '@/ingest/uploadStatus';
 import { useSession } from '@/session';
@@ -31,8 +32,11 @@ import { colors, gutter, radius } from '@/ui/theme';
 export default function OrderScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: Hex }>();
   const { role } = useSession();
+  // An order proposed on this phone is reviewed and signed before it is an order in progress
+  const proposed = useData(async () => !!(await proposals.get(orderId)), [orderId]);
+  if (proposed === undefined) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   if (role !== 'exporter') return <Placeholder title="Order" back />;
-  return <ExporterOrder orderId={orderId} />;
+  return proposed ? <ExporterReview orderId={orderId} /> : <ExporterOrder orderId={orderId} />;
 }
 
 const DOC_NAMES: Record<RequiredDocType, string> = {

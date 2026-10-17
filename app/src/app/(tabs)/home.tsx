@@ -159,15 +159,11 @@ function NeedsYouSheet({ item }: { item: Item }) {
           color="textSoft"
           currencyColor="textFaint"
         />
-        {/* Review (04) comes later and opens Orders until then; Upload opens the order (10) */}
+        {/* Review and Upload both open the order: the review to sign (04, 10a), the upload (10) */}
         <Button
           label={signing ? 'Review' : 'Upload'}
           variant="go"
-          onPress={() =>
-            signing
-              ? router.navigate('/orders')
-              : router.push({ pathname: '/order/[orderId]', params: { orderId: order.po.orderId } })
-          }
+          onPress={() => router.push({ pathname: '/order/[orderId]', params: { orderId: order.po.orderId } })}
         />
       </View>
     </Sheet>
