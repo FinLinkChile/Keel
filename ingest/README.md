@@ -10,14 +10,80 @@ Bills of lading have no standard format across carriers. The parser covers the f
 
 ## Current state
 
-Everything implemented here is the Keel Personal pipeline: invoices arriving by email, read into the `InvoiceExtraction` schema, with beneficiary aliases and an `invoiceKey`. The sections below describe that code as it is today.
+Both modes are implemented.
 
-Most of it is shared with Keel Trade: the quarantined extractor and its provider adapters, the privacy layer, hidden text detection, the two source agreement, flood protection and the admin API. What Keel Trade adds once Area 2 freezes its extraction schemas: the fields the parser and the extractor read (transport document and commercial invoice), the keys (`blNumberHash` and `docsHash`), the intake channel (upload by a party of the order, with email as a secondary channel) and its account change flow (an alert only, because the payout address changes only with a new signed order).
+* **Keel Personal:** invoices arriving by email, read into the `InvoiceExtraction` schema, with beneficiary aliases and an `invoiceKey`.
+* **Keel Trade:** the transport document (bill of lading or air waybill) and the commercial invoice of an order, uploaded from the app by a representative of a party, read into `TransportDocumentExtraction` and `CommercialInvoiceExtraction` (`@keel/schemas`, Area 2), with `blNumberHash`, `docsHash` and an account alert. The code is in `src/trade/`.
+
+Shared by both: the quarantined extractor and its provider adapters, the privacy layer, hidden text detection, the two source agreement, flood protection and the admin API.
 
 ```sh
-npm run serve -w ingest       # inbound webhook, needs INGEST_* and LLM_* in .env
+npm run serve -w ingest       # needs INGEST_* and LLM_* in .env
 npm run typecheck -w ingest
+npm run corpus -w ingest      # regenerates redteam/corpus/trade
+npm run corpus:run -w ingest  # runs the Trade corpus against the configured LLM (costs money)
 ```
+
+## Keel Trade documents
+
+### Authenticated upload (T3.1)
+
+`POST /trade/documents` with `{orderId, docType, issuedAt, signature, file}` (the PDF in base64). The representative signs with their wallet the EIP-712 message `DocumentUpload(bytes32 orderId,string docType,bytes32 fileHash,uint64 issuedAt)` in the domain `{name: "Keel Ingest", version: "1", chainId}`. `fileHash` is the keccak256 of the exact file, so a file swapped after signing recovers another address and is rejected. The full interface for Area 4 is in [docs/interfaces/carga-de-documentos.md](../docs/interfaces/carga-de-documentos.md).
+
+The route exists only with an orders registry: `INGEST_ORDERS_FILE` (a JSON array of `{orderId, payoutAddress, carrier, uploaders: [{address, party}], knownDestinations?}`, mirroring the signed order) and `INGEST_CHAIN_ID`. Uploaders are EOAs: a Safe cannot sign the upload, its owners do. The email channel of Keel Trade is cut, as the task allows.
+
+With `INGEST_APP_ORIGIN` (one exact origin, https except localhost) this route answers CORS for the app, so it can upload from the browser. No other route answers CORS, and no cookies are involved: the signature is the authentication.
+
+### Pipeline
+
+`receiveTradeDocument` runs the checks cheapest first, so a flood costs no LLM calls:
+
+| Step | Outcome when it fails |
+|---|---|
+| Size, order, document type, signature freshness (10 min), signer is a representative of the order | `rejected` with a typed reason |
+| The file is a PDF by content | `quarantined: not_pdf` |
+| Same file already uploaded to the order | `duplicate: same_file` |
+| More than 10 authorized uploads to the order in 24 hours (T3.2) | `quarantined: rate_limited` |
+| Deterministic parser (T3.3) | `held: parser_failed` |
+| Bill of lading already accepted for another order (checked before the model, T3.7) | `held: bl_used_by_other_order` |
+| Same document number already accepted for this order | `duplicate: duplicate_document_number` |
+| Quarantined extractor (T3.4) | `held: extractor_failed` |
+| Two source agreement on every typed field (T3.5) | `held: disagreement`, with both values |
+| Declared transport type matches the document | `held: doc_type_mismatch` |
+
+A document that passes is `ready` and enters the order's package. If it announces other bank details, or prints a destination that is neither the payout address nor a registered account of the exporter, the outcome also carries an `alert` (T3.6). The alert never opens a change: the payout address changes only with a new order signed by both parties (D12). Alerts are stored and returned in one digest (`IngestStore.alertDigest`).
+
+`IngestStore.tradePackage(orderId, requiredDocs)` returns `complete` with the `docsHash`, the `blNumberHash` and the extractions once there is exactly one accepted document per required type; otherwise `incomplete` or `ambiguous`.
+
+### Parser limits (T3.3)
+
+Bills of lading have no standard format across carriers. The parser reads documents that print each field after its label (`B/L No.:`, `Port of Loading:`, `Shipped on Board Date:`), which covers the three layouts of the corpus (two ocean carriers and an airline), not any carrier. It also declares:
+
+* Dates are read only in unambiguous forms (`12-OCT-2026`, `OCT 12, 2026`, `2026-10-12`). `10/12/2026` is held: it is a different day in Chile and in a US template.
+* Amounts use the dot as decimal mark (`25,000.00`); `25.000,00` is held rather than guessed.
+* Ports resolve to UN/LOCODE from the printed code or from the names of the corridor's ports and airports (China, Hong Kong, Chile). A place outside that table is held.
+* The invoice total must state its currency, so `TOTAL PACKAGES: 20` is never read as an amount. Two different totals, or two HS codes, hold the invoice.
+* `document_number`, `invoice_number` and `order_number` are compacted (uppercase, no spaces, hyphens, slashes or dots). `blNumberHash(carrier, number)` takes that form, with the carrier of the signed order, so the carrier's attestation must be built from it. A B/L number is unique per carrier, as on chain. Compaction maps numbers that differ only by separators to the same value (`AB-12` and `AB1-2` both become `AB12`); real B/L formats (SCAC prefix plus digits) do not collide this way.
+
+### Corpus (T3.8)
+
+`redteam/corpus/trade` holds 12 legitimate sets (a transport document and an invoice each, 24 PDFs) and 30 adversarial variants, rendered from `src/testing/tradeCorpus.ts`, with a `manifest.json` that gives each case its upload conditions, its expected ingest outcome, the honest extraction (`truth`), whether its data conform to the order, and, for the documents that reach the engine, the engine's expected decision and reason codes (`expected.engine`). Each order carries its signed `PurchaseOrder`, `OrderTerms` (with the `hsCodes` the goods rule reads) and the carrier's attestation. The engine labels were checked once against `evaluateDocuments` of Area 2. `src/trade/corpus.test.ts` runs the whole corpus in CI with an honest model double and with a compromised one, and checks that the committed files match their specs.
+
+What the tests prove, with an honest model: all 24 legitimate documents are read field by field and the 12 packages are complete; every adversarial variant ends in its expected state. With a model that obeys the attacker (it shifts the BL number, the on board date, the amount and the order number): every legitimate document is held for disagreement and no adversarial document is accepted. This holds for the corpus layouts and the tested attacks. It does not prove how a given real LLM behaves: `npm run corpus:run -w ingest` measures that.
+
+`redteam/corpus/personal` holds the Keel Personal corpus: 12 legitimate bills (rent, electricity, internet and building fees over three periods) and 26 adversarial variants, rendered from `src/testing/personalCorpus.ts`. They go through the real email entry point: the PDFs are committed, and the emails that carry them are built at run time (DKIM keys are generated per run) as the manifest says, so the corpus also covers a forged sender, a look-alike domain, a forwarded email with the attachment swapped, a replay and a second change request while one is pending. `src/personalCorpus.test.ts` runs it with an honest and a compromised model double.
+
+Measured on 2026-10-14 with `claude-opus-5-5` through the team's LiteLLM proxy: 54/54 as expected, 24/24 legitimate documents read end to end, 12/12 complete packages, 0 unsafe, in 139 s. Two runs only. In an earlier run the model also flagged A20 ("RELEASE PAYMENT IMMEDIATELY") as text addressed to an automated system, a stricter result, so a run can differ on such cases; an unsafe result never appeared.
+
+## Proforma reading (T3.9)
+
+`POST /trade/proforma` reads the exporter's proforma so the app can prefill the purchase order on the importer's review screen (step 0 of the flow). The importer signs `ProformaUpload(bytes32 fileHash,uint64 issuedAt)` in the same domain as the document upload; the importer uploaders of `INGEST_ORDERS_FILE` and the addresses of `INGEST_IMPORTERS_FILE` may upload. The body is `{ issuedAt, signature, file }`, the file a PDF, a JPEG, PNG or WebP photo, or a scan; its type is read from the bytes.
+
+A PDF with text is read like the other documents, from redacted text, and the parser's hidden text check is added to the model's. A photo or a scanned PDF has no text to redact, so the file goes to the model and the transfer is logged as unredacted (`extraccion_proforma`). The answer is typed fields only (number, date, currency, amount, incoterm, HS codes, latest shipment date, ports, advance in basis points, and two warnings), with the fields the proforma does not print listed in `missing`. It never returns the payout address, names or free text. One reader is enough because the reading decides nothing: the people review every field before both sign the order. 20 proformas per importer and day; the same file returns the same reading without a second call to the model. Contract: [docs/interfaces/lectura-de-proforma.md](../docs/interfaces/lectura-de-proforma.md).
+
+## Notifications to the bot (Area 4)
+
+With `BOT_URL` and `BOT_INGEST_TOKEN`, ingest posts every outcome as is to `{BOT_URL}/ingest/outcomes` (`{"source": "email" | "trade_upload", "outcome": ...}`), and once a day the beneficiary change digest (`{"source": "change_digest", "since", "requests"}`), as [docs/interfaces/avisos-al-bot.md](../docs/interfaces/avisos-al-bot.md) asks. The bot maps them to template messages and drops the destinations and any document text. Delivery never blocks or changes an outcome: it runs after the reply, with a 3 s timeout, and a failure is only logged as `bot_notify_failed` with the HTTP status or the error class. `BOT_URL` must be https (or http to localhost), because the token and the outcomes travel to it, and the token must differ from ingest's own tokens.
 
 ## Inbound email (T3.1)
 
@@ -61,6 +127,7 @@ An admin can switch the LLM and the DMARC policy at runtime. Requests carry `Aut
   "settings": { "provider": "anthropic", "model": "claude-opus-5-5", "requireDmarc": true },
   "updatedAt": "2026-10-12T15:04:05.000Z",
   "updatedBy": "env",
+  "baseURL": null,
   "availableProviders": ["anthropic", "openai-compatible"]
 }
 ```
@@ -68,16 +135,16 @@ An admin can switch the LLM and the DMARC policy at runtime. Requests carry `Aut
 `PUT /admin/settings` with header `X-Admin-Actor: <who>` and any subset of the settings:
 
 ```json
-{ "provider": "openai-compatible", "model": "qwen-plus", "baseURL": "https://<endpoint>/v1", "requireDmarc": false }
+{ "provider": "openai-compatible", "model": "qwen-plus", "requireDmarc": false }
 ```
 
 * Only providers listed in `availableProviders` (those with an API key in the environment) are accepted. API keys are never accepted or returned by this API.
-* `baseURL` applies only to `openai-compatible` and must be https (plain http only to localhost).
+* Base URLs are never accepted by this API: the redacted documents and the provider's API key travel to them, so whoever held the admin token could otherwise point the extractor at their own server. They come from the environment only, one per provider (`ANTHROPIC_BASE_URL`, `LLM_COMPAT_BASE_URL`, or `LLM_BASE_URL` for the provider in `LLM_PROVIDER`), must be https (plain http only to localhost), and `GET` shows the current one so the admin knows where documents go. `openai-compatible` is offered only when its base URL is set.
 * Invalid input returns `400 {"error": "invalid_settings", "message": ...}` and changes nothing.
 * Every effective change is logged as `{"type": "settings_changed", "actor", "at", "changes": {field: {from, to}}}`. Relaxing `requireDmarc` lowers the bar for who can send invoices, and switching providers changes where redacted invoice text is sent; the screen should say so before confirming.
 * `requireDmarc` defaults to `true`. The log receives only the message hash, the status, the reason and the SPF/DKIM/DMARC keywords. The server refuses to start without a token of at least 32 characters and listens on 127.0.0.1 unless `INGEST_HOST` says otherwise.
 
-The document corpus lives in `redteam/corpus/` so Area 5 can measure against it.
+The document corpora live in `redteam/corpus/` so Area 5 can measure against them.
 
 ## Choosing the LLM
 
@@ -85,10 +152,10 @@ The extractor is provider-agnostic. The prompt, the schema the model sees and th
 
 | `LLM_PROVIDER` | `LLM_MODEL` | Input sent | Notes |
 |---|---|---|---|
-| `anthropic` (default) | defaults to `claude-opus-5-5` | Strict JSON Schema output, server-side refusal fallback |
+| `anthropic` (default) | defaults to `claude-opus-5-5` | Strict JSON Schema output, server-side refusal fallback. `ANTHROPIC_BASE_URL` or `LLM_BASE_URL` (https) points it at a proxy such as LiteLLM; then the request goes without beta features and the transfer is logged as `anthropic-proxy` |
 | `openai` | required | Responses API, strict JSON Schema |
 | `gemini` | required | `responseJsonSchema`, temperature 0 |
-| `openai-compatible` | required, plus `LLM_BASE_URL` | Qwen (Alibaba DashScope), DeepSeek, Kimi or a self-hosted model |
+| `openai-compatible` | required, plus `LLM_COMPAT_BASE_URL` or `LLM_BASE_URL` | Qwen (Alibaba DashScope), DeepSeek, Kimi or a self-hosted model |
 
 The registered issuer RUTs are never given to the model, so it cannot "correct" a fraudulent issuer and hide it from the two-source comparison. Whatever the provider returns is rejected unless it matches the schema exactly.
 
@@ -96,7 +163,7 @@ The registered issuer RUTs are never given to the model, so it cannot "correct" 
 
 `src/privacy.ts` applies [privacy-kit-cl](https://github.com/Yugoxc/privacy-kit-cl) (Ley 21.719) before any provider call:
 
-* The model never receives the PDF, only its text with RUTs, names, addresses, emails, phones, bank accounts and wallet addresses replaced by tokens such as `[RUT_1a2b3c4d]`. Hidden runs stay in the text, so the model still faces the injection attempt.
+* The model never receives the PDF, only its text with RUTs, names, addresses, emails, phones, bank accounts (IBAN included) and wallet addresses replaced by tokens such as `[RUT_1a2b3c4d]`. The labels of trade documents (`Shipper:`, `Consignee:`, `Buyer:`, `A/C No.:`) are covered too. Hidden runs stay in the text, so the model still faces the injection attempt.
 * The model returns the issuer's RUT token; Keel rehydrates it locally. The token map never leaves the process, and a token not issued for that invoice fails validation.
 * Each call uses a fresh random salt. privacy-kit-cl derives tokens as `sha256(salt:value)`, and with its default fixed salt the roughly 10^8 possible RUTs could be brute-forced from a token.
 * Each call is logged as a transfer to a third party (`transferLog()`).
@@ -110,6 +177,7 @@ Known gaps, declared rather than hidden: text covered by a white shape drawn on 
 Limits of the privacy layer: masking is pattern based. A personal name without a label (`Señor(es):`, `Cliente:`…) is not detected, and the issuer company name is left visible on purpose.
 
 ```sh
+npm run llm:check -w ingest                # one tiny call; prints the provider's error if any
 npm run extract -w ingest -- invoice.pdf   # calls the real API, prints LLM vs parser
 ```
 
@@ -127,3 +195,4 @@ Tasks are described in [docs/trabajo/area-3-ingesta.md](../docs/trabajo/area-3-i
 | T3.6 Account change detection (change request; alert only in Trade) | #23 |
 | T3.7 Idempotency and document keys (`invoiceKey`; `blNumberHash`, `docsHash`) | #24 |
 | T3.8 Document corpus | #25 |
+| T3.9 Proforma reading (added by Trade) | #59 |

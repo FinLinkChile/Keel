@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ALIAS_IDS } from "@keel/schemas";
 import { renderInvoice, sampleSpec } from "../testing/renderInvoice";
-import { ExtractionError, toExtraction, type ExtractorProvider, type InvoiceDocument } from "./contract";
+import { ExtractionError, toExtraction, type ExtractorProvider, type ExtractionRequest } from "./contract";
 import { configFromEnv, createExtractor, extractInvoice, MAX_LLM_INPUT_CHARS } from "./index";
 
 const ALIAS = ALIAS_IDS[0];
@@ -20,16 +20,16 @@ const modelOutput = {
 class FakeProvider implements ExtractorProvider {
   readonly provider = "fake";
   readonly model = "fake-1";
-  seen?: InvoiceDocument;
-  constructor(private readonly reply: string | ((doc: InvoiceDocument) => string)) {}
-  async complete(doc: InvoiceDocument) {
+  seen?: ExtractionRequest;
+  constructor(private readonly reply: string | ((doc: ExtractionRequest) => string)) {}
+  async complete(doc: ExtractionRequest) {
     this.seen = doc;
     return typeof this.reply === "string" ? this.reply : this.reply(doc);
   }
 }
 
 // Behaves like a well-behaved model: copies the first RUT token, which is the issuer's
-const tokenEchoingModel = (doc: InvoiceDocument) =>
+const tokenEchoingModel = (doc: ExtractionRequest) =>
   JSON.stringify({ ...modelOutput, issuer_tax_id: /\[RUT_[0-9a-f]{8}\]/.exec(doc.text)![0] });
 
 const reason = (fn: () => unknown) => {
@@ -171,9 +171,16 @@ describe("configFromEnv", () => {
     expect(() => configFromEnv({ ...compat, LLM_BASE_URL: "http://llm.example.com/v1" })).toThrow(/https/);
     expect(() => configFromEnv({ ...compat, LLM_BASE_URL: "not a url" })).toThrow(/valid URL/);
     expect(configFromEnv({ ...compat, LLM_BASE_URL: "http://localhost:8000/v1" }).baseURL).toBe("http://localhost:8000/v1");
-    expect(() => configFromEnv({ LLM_API_KEY: "k", LLM_BASE_URL: "https://my-qwen.example/v1" })).toThrow(
-      /only applies to openai-compatible/,
+    expect(() => configFromEnv({ LLM_API_KEY: "k", LLM_PROVIDER: "gemini", LLM_MODEL: "g", LLM_BASE_URL: "https://x.example" })).toThrow(
+      /only applies to anthropic/,
     );
+  });
+
+  it("accepts Claude behind an https proxy and logs the transfer under the proxy", async () => {
+    const config = configFromEnv({ LLM_API_KEY: "k", LLM_BASE_URL: "https://proxy.example" });
+    expect(config).toMatchObject({ provider: "anthropic", baseURL: "https://proxy.example" });
+    expect((await createExtractor(config)).provider).toBe("anthropic-proxy");
+    expect(() => configFromEnv({ LLM_API_KEY: "k", LLM_BASE_URL: "http://proxy.example" })).toThrow(/https/);
   });
 
   it("validates configs built by hand, not only from the environment", async () => {
