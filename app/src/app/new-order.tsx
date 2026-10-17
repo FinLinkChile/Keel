@@ -175,7 +175,14 @@ function NewOrderScreen() {
     if (built.kind === 'blocked') return setBlocked({ fields: built.fields, problems: built.problems });
     setBlocked(undefined);
     // Kept on this phone until the supplier signs. Nothing leaves the device.
-    const proposal = newProposal(built, form.goods, Date.now() / 1000);
+    const asked = proforma?.reading?.proforma;
+    const quote = asked && {
+      amountCents: asked.amount_minor,
+      advanceBps: asked.advance_bps,
+      issueDate: asked.issue_date,
+      latestShipmentDate: asked.latest_shipment_date,
+    };
+    const proposal = newProposal(built, form.goods, Date.now() / 1000, quote);
     await proposals.save(proposal);
     router.replace({ pathname: '/new-order-sent', params: { orderId: proposal.orderId } });
   }

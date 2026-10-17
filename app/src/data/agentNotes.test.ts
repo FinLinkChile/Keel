@@ -19,6 +19,7 @@ let id = 0;
 const past = (cents: number, extra: Partial<Order> = {}, incoterm: Incoterm = 'FOB', exporter = LINGNAN.address, advanceBps = 3000): Order =>
   ({
     stage: 'settled',
+    documents: [],
     shippedAt: NOW - 30 * DAY,
     signedAt: NOW - 60 * DAY + id,
     ...extra,

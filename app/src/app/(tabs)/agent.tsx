@@ -8,6 +8,7 @@ import { useData } from '@/data';
 import { agentNotes } from '@/data/agentNotes';
 import { tokenToCents } from '@/data/amounts';
 import { insights, type Period } from '@/data/insights';
+import { negotiation } from '@/data/negotiation';
 import { incotermText } from '@/data/signOrder';
 import { supplierScore } from '@/data/supplierScore';
 import { useSession } from '@/session';
@@ -71,7 +72,7 @@ export default function Agent() {
         )
       : 0;
     const labels = new Map(orders.map((o) => [o.po.orderId, `${o.label}, ${o.goodsShort || o.goods}`]));
-    return { data, wallet, waiting: waiting.length, notes, labels };
+    return { data, wallet, waiting: waiting.length, notes, labels, deal: negotiation(orders) };
   }, [role, period]);
 
   return (
@@ -137,6 +138,25 @@ export default function Agent() {
               )}
             </Row>
           </Section>
+
+          {role === 'importer' && view.deal.orders.length > 0 ? (
+            <Section title="Negotiation">
+              <Row>
+                <KpiCard
+                  label="Advance vs. proformas"
+                  value={view.deal.advancePointsSaved === null ? '–' : `${view.deal.advancePointsSaved > 0 ? '−' : view.deal.advancePointsSaved < 0 ? '+' : ''}${Math.abs(view.deal.advancePointsSaved)} pts`}
+                  context={`Lower in ${view.deal.lowerAdvance} of ${view.deal.withAdvance} orders`}
+                  tone={view.deal.advancePointsSaved !== null && view.deal.advancePointsSaved > 0 ? 'money' : 'text'}
+                />
+                <KpiCard
+                  label="Total vs. proformas"
+                  value={view.deal.amountChangePct === null ? '–' : `${view.deal.amountChangePct > 0 ? '+' : ''}${view.deal.amountChangePct}%`}
+                  context={`${view.deal.orders.length} orders with a proforma read`}
+                  tone={view.deal.amountChangePct !== null && view.deal.amountChangePct < 0 ? 'money' : 'text'}
+                />
+              </Row>
+            </Section>
+          ) : null}
 
           {view.data.byCounterparty.length > 0 ? (
             <Section title={role === 'importer' ? 'By supplier' : 'By buyer'}>
