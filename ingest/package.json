@@ -11,7 +11,8 @@
     "corpus": "node --import tsx scripts/corpus.ts",
     "corpus:run": "node --env-file-if-exists=../.env --import tsx scripts/corpus-run.ts",
     "proforma:check": "node --env-file-if-exists=../.env --import tsx scripts/proforma-check.ts",
-    "llm:check": "node --env-file-if-exists=../.env --import tsx scripts/llm-check.ts"
+    "llm:check": "node --env-file-if-exists=../.env --import tsx scripts/llm-check.ts",
+    "demo-docs": "node --env-file-if-exists=../.env --import tsx scripts/demo-documents.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
