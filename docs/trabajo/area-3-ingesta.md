@@ -1,11 +1,11 @@
 ---
 type: Área de trabajo
 title: "Área 3: ingesta de documentos y extracción en cuarentena"
-description: "Objetivo, entregables y tareas T3.1 a T3.9: canal autenticado, protección contra inundación, parser, extractor, concordancia, cambio de cuenta, idempotencia, corpus y lectura de la proforma."
+description: "Objetivo, entregables y tareas T3.1 a T3.11: canal autenticado, protección contra inundación, parser, extractor, concordancia, cambio de cuenta, idempotencia, corpus, lectura de la proforma, documentos de la demo y registro de órdenes firmadas desde la app."
 tags: [area-3, ingesta, extractor, parser, t3]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T03:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T03:45:00Z }
 ---
 
 **Perfil sugerido:** backend con experiencia en LLM, parsing de PDF y correo.
@@ -73,6 +73,19 @@ Sirve al paso 0 del flujo: el agente lee la proforma y propone la orden estructu
 * Sin segundo lector para fotos: la revisión humana antes de firmar cumple ese papel, y lo que vale es la orden firmada, con el hash de la proforma dentro de `termsHash`.
 * No guarda la proforma ni decide nada: solo ayuda a llenar la orden.
 * Implementada en `ingest/src/trade/proforma.ts` (`POST /trade/proforma`): importadores registrados, 20 proformas por importador y día, y la misma lectura sin llamar otra vez al modelo para un archivo repetido. Contrato en [lectura de la proforma](../interfaces/lectura-de-proforma.md).
+
+**T3.10 Documentos y atestación de la demo (agregada por Trade).**
+Sirve al acto 1 de la [demo](../entrega/demo.md): los documentos de PO-0142 que ingesta lee y el agente compara con la orden firmada. La pidió el Área 4 (Christian) en el PR #56.
+* BL de Harbor Line (HLIN-2610-0142, a bordo el 30-OCT-2026, de HKHKG a CLSAI) y factura de Lingnan a Pacífico Foods (USD 48.000, FOB, HS 1302.31), con los valores de `app/src/data/mock.ts`, en `redteam/corpus/demo/`.
+* Atestación de embarque firmada con la llave de naviera de la demo, `testAccount("demo:carrier:harbor-line")`, que es la dirección de Harbor Line en `mock.ts`.
+* `npm run demo-docs -w ingest` escribe `documents.json` y `shipment.json` en la carpeta del agente. Implementada en `ingest/src/testing/demoOrder.ts` (PR #69).
+
+**T3.11 Registro de órdenes firmadas desde la app (agregada por Trade) [PROPUESTA].**
+Sirve a los pasos 4 y 5 del flujo para una orden creada en la app: hoy ni la carga de documentos de ingesta (T3.1) ni el agente la conocen, porque solo leen los archivos de la demo. Toca la [decisión abierta 15](../decisiones/abiertas.md) (Áreas 2, 3 y 4): se implementa solo si el Área 2 la confirma; propuesta en la revisión del PR #70.
+* Cuando ambas partes firman, la app envía la orden, sus términos y las dos firmas a ingesta (`POST /trade/orders`).
+* Ingesta no confía en la app: acepta la orden solo si las dos firmas EIP-712 recuperan al importador y al exportador con el dominio del escrow, si el hash de los términos es el `termsHash` de la orden y si el `orderId` corresponde a las partes y al nonce.
+* Recién entonces registra al importador y al exportador como quienes pueden subir documentos de esa orden y escribe el `order.json` que lee el agente (`engine/src/agent/store.ts`).
+* El agente vuelve a verificar firmas y términos al leerlo y, después de `open()`, compara con la orden registrada en cadena (defensa en profundidad).
 
 # Decisiones de implementación en Keel Trade **[PROPUESTA]**
 

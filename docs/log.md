@@ -1,5 +1,9 @@
 # Historial de la documentación
 
+## 2026-10-17
+
+* **Actualización (plan)**: se agregan dos tareas al Área 3. **T3.10**, los documentos y la atestación de PO-0142 para la demo, ya hecha en el PR #69 a pedido del Área 4. **T3.11 [PROPUESTA]**, el registro de órdenes firmadas desde la app: ingesta acepta una orden solo si las dos firmas, el hash de los términos y el `orderId` se verifican, y recién entonces habilita la carga de sus documentos y escribe el `order.json` del agente. Sin T3.11, una orden creada en la app no puede subir el BL ni la factura. Toca la decisión abierta 15, así que espera la confirmación del Área 2, planteada en la revisión del PR #70. Área 3 (Daniela). Concepto: [Área 3](trabajo/area-3-ingesta.md).
+
 ## 2026-10-16
 
 * **Actualización (demo) [PROPUESTA]**: los documentos de PO-0142, la orden del acto 1, quedan generados con los valores de `app/src/data/mock.ts`: el BL y la factura (`redteam/corpus/demo/`) y, con `npm run demo-docs -w ingest`, el `documents.json` que lee el agente y el `shipment.json` con la atestación firmada por la naviera. Para que esa firma valga, la dirección de Harbor Line en `mock.ts` tiene que ser la de la llave de naviera de la demo, `testAccount("demo:carrier:harbor-line")` (`0xb4b5591aff224d76de4d59f9fd832f5ac26b7708`): la orden nombra esa dirección como naviera. Lo pidió el Área 4 (Christian) en el PR #56; lo generó el Área 3 (Daniela). Afecta al Área 4 (la dirección de Harbor Line) y al Área 2 (el agente lee estos archivos mientras no se cierre la decisión abierta 15, que el Área 2 propone en `area2/agent-service`).
