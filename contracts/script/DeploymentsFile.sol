@@ -6,7 +6,8 @@ import {VmSafe} from "forge-std/Vm.sol";
 /// @notice deployments/<chainId>.json is shared by DeployTrade and DeployPDRGate. Each script loads
 /// the file if it exists, keeps every key it does not own and writes only its own keys:
 /// - DeployTrade: deployBlock, safe, roles, delay, tradeEscrow, fundingGate, policySigner,
-///   cosigner, refundGrace, configDelay, rolesConfigHash, rolesConfigCalls, trade (object), and
+///   cosigner, guardian, owners, refundGrace, configDelay, rolesConfigHash, rolesConfigCalls,
+///   trade (object), and
 ///   pdrGate = null only when absent;
 /// - DeployPDRGate: pdrGate and personal (object).
 /// Both write chainId and usdc, and refuse to run if the file already holds different values.

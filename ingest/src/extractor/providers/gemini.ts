@@ -19,7 +19,15 @@ export class GeminiProvider implements ExtractorProvider {
     try {
       res = await this.client.models.generateContent({
         model: this.model,
-        contents: [{ role: "user", parts: [{ text: request.user }] }],
+        contents: [
+          {
+            role: "user",
+            parts: [
+              ...(request.attachment ? [{ inlineData: { mimeType: request.attachment.mediaType, data: request.attachment.data } }] : []),
+              { text: request.user },
+            ],
+          },
+        ],
         config: {
           systemInstruction: request.system,
           responseMimeType: "application/json",

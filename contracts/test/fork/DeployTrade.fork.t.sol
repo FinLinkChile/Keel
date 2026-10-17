@@ -19,7 +19,11 @@ import {PurchaseOrder, FundIntent, PolicyDecision} from "../../src/KeelTypes.sol
 /// SetTradePolicy. Skips when BASE_SEPOLIA_RPC_URL is not set.
 contract DeployTradeForkTest is Test {
     uint256 constant FORK_BLOCK = 48_173_000;
-    string constant FILE = "./deployments/test-deploy-trade-fork.json";
+
+    /// One file per test: tests of a suite run in parallel, a shared path would race.
+    function _file(string memory test) internal pure returns (string memory) {
+        return string.concat("./deployments/test-", test, ".json");
+    }
     uint256 constant TOTAL = 10_000e6;
 
     // Labelled keys: plain EOAs on Base Sepolia (checked in setUp)
@@ -28,7 +32,10 @@ contract DeployTradeForkTest is Test {
     uint256 policyKey = uint256(keccak256("keel.deploy.policy"));
     uint256 cosignerKey = uint256(keccak256("keel.deploy.cosigner"));
     uint256 exporterKey = uint256(keccak256("keel.deploy.exporter"));
+    uint256 secondOwnerKey = uint256(keccak256("keel.deploy.second-owner"));
+    uint256 thirdOwnerKey = uint256(keccak256("keel.deploy.third-owner"));
     address relayer = makeAddr("keel.deploy.relayer");
+    address guardian = makeAddr("keel.deploy.guardian");
     address payout = makeAddr("keel.deploy.payout");
     address carrier = makeAddr("keel.deploy.carrier");
     address arbiter = makeAddr("keel.deploy.arbiter");
@@ -51,7 +58,8 @@ contract DeployTradeForkTest is Test {
         forked = true;
         assertEq(
             vm.addr(deployerKey).code.length + vm.addr(ownerKey).code.length + vm.addr(policyKey).code.length
-                + vm.addr(cosignerKey).code.length + vm.addr(exporterKey).code.length,
+                + vm.addr(cosignerKey).code.length + vm.addr(exporterKey).code.length
+                + vm.addr(secondOwnerKey).code.length + vm.addr(thirdOwnerKey).code.length,
             0,
             "test keys must be plain EOAs"
         );
@@ -69,7 +77,10 @@ contract DeployTradeForkTest is Test {
             cosignedCap: 200_000e6,
             period: 30 days,
             initialPolicyHash: keccak256("keel-trade/initial-policy-placeholder"),
-            saltNonce: uint256(keccak256("keel.deploy.fork-test"))
+            saltNonce: uint256(keccak256("keel.deploy.fork-test")),
+            guardian: guardian,
+            secondOwner: vm.addr(secondOwnerKey),
+            thirdOwner: vm.addr(thirdOwnerKey)
         });
     }
 
@@ -87,24 +98,61 @@ contract DeployTradeForkTest is Test {
         address deployer = vm.addr(deployerKey);
         uint256 before = vm.getNonce(deployer);
         _deploy();
-        // 1 Safe + 2 modules + TradeEscrow + FundingGate + 15 Safe transactions
-        // (2 enableModule, 11 Roles configuration calls, 1 Delay enableModule, 1 swapOwner)
-        assertEq(vm.getNonce(deployer) - before, 20, "only the deployment was broadcast");
+        // 1 Safe + 2 modules + TradeEscrow + FundingGate + 18 Safe transactions (2 enableModule,
+        // 11 Roles configuration calls, 1 Delay enableModule, setGuardian, 2 addOwnerWithThreshold,
+        // swapOwner)
+        assertEq(vm.getNonce(deployer) - before, 23, "only the deployment was broadcast");
         assertEq(vm.getNonce(relayer), 0, "relayer probe not sent");
         assertEq(vm.getNonce(c.cosigner), 0, "cosigner probe not sent");
-        assertEq(d.safe.nonce(), 15, "Safe transactions");
+        assertEq(d.safe.nonce(), 18, "Safe transactions");
+        assertEq(vm.getNonce(guardian), 0, "guardian probe not sent");
         assertEq(TradeRolesConfig.calls(d.params).length, 11);
     }
 
-    function test_fork_deploy_handsTheSafeToTheOwner() public onlyFork {
+    function test_fork_deploy_handsTheSafeToThreeOwners() public onlyFork {
+        _deploy();
+        address[] memory owners = d.safe.getOwners();
+        assertEq(owners.length, 3);
+        assertTrue(d.safe.isOwner(c.owner) && d.safe.isOwner(c.secondOwner) && d.safe.isOwner(c.thirdOwner));
+        assertEq(d.safe.getThreshold(), 1);
+        assertFalse(d.safe.isOwner(vm.addr(deployerKey)));
+        assertTrue(d.delay.isModuleEnabled(c.owner));
+        assertEq(d.gate.currentPolicyHash(), c.initialPolicyHash);
+    }
+
+    function test_fork_deploy_withoutExtraOwners() public onlyFork {
+        c.secondOwner = address(0);
+        c.thirdOwner = address(0);
+        address deployer = vm.addr(deployerKey);
+        uint256 before = vm.getNonce(deployer);
         _deploy();
         address[] memory owners = d.safe.getOwners();
         assertEq(owners.length, 1);
         assertEq(owners[0], c.owner);
         assertEq(d.safe.getThreshold(), 1);
+        assertFalse(d.safe.isOwner(deployer));
+        assertEq(d.safe.nonce(), 16, "no addOwnerWithThreshold");
+        assertEq(vm.getNonce(deployer) - before, 21);
+        assertEq(d.gate.guardian(), guardian);
+    }
+
+    /// Each extra owner is optional on its own: only THIRD_OWNER_ADDRESS set.
+    function test_fork_deploy_onlyTheThirdOwner() public onlyFork {
+        c.secondOwner = address(0);
+        _deploy();
+        address[] memory owners = d.safe.getOwners();
+        assertEq(owners.length, 2);
+        assertTrue(d.safe.isOwner(c.owner) && d.safe.isOwner(c.thirdOwner));
         assertFalse(d.safe.isOwner(vm.addr(deployerKey)));
-        assertTrue(d.delay.isModuleEnabled(c.owner));
-        assertEq(d.gate.currentPolicyHash(), c.initialPolicyHash);
+        assertEq(d.safe.nonce(), 17);
+    }
+
+    function test_fork_deploy_setsTheGuardian() public onlyFork {
+        _deploy();
+        assertEq(d.gate.guardian(), guardian);
+        vm.prank(guardian);
+        d.gate.emergencyPause();
+        assertTrue(d.gate.paused());
     }
 
     function test_fork_deploy_failsWithRepeatedAddresses() public onlyFork {
@@ -120,12 +168,48 @@ contract DeployTradeForkTest is Test {
         bad.policySigner = bad.cosigner;
         vm.expectRevert(bytes("policy signer and cosigner must be different addresses"));
         script.deploy(bad);
+        bad = c;
+        bad.guardian = bad.relayer;
+        vm.expectRevert(bytes("relayer and guardian must be different addresses"));
+        script.deploy(bad);
+        bad = c;
+        bad.guardian = vm.addr(deployerKey);
+        vm.expectRevert(bytes("deployer and guardian must be different addresses"));
+        script.deploy(bad);
+        bad = c;
+        bad.secondOwner = bad.owner;
+        vm.expectRevert(bytes("owner and second owner must be different addresses"));
+        script.deploy(bad);
+        bad = c;
+        bad.secondOwner = bad.guardian;
+        vm.expectRevert(bytes("second owner and guardian must be different addresses"));
+        script.deploy(bad);
+        bad = c;
+        bad.thirdOwner = bad.secondOwner;
+        vm.expectRevert(bytes("second owner and third owner must be different addresses"));
+        script.deploy(bad);
+        bad = c;
+        bad.thirdOwner = bad.owner;
+        vm.expectRevert(bytes("owner and third owner must be different addresses"));
+        script.deploy(bad);
+        bad = c;
+        bad.thirdOwner = bad.policySigner;
+        vm.expectRevert(bytes("third owner and policy signer must be different addresses"));
+        script.deploy(bad);
+        bad = c;
+        bad.thirdOwner = bad.guardian;
+        vm.expectRevert(bytes("third owner and guardian must be different addresses"));
+        script.deploy(bad);
+        bad = c;
+        bad.guardian = address(0);
+        vm.expectRevert(bytes("guardian address is zero"));
+        script.deploy(bad);
     }
 
     function test_fork_deploy_writesTheDeploymentsFile() public onlyFork {
         _deploy();
-        script.writeDeployment(FILE, c, d);
-        string memory json = vm.readFile(FILE);
+        script.writeDeployment(_file("test_fork_deploy_writesTheDeploymentsFile"), c, d);
+        string memory json = vm.readFile(_file("test_fork_deploy_writesTheDeploymentsFile"));
         assertEq(vm.parseJsonUint(json, ".chainId"), 84532);
         assertEq(vm.parseJsonUint(json, ".deployBlock"), d.deployBlock);
         assertEq(vm.parseJsonAddress(json, ".usdc"), BaseSepolia.USDC);
@@ -147,7 +231,13 @@ contract DeployTradeForkTest is Test {
             assertEq(calls[i], cfg[i].data);
         }
         assertEq(vm.parseJsonAddress(json, ".trade.owner"), c.owner);
-        vm.removeFile(FILE);
+        assertEq(vm.parseJsonAddress(json, ".guardian"), guardian);
+        address[] memory owners = vm.parseJsonAddressArray(json, ".owners");
+        assertEq(owners.length, 3);
+        assertEq(owners[0], c.owner);
+        assertEq(owners[1], c.secondOwner);
+        assertEq(owners[2], c.thirdOwner);
+        vm.removeFile(_file("test_fork_deploy_writesTheDeploymentsFile"));
     }
 
     // ------------------------------------------------------------------ record (after the send)
@@ -155,15 +245,21 @@ contract DeployTradeForkTest is Test {
     /// record rebuilds every address from the Safe on the chain, checks it and writes the file.
     function test_fork_record_rebuildsFromTheSafeAndWrites() public onlyFork {
         _deploy();
-        DeployTrade.Deployed memory r = script.recordTo(c, address(d.safe), vm.addr(deployerKey), d.deployBlock, FILE);
+        DeployTrade.Deployed memory r = script.recordTo(
+            c,
+            address(d.safe),
+            vm.addr(deployerKey),
+            d.deployBlock,
+            _file("test_fork_record_rebuildsFromTheSafeAndWrites")
+        );
         assertEq(address(r.roles), address(d.roles));
         assertEq(address(r.delay), address(d.delay));
         assertEq(address(r.gate), address(d.gate));
         assertEq(address(r.escrow), address(d.escrow));
-        string memory json = vm.readFile(FILE);
+        string memory json = vm.readFile(_file("test_fork_record_rebuildsFromTheSafeAndWrites"));
         assertEq(vm.parseJsonAddress(json, ".fundingGate"), address(d.gate));
         assertEq(vm.parseJsonBytes32(json, ".rolesConfigHash"), TradeRolesConfig.configHash(d.params));
-        vm.removeFile(FILE);
+        vm.removeFile(_file("test_fork_record_rebuildsFromTheSafeAndWrites"));
     }
 
     /// A Safe that still has another owner besides OWNER_ADDRESS (as if swapOwner never landed) is
@@ -173,9 +269,38 @@ contract DeployTradeForkTest is Test {
         _execSafe(
             address(d.safe), abi.encodeWithSignature("addOwnerWithThreshold(address,uint256)", vm.addr(deployerKey), 1)
         );
-        vm.expectRevert(bytes("Safe owners must be exactly OWNER_ADDRESS"));
-        script.recordTo(c, address(d.safe), vm.addr(deployerKey), d.deployBlock, FILE);
-        assertFalse(vm.exists(FILE), "nothing written");
+        vm.expectRevert(bytes("Safe owners must be exactly the configured owners"));
+        script.recordTo(
+            c,
+            address(d.safe),
+            vm.addr(deployerKey),
+            d.deployBlock,
+            _file("test_fork_record_refusesASafeWithAnotherOwner")
+        );
+        assertFalse(vm.exists(_file("test_fork_record_refusesASafeWithAnotherOwner")), "nothing written");
+    }
+
+    /// record with an env that repeats an address (SECOND_OWNER_ADDRESS = OWNER_ADDRESS) is refused:
+    /// otherwise the owner check would pass and the real second owner would be missing from the file.
+    function test_fork_record_refusesARepeatedOwnerInTheEnv() public onlyFork {
+        _deploy();
+        DeployTrade.Config memory wrong = c;
+        wrong.thirdOwner = c.secondOwner;
+        string memory path = _file("test_fork_record_refusesARepeatedOwnerInTheEnv");
+        vm.expectRevert(bytes("second owner and third owner must be different addresses"));
+        script.recordTo(wrong, address(d.safe), vm.addr(deployerKey), d.deployBlock, path);
+        assertFalse(vm.exists(path));
+    }
+
+    /// A guardian other than GUARDIAN_ADDRESS (changed after the deployment) is refused.
+    function test_fork_record_refusesAnotherGuardian() public onlyFork {
+        _deploy();
+        _execSafe(address(d.gate), abi.encodeCall(FundingGate.setGuardian, (makeAddr("someone else"))));
+        vm.expectRevert(bytes("gate guardian is not GUARDIAN_ADDRESS"));
+        script.recordTo(
+            c, address(d.safe), vm.addr(deployerKey), d.deployBlock, _file("test_fork_record_refusesAnotherGuardian")
+        );
+        assertFalse(vm.exists(_file("test_fork_record_refusesAnotherGuardian")));
     }
 
     /// Anything done after the deployment (here, a registry change) means it is not the fresh
@@ -184,8 +309,10 @@ contract DeployTradeForkTest is Test {
         _deploy();
         _execSafe(address(d.gate), abi.encodeCall(FundingGate.queueSupplier, (vm.addr(exporterKey), payout)));
         vm.expectRevert(bytes("gate registries already used"));
-        script.recordTo(c, address(d.safe), vm.addr(deployerKey), d.deployBlock, FILE);
-        assertFalse(vm.exists(FILE));
+        script.recordTo(
+            c, address(d.safe), vm.addr(deployerKey), d.deployBlock, _file("test_fork_record_refusesAUsedDeployment")
+        );
+        assertFalse(vm.exists(_file("test_fork_record_refusesAUsedDeployment")));
     }
 
     function test_fork_deploy_failsWithOutOfRangeSettings() public onlyFork {
@@ -248,15 +375,32 @@ contract DeployTradeForkTest is Test {
         return abi.encodePacked(r, s, v);
     }
 
-    function _safeSign(bytes32 hash) internal view returns (bytes memory) {
+    /// ERC-1271 signature of the Safe (CompatibilityFallbackHandler): any one owner signs the
+    /// SafeMessage, since the threshold is 1.
+    function _safeSign(uint256 signerKey, bytes32 hash) internal view returns (bytes memory) {
         bytes32 safeMsg = keccak256(abi.encode(BaseSepolia.SAFE_MSG_TYPEHASH, keccak256(abi.encode(hash))));
         return
-            _sign(ownerKey, keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), d.safe.domainSeparator(), safeMsg)));
+            _sign(signerKey, keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), d.safe.domainSeparator(), safeMsg)));
     }
 
     /// The owner approves the supplier and third parties, waits the gate delay, both parties sign
     /// an order and the relayer funds it at tier 1 with the deployed contracts.
     function test_fork_deploy_fundsATier1OrderEndToEnd() public onlyFork {
+        _fundTier1(ownerKey);
+    }
+
+    /// The same order signed for the importer by the second owner (the app's importer key, Area 4)
+    /// through the Safe's ERC-1271: the escrow accepts it and the gate funds it.
+    function test_fork_deploy_secondOwnerSignsTheOrderThroughERC1271() public onlyFork {
+        _fundTier1(secondOwnerKey);
+    }
+
+    /// And by the third owner (the importer key of Area 3's app): with threshold 1, any one owner.
+    function test_fork_deploy_thirdOwnerSignsTheOrderThroughERC1271() public onlyFork {
+        _fundTier1(thirdOwnerKey);
+    }
+
+    function _fundTier1(uint256 importerSignerKey) internal {
         _deploy();
         address exporter = vm.addr(exporterKey);
         _execSafe(address(d.gate), abi.encodeCall(FundingGate.queueSupplier, (exporter, payout)));
@@ -286,7 +430,7 @@ contract DeployTradeForkTest is Test {
         });
         bytes32 orderDigest =
             KeelHash.digest(KeelHash.domainSeparator(block.chainid, address(d.escrow)), KeelHash.hash(po));
-        d.escrow.open(po, _safeSign(orderDigest), _sign(exporterKey, orderDigest));
+        d.escrow.open(po, _safeSign(importerSignerKey, orderDigest), _sign(exporterKey, orderDigest));
 
         FundIntent memory i = FundIntent({
             orderId: po.orderId,

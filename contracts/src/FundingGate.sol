@@ -39,9 +39,14 @@ import {PDRVerifier} from "./PDRVerifier.sol";
 /// Deployment invariant (checked by the deployment script and the fork tests, T1.7/T1.8): no
 /// Roles role of this Safe may have this gate as a target. `onlySafe` trusts `msg.sender == safe`,
 /// so a role scoped to this gate would let its member queue suppliers as if it were the Safe.
-/// The cosigner does not need one: it calls `vetoPending` and `emergencyPause` directly.
+/// The cosigner does not need one: it calls `vetoPending` and `emergencyPause` directly. An optional
+/// guardian (setGuardian, Safe only) can call `emergencyPause` and nothing else.
 /// Declared risk: a stolen cosigner key can veto every queued change and pause the gate (it can
-/// delay onboarding, never add anything) until the Safe rotates it with `setCosigner`.
+/// delay onboarding, never add anything) until the Safe rotates it with `setCosigner`. A stolen
+/// guardian key (a monitor's server key, more exposed) can pause, and pause again after every
+/// unpause: liveness only. Recovery is one atomic Safe transaction (for example a MultiSend) with
+/// setGuardian(address(0)) and unpause; if both have to wait in the Delay, the gate stays
+/// stoppable for that window.
 contract FundingGate is PDRVerifier, ReentrancyGuard {
     // ----------------------------------------------------------------- types
     enum ChangeKind {
@@ -95,6 +100,8 @@ contract FundingGate is PDRVerifier, ReentrancyGuard {
     event ChangeVetoed(uint256 indexed changeId, address indexed by);
     event SupplierRemoved(address indexed exporter, address payout);
     event ThirdPartyRemoved(address indexed party, uint8 roles);
+    /// @notice address(0) turns the guardian off.
+    event GuardianSet(address indexed previousGuardian, address indexed guardian);
 
     // ----------------------------------------------------------------- errors
     /// @dev The intent or the stored order does not match: other escrow or token, other order
@@ -111,6 +118,12 @@ contract FundingGate is PDRVerifier, ReentrancyGuard {
     /// @dev An allowance from the Safe to the escrow is left after `fund`.
     error AllowanceNotConsumed();
     error OnlySafeOrCosigner();
+    /// @dev emergencyPause called by someone other than the Safe, the cosigner or the guardian.
+    error OnlyPauser();
+    /// @dev The guardian would be the policy signer, the cosigner or the Safe.
+    error InvalidGuardian();
+    /// @dev The new policy signer or cosigner would be the guardian.
+    error SignerIsGuardian();
     /// @dev The change does not exist, was vetoed, was removed or replaced, or is already active.
     error ChangeNotPending();
     error AlreadyRegistered();
@@ -137,6 +150,9 @@ contract FundingGate is PDRVerifier, ReentrancyGuard {
     mapping(uint256 changeId => Change) public changes;
     mapping(address exporter => mapping(address payout => Entry)) private _suppliers;
     mapping(address party => mapping(uint8 role => Entry)) private _parties;
+    /// @notice A key that can only stop the gate (emergencyPause), for a monitor or an operator
+    /// (#57). It cannot resume, veto, queue, remove or configure anything. Zero when unset.
+    address public guardian;
 
     modifier onlySafeOrCosigner() {
         if (msg.sender != safe && msg.sender != cosigner) revert OnlySafeOrCosigner();
@@ -303,11 +319,33 @@ contract FundingGate is PDRVerifier, ReentrancyGuard {
         emit ThirdPartyRemoved(party, removed);
     }
 
-    /// @notice Panic button the cosigner can call directly (or the Safe). Only pauses: resuming
-    /// is `unpause`, Safe only.
-    function emergencyPause() external onlySafeOrCosigner {
+    /// @notice Panic button the cosigner or the guardian can call directly (and the Safe). Only
+    /// pauses: resuming is `unpause`, Safe only.
+    function emergencyPause() external {
+        // With no guardian set, guardian is address(0), which no transaction comes from.
+        if (msg.sender != safe && msg.sender != cosigner && msg.sender != guardian) {
+            revert OnlyPauser();
+        }
         paused = true;
         emit GatePaused(msg.sender);
+    }
+
+    /// @notice Sets or clears (address(0)) the guardian. Safe only. The guardian must differ from
+    /// the policy signer, the cosigner and the Safe, so none of those three keys also holds the
+    /// guardian's pause (it is not checked against Safe owners, Roles members or registered parties).
+    // address(0) is allowed on purpose: it turns the guardian off.
+    // forge-lint: disable-next-line(missing-zero-check)
+    function setGuardian(address g) external onlySafe {
+        if (g != address(0) && (g == policySigner || g == cosigner || g == safe)) revert InvalidGuardian();
+        address previous = guardian;
+        guardian = g;
+        emit GuardianSet(previous, g);
+    }
+
+    /// @dev PDRVerifier hook: a new policy signer or cosigner cannot be the guardian.
+    function _checkSigner(address signer) internal view override {
+        // signer is never address(0) here (the setters reject it first), so an unset guardian never matches
+        if (signer == guardian) revert SignerIsGuardian();
     }
 
     // ================================================================== views

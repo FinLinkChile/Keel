@@ -17,6 +17,15 @@ export class OpenAICompatibleProvider implements ExtractorProvider {
   }
 
   async complete(request: ExtractionRequest): Promise<string> {
+    // Chat Completions takes images but has no portable way to send a PDF
+    const a = request.attachment;
+    if (a?.mediaType === "application/pdf") throw new ExtractionError("unsupported_input");
+    const user: OpenAI.Chat.ChatCompletionUserMessageParam["content"] = a
+      ? [
+          { type: "image_url", image_url: { url: `data:${a.mediaType};base64,${a.data}` } },
+          { type: "text", text: request.user },
+        ]
+      : request.user;
     let res: OpenAI.Chat.ChatCompletion;
     try {
       res = await this.client.chat.completions.create({
@@ -28,7 +37,7 @@ export class OpenAICompatibleProvider implements ExtractorProvider {
             role: "system",
             content: `${request.system}\n\nReply with one JSON object that matches this JSON Schema exactly:\n${JSON.stringify(request.schema)}`,
           },
-          { role: "user", content: request.user },
+          { role: "user", content: user },
         ],
       });
     } catch (e) {

@@ -101,14 +101,14 @@ Ingest names an order by its bytes32 `orderId` and the parties by wallet address
 ```json
 {
   "orders": {
-    "0x0000000000000000000000000000000000000000000000000000000000000142": {
+    "0xd4ea1e15e78409b5ac70c0f757355733cb4685325bb9b238122ad8be30768f8e": {
       "label": "PO-0142", "importer": "acme-imports", "exporter": "lingnan", "arbiter": "hk-arbitration", "shipmentDeadline": 1795132800
     }
   }
 }
 ```
 
-The bytes32 id becomes the notice's `orderRef`, so the app link opens the same order. Startup fails if the file does not validate, if a label is not a valid `orderLabel`, if an account is not in the directory or if an order names the same account twice. There is no address map: ingest's outcomes already say which side uploaded (`party`), and an address is never shown. `examples/orders.json` holds the three demo orders, and the act files use their ids.
+The bytes32 id becomes the notice's `orderRef`, so the app link opens the same order. Startup fails if the file does not validate, if a label is not a valid `orderLabel`, if an account is not in the directory or if an order names the same account twice. There is no address map: ingest's outcomes already say which side uploaded (`party`), and an address is never shown. `examples/orders.json` holds the three demo orders, and the act files use their ids. The ids are computed as the escrow opens an order, `keccak256(abi.encode(importer, exporter, nonce))`, from the app's demo data: regenerate the examples with `npm run bot-examples -w app`, and a real order book for test wallets with `npm run demo-data -w app` (`bot-orders.json`).
 
 ## Layers
 
