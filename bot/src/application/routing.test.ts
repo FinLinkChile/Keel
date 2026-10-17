@@ -21,6 +21,8 @@ describe("route", () => {
     for (const k of ["transfer_blocked", "agent_revoked", "gate_paused"] as const) {
       expect(who(SAMPLES[k])).toEqual(["importer:owner", "importer:cosigner"]);
     }
+    // The incident of the monitor reaches the whole team of the importer's account, and no one else
+    expect(who(SAMPLES.unauthorized_execution)).toEqual(["importer:owner", "importer:operator", "importer:cosigner"]);
     expect(who(SAMPLES.dispute_raised)).toEqual([
       "importer:owner",
       "importer:operator",
@@ -73,5 +75,19 @@ describe("route", () => {
     const [imp, , exp, , arb] = route(SAMPLES.dispute_raised);
     expect([imp?.accountId, exp?.accountId, arb?.accountId]).toEqual(["acme-imports", "lingnan", "hk-arbitration"]);
     expect(route(SAMPLES.transfer_blocked).every((r) => r.accountId === "acme-imports")).toBe(true);
+  });
+});
+
+// Area 2's monitor (T2.8, engine/src/monitor/notices.ts) posts this notice for an execution the
+// engine never decided. This is exactly its shape: the bot has to accept it as it is.
+describe("the monitor's unauthorized_execution", () => {
+  it("accepts the shape Area 2 sends and nothing more", async () => {
+    const { Notice } = await import("../domain/notice");
+    const tx = `0x${"ab".repeat(32)}`;
+    const sent = { id: `${tx}:unauthorized`, occurredAt: 1_762_000_000, mode: "trade", accountId: "acme-imports", kind: "unauthorized_execution", txHash: tx };
+    expect(Notice.safeParse(sent).success).toBe(true);
+    expect(Notice.safeParse({ ...sent, extra: "x" }).success).toBe(false);
+    expect(Notice.safeParse({ ...sent, txHash: "0x12" }).success).toBe(false);
+    expect(Notice.safeParse({ ...sent, accountId: undefined }).success).toBe(false);
   });
 });

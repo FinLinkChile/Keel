@@ -6,7 +6,7 @@
 // a proposal.
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type RequestListener, type Server, type ServerResponse } from "node:http";
-import type { NotifyResult } from "../../application/notify";
+import type { NoticeOrigin, NotifyResult } from "../../application/notify";
 import { Notice } from "../../domain/notice";
 import { ConfigError } from "../config/env";
 
@@ -32,7 +32,7 @@ async function readBody(req: IncomingMessage): Promise<Buffer | null> {
 }
 
 export interface NoticeSink {
-  notify(input: unknown): Promise<NotifyResult>;
+  notify(input: unknown, origin?: NoticeOrigin): Promise<NotifyResult>;
 }
 
 // A route receives the parsed JSON body once the token and the size are checked.

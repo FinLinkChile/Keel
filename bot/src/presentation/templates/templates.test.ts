@@ -21,6 +21,19 @@ describe("templates", () => {
     }
   });
 
+  it("tells an unauthorized execution without an address, an amount or a pause it cannot know", () => {
+    const owner = as(SAMPLES.unauthorized_execution, "importer", "owner");
+    const cosigner = as(SAMPLES.unauthorized_execution, "importer", "cosigner");
+    expect(owner.text).toBe(
+      "A payment on one of your orders used an approval Keel's engine never issued. A Keel key may have been used outside the system. Check it in Keel, and if you did not expect it, tell your cosigner right away.",
+    );
+    expect(cosigner.text).toBe("A payment on one of your orders used an approval Keel's engine never issued. A Keel key may have been used outside the system. If it was not expected, pause new deposits in Keel now.");
+    for (const m of [owner, cosigner]) {
+      expect(m.text).not.toMatch(/0x|paused|USD|\d/);
+      expect(m.link).toEqual({ label: "See what happened", path: "/activity" });
+    }
+  });
+
   it("tells each side its own version", () => {
     expect(as(SAMPLES.advance_released, "importer").text).toBe(
       "Advance of 14,400.00 USD paid to Lingnan Hydrocolloids for PO-0142, as the signed order says. The rest stays locked until proof of shipment is accepted and the dispute window closes.",
