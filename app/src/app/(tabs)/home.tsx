@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { proposals, useData, type KeelData, type Party, type Role } from '@/data';
 import { tokenToCents } from '@/data/amounts';
 import { loadNeedsItems, needsItemHref, type NeedsItem } from '@/data/needsItems';
+import { ActivityList } from '@/orders/ActivityList';
 import { useSession } from '@/session';
 import { Amount } from '@/ui/Amount';
 import { Avatar } from '@/ui/Avatar';
@@ -98,6 +99,13 @@ export default function Home() {
           </Text>
         </View>
       )}
+
+      <View style={{ gap: 6 }}>
+        <Text size={22} weight={800} accessibilityRole="header">
+          Activity
+        </Text>
+        <ActivityList limit={5} />
+      </View>
     </ScrollView>
   );
 }

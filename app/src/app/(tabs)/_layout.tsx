@@ -13,7 +13,6 @@ export default function TabsLayout() {
         <TabTrigger name="orders" href="/orders" />
         <TabTrigger name="agent" href="/agent" />
         <TabTrigger name="suppliers" href="/suppliers" />
-        <TabTrigger name="activity" href="/activity" />
       </TabList>
     </Tabs>
   );
