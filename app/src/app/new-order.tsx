@@ -101,6 +101,7 @@ function NewOrderScreen() {
           advanceBps: advanceBpsOf(form),
           shipmentDeadline: parseDay(form.dayText),
           incoterm: form.incoterm,
+          lines: reading?.proforma.lines,
           orders: data.orders,
           warnings: reading && { accountChange: reading.mentionsAccountChange, hiddenText: reading.hiddenTextDetected },
           now: Date.now() / 1000,
@@ -181,6 +182,7 @@ function NewOrderScreen() {
       advanceBps: asked.advance_bps,
       issueDate: asked.issue_date,
       latestShipmentDate: asked.latest_shipment_date,
+      lines: asked.lines,
     };
     const proposal = newProposal(built, form.goods, Date.now() / 1000, quote);
     await proposals.save(proposal);

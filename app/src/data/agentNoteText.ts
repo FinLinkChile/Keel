@@ -2,6 +2,8 @@ import { formatMinor } from '../ui/format';
 
 import type { AgentNote } from './agentNotes';
 import { WARNING_ACCOUNT_CHANGE, WARNING_HIDDEN_TEXT } from './newOrderForm';
+import { UNIT_WORDS } from './unitPrice';
+import type { ProformaUnit } from '../ingest/proforma';
 
 // The words of each note: fixed templates that only take the numbers and supplier names of the
 // note. Nothing a document prints reaches the screen through here.
@@ -15,6 +17,11 @@ const BASIS: Record<string, (n: string | number) => string> = {
 };
 
 const usd = (cents: string | number) => `USD ${formatMinor(BigInt(Math.round(Number(cents))))}`;
+// Cents, or up to 4 decimals for a price under a dollar (a screw, a gram)
+const perUnit = (cents: string | number) =>
+  `USD ${(Number(cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: Number(cents) < 100 ? 4 : 2 })}`;
+const hs = (code: string | number) => `${String(code).slice(0, 4)}.${String(code).slice(4)}`;
+
 const pct = (value: string | number) => `${Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 })}%`;
 
 export function agentNoteText(note: AgentNote): string {
@@ -34,6 +41,10 @@ export function agentNoteText(note: AgentNote): string {
       return `The total is ${f.pct}% ${f.direction} your average with ${f.supplier} (${usd(f.averageCents!)}; your ${f.orders} orders ranged ${usd(f.minCents!)} to ${usd(f.maxCents!)}). The agent will hold the deposit for your approval.`;
     case 'amount_above_history':
       return `This is your largest order with ${f.supplier}: your ${f.orders} earlier orders ranged ${usd(f.minCents!)} to ${usd(f.maxCents!)}.`;
+    case 'unit_price_above_usual': {
+      const unit = UNIT_WORDS[f.unit as ProformaUnit];
+      return `HS ${hs(f.hsCode!)} costs ${perUnit(f.priceCents!)} per ${unit}, ${f.pct}% above your last ${f.orders} orders of it (${perUnit(f.averageCents!)} per ${unit} on average).`;
+    }
     case 'deadline_soon':
       return `The ship-by date is in ${f.days} ${f.days === 1 ? 'day' : 'days'}. Check that the supplier can make it.`;
     case 'incoterm_changed':

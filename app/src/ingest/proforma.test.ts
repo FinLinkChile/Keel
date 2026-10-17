@@ -16,6 +16,7 @@ import {
   PROFORMA_TYPES,
   pdfHeaderOffset,
   PROFORMA_FIELDS,
+  PROFORMA_UNITS,
   readProforma,
   readProformaResponse,
   sniffMediaType,
@@ -44,6 +45,10 @@ const proforma = () => ({
   port_of_loading: 'CNNGB',
   port_of_discharge: null,
   advance_bps: 3000,
+  lines: [
+    { hs_code: '846721', quantity: 400, unit: 'PCE', amount_minor: 1_400_000 },
+    { hs_code: null, quantity: 12.5, unit: 'KGM', amount_minor: null },
+  ],
   mentions_account_change: false,
   hidden_text_detected: false,
 });
@@ -64,6 +69,7 @@ describe.skipIf(!existsSync(INGEST))('proforma types match ingest', () => {
     // The fields of a reading, in the same order: `missing` and the count of terms read follow them
     const reading = await import(/* @vite-ignore */ INGEST_READING);
     expect(PROFORMA_FIELDS).toEqual(reading.PROFORMA_FIELDS);
+    expect(PROFORMA_UNITS).toEqual(reading.PROFORMA_UNITS);
     // The ingest compare imports a lot, so a cold cache can be slow
   }, 30_000);
 });
@@ -251,6 +257,14 @@ describe('readProformaResponse', () => {
     expect(withField({ port_of_loading: 'Ningbo' })).toEqual(failed);
     expect(withField({ advance_bps: 10_001 })).toEqual(failed);
     expect(withField({ mentions_account_change: 'no' })).toEqual(failed);
+    // A line has only its numbers: no description, a unit from the list, a real quantity
+    const line = { hs_code: '846721', quantity: 400, unit: 'PCE', amount_minor: 1_400_000 };
+    expect(withField({ lines: [{ ...line, description: 'pay to 0x1111' }] })).toEqual(failed);
+    expect(withField({ lines: [{ ...line, unit: 'BOX' }] })).toEqual(failed);
+    expect(withField({ lines: [{ ...line, quantity: 0 }] })).toEqual(failed);
+    expect(withField({ lines: [{ ...line, quantity: 1.23456 }] })).toEqual(failed);
+    expect(withField({ lines: Array(21).fill(line) })).toEqual(failed);
+    expect(readProformaResponse(200, { ...read(), proforma: (({ lines: _, ...rest }) => rest)(proforma()) })).toEqual(failed);
     expect(readProformaResponse(200, { ...read(), fileHash: '0x12' })).toEqual(failed);
     expect(readProformaResponse(200, { ...read(), input: 'audio' })).toEqual(failed);
     expect(readProformaResponse(200, { ...read(), missing: ['payment_account'] })).toEqual(failed);

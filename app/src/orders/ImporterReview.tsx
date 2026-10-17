@@ -54,6 +54,7 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
       advanceBps: po.advanceBps,
       shipmentDeadline: Number(po.shipmentDeadline),
       incoterm: incotermText(po.incoterm) as Incoterm,
+      lines: proposal.quote?.lines,
       orders,
       excludeOrderId: po.orderId,
       now: Date.now() / 1000,

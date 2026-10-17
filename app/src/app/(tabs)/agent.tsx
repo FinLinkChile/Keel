@@ -64,6 +64,7 @@ export default function Agent() {
               advanceBps: o.po.advanceBps,
               shipmentDeadline: Number(o.po.shipmentDeadline),
               incoterm: incotermText(o.po.incoterm) as Incoterm,
+              lines: o.quote?.lines,
               orders,
               excludeOrderId: o.po.orderId,
               now,

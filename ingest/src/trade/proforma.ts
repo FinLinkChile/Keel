@@ -112,7 +112,11 @@ export async function receiveProforma(
   if (!importers.has(signer)) return { status: "rejected", reason: "not_an_importer" };
 
   const cached = opts.store.proformaReading<{ input: "text" | "file"; proforma: ProformaReading }>(signer, hash);
-  if (cached) return { status: "read", fileHash: hash, ...cached, missing: missingFields(cached.proforma) };
+  if (cached) {
+    // Readings saved before lines existed come back with none
+    const proforma = { ...cached.proforma, lines: cached.proforma.lines ?? [] };
+    return { status: "read", fileHash: hash, input: cached.input, proforma, missing: missingFields(proforma) };
+  }
   if (opts.store.proformaUploadsToday(signer) >= MAX_PROFORMAS_PER_IMPORTER_PER_DAY) {
     return { status: "rejected", reason: "rate_limited" };
   }

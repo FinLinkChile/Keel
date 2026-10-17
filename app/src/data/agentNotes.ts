@@ -1,8 +1,11 @@
 import type { Hex, Incoterm } from '@keel/schemas';
 
+import type { ProformaLine } from '../ingest/proforma';
+
 import { tokenToCents } from './amounts';
 import { incotermText } from './signOrder';
 import { supplierScore } from './supplierScore';
+import { unitPrice } from './unitPrice';
 import type { Order } from './types';
 
 // The agent's notes before signing. The agent reads (the quarantined extractor turned the proforma
@@ -20,6 +23,7 @@ export type NoteRule =
   | 'advance_above_usual'
   | 'amount_out_of_range'
   | 'amount_above_history'
+  | 'unit_price_above_usual'
   | 'deadline_soon'
   | 'incoterm_changed';
 
@@ -45,6 +49,10 @@ export const DEFAULT_NOTE_POLICY = {
   // Same values as DEFAULT_FUNDING_POLICY in engine/src/funding.ts (the app does not import the
   // engine), so a note warns about what the agent will hold
   amountToleranceBps: 2500,
+  // A price per unit this much above the company's recent average for the product is flagged
+  unitPriceToleranceBps: 1000,
+  // How many recent orders of the product make the average
+  unitPriceOrders: 3,
   deadlineWarningSeconds: 3 * 24 * 60 * 60,
 } as const;
 
@@ -54,6 +62,8 @@ export type NotesInput = {
   advanceBps: number | null;
   shipmentDeadline: number | null;
   incoterm: Incoterm | null;
+  // The lines the proforma printed, to compare prices per unit
+  lines?: readonly ProformaLine[];
   // The company's orders; the one under review, if any, is left out of its own history
   orders: readonly Order[];
   excludeOrderId?: Hex;
@@ -77,6 +87,9 @@ export function agentNotes(input: NotesInput, policy = DEFAULT_NOTE_POLICY): Age
       notes.push({ rule: 'deadline_soon', tone: 'caution', facts: { days: Math.max(1, Math.ceil(left / 86_400)) } });
     }
   }
+
+  const unit = unitPriceNote(input, policy);
+  if (unit) notes.push(unit);
 
   if (!supplier) return sorted(notes);
   const history = input.orders.filter(
@@ -153,6 +166,36 @@ export function agentNotes(input: NotesInput, policy = DEFAULT_NOTE_POLICY): Age
   }
 
   return sorted(notes);
+}
+
+// The price per unit of each line against the company's last orders of the same product (HS
+// code) in an equivalent unit, from any supplier. One note, for the line furthest above.
+function unitPriceNote(input: NotesInput, policy: typeof DEFAULT_NOTE_POLICY): AgentNote | undefined {
+  const past = input.orders
+    .filter((o) => o.quote?.lines?.length && !UNSIGNED.has(o.stage) && (!input.excludeOrderId || o.po.orderId.toLowerCase() !== input.excludeOrderId.toLowerCase()))
+    .sort((a, b) => (b.signedAt ?? 0) - (a.signedAt ?? 0));
+  let worst: AgentNote | undefined;
+  for (const line of input.lines ?? []) {
+    const now = unitPrice(line);
+    if (!now) continue;
+    // One price per earlier order: its first line of the same product and kind of unit
+    const earlier = past
+      .map((o) => o.quote!.lines!.map(unitPrice).find((p) => p && p.hsCode === now.hsCode && p.unit === now.unit))
+      .filter((p) => p !== undefined)
+      .slice(0, policy.unitPriceOrders);
+    if (earlier.length < policy.minHistory) continue;
+    const average = earlier.reduce((a, p) => a + p.centsPerUnit, 0) / earlier.length;
+    if (average <= 0 || (now.centsPerUnit - average) * 10_000 <= average * policy.unitPriceToleranceBps) continue;
+    const pct = Math.round(((now.centsPerUnit - average) / average) * 100);
+    if (!worst || pct > (worst.facts.pct as number)) {
+      worst = {
+        rule: 'unit_price_above_usual',
+        tone: 'caution',
+        facts: { hsCode: now.hsCode, unit: now.unit, priceCents: now.centsPerUnit, averageCents: average, pct, orders: earlier.length },
+      };
+    }
+  }
+  return worst;
 }
 
 export type AdvanceBasis = 'supplier' | 'first_orders' | 'company' | 'lowest' | 'default';

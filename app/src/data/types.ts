@@ -1,5 +1,7 @@
 import type { Hex, OrderTerms, PurchaseOrder, RequiredDocType } from '@keel/schemas';
 
+import type { ProformaLine } from '../ingest/proforma';
+
 // Same slugs as bot/examples/recipients.json
 export type PartyId = string;
 
@@ -59,6 +61,8 @@ export type Quote = {
   // Unix seconds
   issueDate: number | null;
   latestShipmentDate: number | null;
+  // Quantity, unit and amount of each line, to compare prices per unit
+  lines?: ProformaLine[];
 };
 
 export type Order = {

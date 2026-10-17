@@ -144,4 +144,30 @@ describe('agent notes', () => {
     expect(DEFAULT_NOTE_POLICY.amountToleranceBps).toBe(2500);
     expect(DEFAULT_NOTE_POLICY.deadlineWarningSeconds).toBe(3 * 24 * 60 * 60);
   });
+
+  describe('price per unit', () => {
+    const line = (quantity: number, unit: 'KGM' | 'TNE' | 'CT', cents: number, hs = '130231') => ({ hs_code: hs, quantity, unit, amount_minor: cents });
+    // Earlier orders of agar, from any supplier, with the lines their proforma printed
+    const withLines = (cents: number, signedAt: number, unit: 'KGM' | 'TNE' | 'CT' = 'KGM', quantity = 6000) =>
+      past(cents, { signedAt, quote: { amountCents: cents, advanceBps: 3000, issueDate: null, latestShipmentDate: null, lines: [line(quantity, unit, cents)] } });
+    const history = [withLines(4_200_000, NOW - 10 * DAY), withLines(4_380_000, NOW - 20 * DAY), withLines(4_260_000, NOW - 30 * DAY), withLines(1, NOW - 40 * DAY)];
+
+    it('flags a price per unit well above the last orders of the same product', () => {
+      // USD 8.00/kg against 7.00, 7.30 and 7.10 (the oldest order is past the last 3)
+      const notes = agentNotes(input({ supplier: undefined, orders: history, lines: [line(6000, 'KGM', 4_800_000)] }));
+      expect(notes.map((n) => n.rule)).toEqual(['unit_price_above_usual']);
+      expect(agentNoteText(notes[0]!)).toBe('HS 1302.31 costs USD 8.00 per kg, 12% above your last 3 orders of it (USD 7.13 per kg on average).');
+    });
+
+    it('compares tons with kilos, but never cartons with kilos', () => {
+      expect(rules(input({ supplier: undefined, orders: history, lines: [line(6, 'TNE', 4_800_000)] }))).toEqual(['unit_price_above_usual']);
+      expect(rules(input({ supplier: undefined, orders: history, lines: [line(100, 'CT', 4_800_000)] }))).toEqual([]);
+    });
+
+    it('stays quiet within 10%, for another product, or with less than 2 earlier orders', () => {
+      expect(rules(input({ supplier: undefined, orders: history, lines: [line(6000, 'KGM', 4_700_000)] }))).toEqual([]);
+      expect(rules(input({ supplier: undefined, orders: history, lines: [line(6000, 'KGM', 4_800_000, '130232')] }))).toEqual([]);
+      expect(rules(input({ supplier: undefined, orders: history.slice(0, 1), lines: [line(6000, 'KGM', 9_000_000)] }))).toEqual([]);
+    });
+  });
 });
