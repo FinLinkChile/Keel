@@ -94,6 +94,23 @@ What each outcome means:
 
 Nothing on this screen pays or changes the order: the upload only gives ingest the documents that the engine later compares with the signed order and the carrier's attestation. The screen never shows what ingest read in the file.
 
+## Sign-up
+
+The first time, the app asks for the country (only Chile is available), the company (RUT, legal name, email and a Chilean mobile), and the person who represents it (name, RUT, and whether they are a politically exposed person), the data a Chilean bank asks to open a company account. RUTs are checked with their check digit. The form comes filled with the demo company, Pacífico Foods SpA, because the documents of the test orders carry its RUT.
+
+**The identity validation is simulated.** The last step lists what a bank asks (the ID card, front and back, and a selfie) and the person ticks that it was done; nothing is captured or checked. KYC is future work (`docs/flujo/alcance.md`). The details stay on the phone (`onboarding.json`) and are never sent to ingest or to a model. The company the person signed up replaces the example importer on screen. Logging out from the profile goes back to Connect and keeps the test wallet.
+
+## The app on a phone with Xcode, without Expo Go
+
+Expo Go cannot run the document scanner of the proforma, so the app is built as a native app. `ios/` is generated and ignored by git, so nothing heavy is committed:
+
+1. `npm install` at the repository root, and copy `app/.env.example` to `app/.env` (set `EXPO_PUBLIC_INGEST_URL`, `EXPO_PUBLIC_CHAIN_ID` and, for a test build, `EXPO_PUBLIC_WALLET_CHECK=1`).
+2. In `app/`: `npx expo prebuild --platform ios` and `cd ios && pod install` (CocoaPods).
+3. Open `app/ios/Keel.xcworkspace`, choose your team in Signing & Capabilities (a free Apple ID works) and your iPhone.
+4. Edit Scheme, Run, Build Configuration: **Release**, so the app carries its JavaScript and needs no Metro. Press Run. If Xcode says the bundle identifier is taken, change it (`ios.bundleIdentifier` in `app.json`) to one of your own.
+
+The proforma is scanned with the iPhone's document scanner (the one in Notes); the pages are joined into one PDF before they go to ingest.
+
 ## Tasks
 
 Tasks are described in [docs/trabajo/area-4-producto.md](../docs/trabajo/area-4-producto.md) (tasks T4.x). A task that exists in both modes keeps one number: its base text is Keel Personal and Keel Trade adds to it.

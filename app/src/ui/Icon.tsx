@@ -35,6 +35,21 @@ const ICONS = {
     </>
   ),
   activity: <Path d="M3 12h4l3-7 4 14 3-7h4" />,
+  camera: (
+    <>
+      <Path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+      <Circle cx={12} cy={13} r={3.5} />
+    </>
+  ),
+  send: <Path d="M4 12l16-8-6 16-3-7z" />,
+  info: (
+    <>
+      <Circle cx={12} cy={12} r={9} />
+      <Path d="M12 8v5M12 16v.5" />
+    </>
+  ),
+  upload: <Path d="M12 19V5M6 11l6-6 6 6" />,
+  chevronDown: <Path d="M6 9l6 6 6-6" />,
 } as const;
 
 export type IconName = keyof typeof ICONS;

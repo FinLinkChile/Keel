@@ -47,7 +47,7 @@ export function orderLine(order: Order, role: Role, counterparty: Party, now: nu
     case 'signed':
       if (order.blockedBy === 'supplier_check')
         return { status: 'Signed', yourTurn: false, detail: [{ text: `${who}, waits for the supplier check` }] };
-      return { status: 'Signed', yourTurn: false, detail: [{ text: `${who}, waits for the deposit` }] };
+      return { status: 'Signed', yourTurn: false, detail: [{ text: `${who}, signed by both, waiting to open` }] };
     case 'advance_paid':
       if (role === 'exporter')
         return { status: 'Ship', yourTurn: mine, detail: [{ text: `${who}, ship by ${deadline}` }] };
@@ -67,6 +67,10 @@ export function orderLine(order: Order, role: Role, counterparty: Party, now: nu
             detail: [{ text: 'No proof of shipment, ' }, { text: `${formatMinor(balance)} back to you`, money: true }],
           }
         : { status: 'Refunded', yourTurn: false, detail: [{ text: `No proof of shipment, balance back to ${who}` }] };
+    case 'rejected':
+      return role === 'importer'
+        ? { status: 'Rejected', yourTurn: false, detail: [{ text: `${who} did not sign, ${total}` }] }
+        : { status: 'Rejected', yourTurn: false, detail: [{ text: `You did not sign, ${total}` }] };
     case 'cancelled':
       return { status: 'Cancelled', yourTurn: false, detail: [{ text: `${who}, both agreed to cancel` }] };
   }

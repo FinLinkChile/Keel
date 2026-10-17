@@ -30,15 +30,23 @@ export default function Home() {
       contentContainerStyle={{ paddingTop: Math.max(56, insets.top + 12), paddingHorizontal: gutter, paddingBottom: 48, gap: 24 }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Avatar name={me.name} />
-        <View style={{ flex: 1 }}>
-          <Text size={18} weight={700}>
-            {me.name}
-          </Text>
-          <Text size={14} color="textMuted">
-            {role === 'importer' ? 'Importer' : 'Exporter'}, {account.title}
-          </Text>
-        </View>
+        {/* The company opens the profile: basic data and the way back to Connect */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Profile, ${me.name}`}
+          onPress={() => router.push('/profile')}
+          style={({ pressed }) => ({ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, opacity: pressed ? 0.7 : 1 })}
+        >
+          <Avatar name={me.name} />
+          <View style={{ flex: 1 }}>
+            <Text size={18} weight={700}>
+              {me.name}
+            </Text>
+            <Text size={14} color="textMuted">
+              {role === 'importer' ? 'Importer' : 'Exporter'}, {account.title}
+            </Text>
+          </View>
+        </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={items.length > 0 ? 'Activity, something needs you' : 'Activity'}
@@ -144,7 +152,7 @@ function NeedsYouSheet({ item }: { item: Item }) {
       </View>
       <View style={{ gap: 2 }}>
         <Text size={20} weight={800}>
-          {order.goods}, {order.quantity}
+          {[order.goods, order.quantity].filter(Boolean).join(', ')}
         </Text>
         <Text size={14} color="textMuted">
           {counterparty.name}, ship by {formatDay(order.po.shipmentDeadline)}
@@ -159,15 +167,11 @@ function NeedsYouSheet({ item }: { item: Item }) {
           color="textSoft"
           currencyColor="textFaint"
         />
-        {/* Review (04) comes later and opens Orders until then; Upload opens the order (10) */}
+        {/* Review and Upload both open the order: the review to sign (04, 10a), the upload (10) */}
         <Button
           label={signing ? 'Review' : 'Upload'}
           variant="go"
-          onPress={() =>
-            signing
-              ? router.navigate('/orders')
-              : router.push({ pathname: '/order/[orderId]', params: { orderId: order.po.orderId } })
-          }
+          onPress={() => router.push({ pathname: '/order/[orderId]', params: { orderId: order.po.orderId } })}
         />
       </View>
     </Sheet>

@@ -4,7 +4,7 @@ import { getAddress, keccak256, stringToBytes } from 'viem';
 
 import { centsToToken } from './amounts';
 import { orderIdOf } from './orderRules';
-import type { Account, KeelData, NeedsYou, Order, OrderStage, Party, PartyId, Role, Wallet } from './types';
+import type { Account, KeelData, NeedsYou, Order, OrderStage, Party, PartyId, Role, SupplierRecord, Wallet } from './types';
 
 // Test data for the screens and the single source of the demo data files (scripts/demo-data.ts).
 // Order ids, labels and party slugs match bot/examples so the app, the bot, ingest and the agent
@@ -28,7 +28,7 @@ const PARTIES: Party[] = [
 ];
 
 // Payout accounts signed in each order; never taken from a document
-const PAYOUT: Record<PartyId, Hex> = {
+const PAYOUTS: Record<PartyId, Hex> = {
   lingnan: addr('0x3E9dA4c7F1b2E8d06C5a9B3f7E1d4C8a2B6f8812'),
   kowloon: addr('0x1C7bE3a9D5f2B8c04E6a1D9f3B7c5E2a8D4f6630'),
   'pearl-delta': addr('0x7F2aC8e4B1d6F9a03C5e7B2d8F4a1C6e9B3d2A55'),
@@ -39,20 +39,24 @@ const USDC: Hex = addr('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48');
 // Test wallets stand in for the companies of the demo (importer: Pacífico, exporter: Lingnan),
 // so what they sign matches the orders on screen and in the data files.
 let bound: Partial<Record<PartyId, Hex>> = {};
+// The demo exporter is registered as a supplier with its own address as payout account
+let boundPayout: Partial<Record<PartyId, Hex>> = {};
 
-// The app: the connected wallet, for the role chosen at Connect
-export function bindWallet(role: Role, walletAddress: Hex | undefined) {
-  bound = walletAddress ? { [ACCOUNTS[role].party]: addr(walletAddress) } : {};
-}
-
-// The demo data script: both test wallets at once
-export function bindWallets(wallets: Partial<Record<Role, Hex>>) {
+// The app and the demo data script: the test wallets of the device, one per role. The importer is
+// a Safe: when `importerSafe` is given it is the importer's address (po.importer), and the
+// importer wallet is only a key that owns it.
+export function bindWallets(wallets: Partial<Record<Role, Hex>>, importerSafe?: Hex) {
   bound = {};
+  boundPayout = {};
   for (const role of ['importer', 'exporter'] as const) {
     const w = wallets[role];
     if (w) bound[ACCOUNTS[role].party] = addr(w);
   }
+  if (wallets.importer && importerSafe) bound[ACCOUNTS.importer.party] = addr(importerSafe);
+  if (wallets.exporter) boundPayout[ACCOUNTS.exporter.party] = addr(wallets.exporter);
 }
+
+const payoutOf = (party: PartyId): Hex => boundPayout[party] ?? PAYOUTS[party];
 
 const parties = (): Party[] => PARTIES.map((p) => (bound[p.id] ? { ...p, address: bound[p.id]! } : p));
 const address = (party: PartyId) => parties().find((p) => p.id === party)!.address;
@@ -108,7 +112,7 @@ function order(s: Seed): Order {
       orderId: orderIdOf(address('acme-imports'), address(s.exporter), BigInt(s.n)),
       importer: address('acme-imports'),
       exporter: address(s.exporter),
-      payoutAddress: PAYOUT[s.exporter],
+      payoutAddress: payoutOf(s.exporter),
       token: USDC,
       totalAmount: centsToToken(BigInt(s.totalMinor)),
       advanceBps: 5000,
@@ -167,6 +171,15 @@ const NEEDS_YOU: Record<Role, Pending[]> = {
   exporter: [{ kind: 'upload_documents', label: 'PO-0142' }],
 };
 
+// A supplier is verified once its payout account is registered and no supplier check is pending
+// for it: Kowloon's check is open (PO-0151 waits on it), so it cannot receive a new order yet.
+const verifiedSuppliers = (): SupplierRecord[] => {
+  const pending = new Set(NEEDS_YOU.importer.flatMap((n) => (n.kind === 'verify_supplier' ? [n.party] : [])));
+  return parties()
+    .filter((p) => PAYOUTS[p.id] && !pending.has(p.id))
+    .map((party) => ({ party, payoutAddress: payoutOf(party.id) }));
+};
+
 const idOf = (label: string) => ORDERS().find((o) => o.label === label)!.po.orderId;
 
 export const mockData: KeelData = {
@@ -178,4 +191,11 @@ export const mockData: KeelData = {
   order: async (orderId) => ORDERS().find((o) => o.po.orderId === orderId),
   needsYou: async (role) =>
     NEEDS_YOU[role].map((n): NeedsYou => (n.kind === 'verify_supplier' ? n : { kind: n.kind, orderId: idOf(n.label) })),
+  verifiedSuppliers: async () => verifiedSuppliers(),
+  tradeRegistry: async () => ({
+    token: USDC,
+    carrier: parties().find((p) => p.id === 'harbor-line')!,
+    arbiter: parties().find((p) => p.id === 'hk-arbitration')!,
+    documentVerifier: parties().find((p) => p.id === 'keel-verifier')!,
+  }),
 };
