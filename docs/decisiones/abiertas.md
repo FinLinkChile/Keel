@@ -4,14 +4,14 @@ title: "Decisiones abiertas"
 description: "Las 14 preguntas que el equipo todavía no cierra. Si un componente toca alguna, se decide con el equipo antes de escribir código."
 tags: [decisiones-abiertas, pendiente]
 modo: ambos
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T01:40:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T18:00:00Z }
 ---
 
 No resolver ninguna por cuenta propia. Cuando el equipo cierra una, se actualiza primero el concepto afectado, luego esta tabla y después el código. Los números son estables: el código y los README los citan.
 
 | # | Pregunta | Quién decide | Concepto afectado |
 | --- | --- | --- | --- |
-| 1 | ¿Qué red cerrada se usa (por ejemplo FISCO BCOS) y qué token de pago existe en ella? De esto depende si Safe, Zodiac Roles y Delay se pueden desplegar ahí tal como están | Equipo y Contratos, miércoles 14 | [Sistema de pago](../pagos/sistema-de-pago.md), [stack](../arquitectura/stack.md) |
+| 1 | ¿Qué red cerrada se usa (por ejemplo FISCO BCOS) y qué token de pago existe en ella? De esto depende si Safe, Zodiac Roles y Delay se pueden desplegar ahí tal como están. Para la arquitectura en AWS la red es solo una URL de RPC ([stack](../arquitectura/stack.md)), así que basta con que la red elegida ofrezca un endpoint RPC compatible con viem | Área 1 (Adrean), pronto: sin la red no se pueden hacer las pruebas sobre la arquitectura en AWS | [Sistema de pago](../pagos/sistema-de-pago.md), [stack](../arquitectura/stack.md) |
 | 2 | **Decidida el 14 de octubre (Área 1, Adrean).** Sí: `fund` recibe el total y paga el anticipo en la misma transacción, sin estado Depositado. Elimina la carrera entre liberar el anticipo y una cancelación ya firmada. | Contratos | [Paso 3](../flujo/paso-3-anticipo.md) |
 | 3 | **Decidida el 14 de octubre por las Áreas 1 y 2.** El `DocumentDecision` es obligatorio, con dos salidas: el importador puede aprobar el saldo a mano (`BalanceApproval`, función `approveBalance`, en cualquier momento) y con una atestación registrada no hay reembolso automático. `releaseBalance` con el `DocumentDecision` se puede llamar solo después de la ventana de disputa. Lo firma el `documentVerifier` fijado en cada orden, que no es ninguna de las partes ni la naviera. Detalle en el [paso 5](../flujo/paso-5-saldo.md). | Motor y Contratos | [Paso 5](../flujo/paso-5-saldo.md), [PDR](../interfaces/pdr.md) |
 | 4 | **[PROPUESTA] Decidida por el Área 1 (Adrean) el 14 de octubre, falta que el equipo la confirme.** `disputeWindow` lo fija cada orden, sin valor por defecto en el contrato; la app sugiere 3 días y la demo usa 2 minutos. | Equipo | [Paso 5](../flujo/paso-5-saldo.md) |
