@@ -60,7 +60,7 @@ export default function Signature() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView contentContainerStyle={{ padding: gutter, gap: 24, paddingBottom: 64 }}>
+      <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentContainerStyle={{ padding: gutter, gap: 24, paddingBottom: 64 }}>
         <Text size={28} weight={800}>
           Wallet check
         </Text>
@@ -110,7 +110,19 @@ export default function Signature() {
             autoCapitalize="none"
             autoCorrect={false}
             secureTextEntry
-            style={{ color: colors.text, fontFamily: 'monospace', fontSize: 14, paddingVertical: 8 }}
+            style={{
+              alignSelf: 'stretch',
+              minHeight: 48,
+              marginVertical: 8,
+              paddingHorizontal: 14,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: colors.dividerOnSurface,
+              backgroundColor: colors.surface,
+              color: colors.text,
+              fontFamily: 'monospace',
+              fontSize: 14,
+            }}
           />
           <Button
             label="Import test key"
