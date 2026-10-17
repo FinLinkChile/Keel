@@ -8,7 +8,9 @@ import {
   checkOrder,
   orderDifferences,
   recoverPurchaseOrderSigner,
+  recoverSafeOwner,
   signPurchaseOrder,
+  signPurchaseOrderAsSafeOwner,
   type OrderCheck,
   type SigningSetup,
 } from './signOrder';
@@ -62,13 +64,15 @@ export type Review = { checks: OrderCheck[]; differences: string[] };
 
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
+// `owner` is the key of this phone that owns the importer's Safe. po.importer must be that Safe.
 export async function reviewForImporter(
   proposal: Proposal,
-  ctx: { importer: Hex | undefined; setup: SigningSetup | undefined; now: number },
+  ctx: { owner: Hex | undefined; setup: SigningSetup | undefined; now: number },
 ): Promise<Review> {
   const checks = checkOrder(proposal, proposal.proposed, { now: ctx.now, escrow: ctx.setup?.escrow });
   const differences = orderDifferences(proposal, proposal.proposed);
-  if (!ctx.importer || !same(proposal.po.importer, ctx.importer)) checks.push('wrong_importer');
+  // Without the Safe configured the order cannot be checked against it, and signing is off anyway
+  if (!ctx.owner || (ctx.setup?.safe && !same(proposal.po.importer, ctx.setup.safe))) checks.push('wrong_importer');
   if (proposal.status === 'awaiting_importer' || proposal.status === 'signed') {
     // Without the escrow the signature cannot be recovered, and signing is off anyway
     const recovered =
@@ -88,12 +92,16 @@ export async function importerSigns(
   ctx: { signer: Signer; setup: SigningSetup; now: number },
 ): Promise<Move> {
   if (proposal.status !== 'awaiting_importer') return { ok: false, checks: ['not_waiting_for_you'], differences: [] };
-  const review = await reviewForImporter(proposal, { importer: await ctx.signer.address(), setup: ctx.setup, now: ctx.now });
+  const owner = await ctx.signer.address();
+  const safe = ctx.setup.safe;
+  if (!safe) return { ok: false, checks: ['wrong_importer'], differences: [] };
+  const review = await reviewForImporter(proposal, { owner, setup: ctx.setup, now: ctx.now });
   if (review.checks.length > 0) return { ok: false, ...review };
 
-  const signature = await signPurchaseOrder(ctx.signer, ctx.setup, proposal.po);
-  const signedBy = await recoverPurchaseOrderSigner(ctx.setup, proposal.po, signature);
-  if (!signedBy || !same(signedBy, proposal.po.importer)) return { ok: false, checks: ['wrong_importer'], differences: [] };
+  const signature = await signPurchaseOrderAsSafeOwner(ctx.signer, ctx.setup, safe, proposal.po);
+  // The key of this phone must be the one that signed; the Safe then accepts it if it is an owner
+  const signedBy = await recoverSafeOwner(ctx.setup, safe, proposal.po, signature);
+  if (!signedBy || !same(signedBy, owner)) return { ok: false, checks: ['wrong_importer'], differences: [] };
   const signed: Proposal = { ...proposal, status: 'signed', importerSignature: signature, signedAt: Math.floor(ctx.now) };
   await store.save(signed);
   return { ok: true, proposal: signed };

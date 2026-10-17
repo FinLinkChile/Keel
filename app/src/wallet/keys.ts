@@ -1,4 +1,6 @@
 import type { Hex } from '@keel/schemas';
+import { isHex } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
 
 import type { Role } from '../data/types';
 
@@ -62,4 +64,18 @@ export async function ensureKeys(store: KeyStore, make: () => Hex = newPrivateKe
 // Development only: forgets both keys
 export async function removeKeys(store: KeyStore): Promise<void> {
   for (const name of [...Object.values(SLOT), LEGACY]) await store.remove(name);
+}
+
+// Development only: puts a key made elsewhere (the demo keys, one of them owner of the importer's
+// Safe) in the slot of a role, replacing the one there. Throws when the text is not a private key.
+export async function importKey(store: KeyStore, role: Role, text: string): Promise<void> {
+  const key = text.trim();
+  const prefixed = (key.startsWith('0x') ? key : `0x${key}`) as Hex;
+  if (!isHex(prefixed, { strict: true }) || prefixed.length !== 66) throw new Error('Not a private key');
+  try {
+    privateKeyToAccount(prefixed);
+  } catch {
+    throw new Error('Not a private key');
+  }
+  await store.write(SLOT[role], prefixed);
 }

@@ -4,7 +4,7 @@ import type { Hex } from '@keel/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { KeyStore } from './keyStore.types';
-import { ensureKeys, loadKeys, migrateLegacyKey, removeKeys } from './keys';
+import { ensureKeys, importKey, loadKeys, migrateLegacyKey, removeKeys } from './keys';
 import { localSigner, newPrivateKey } from './localSigner';
 
 vi.mock('expo-crypto', () => ({ getRandomValues: (a: Uint8Array<ArrayBuffer>) => globalThis.crypto.getRandomValues(a) }));
@@ -82,5 +82,23 @@ describe('the two slots', () => {
     const { store, data } = memory({ privateKey: KEY_A, 'privateKey.importer': KEY_B });
     await removeKeys(store);
     expect(data.size).toBe(0);
+  });
+});
+
+describe('importing a demo key (development)', () => {
+  it('puts the key in the slot of the role, with or without 0x, and replaces the one there', async () => {
+    const { store, data } = memory({ 'privateKey.importer': KEY_A });
+    await importKey(store, 'importer', `  ${KEY_B.slice(2)}
+`);
+    expect(data.get('privateKey.importer')).toBe(KEY_B);
+    expect(await loadKeys(store)).toEqual({ importer: KEY_B });
+  });
+
+  it('refuses text that is not a private key and keeps what was there', async () => {
+    const { store, data } = memory({ 'privateKey.exporter': KEY_A });
+    for (const bad of ['', 'hello', '0x1234', `0x${'0'.repeat(64)}`, `${KEY_B}00`]) {
+      await expect(importKey(store, 'exporter', bad)).rejects.toThrow('Not a private key');
+    }
+    expect(data.get('privateKey.exporter')).toBe(KEY_A);
   });
 });

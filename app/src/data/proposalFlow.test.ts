@@ -7,12 +7,14 @@ import { localSigner, newPrivateKey } from '../wallet/localSigner';
 import { buildOrder } from './newOrder';
 import { exporterRejects, exporterSigns, importerRejects, importerSigns, reviewForImporter } from './proposalFlow';
 import { memoryProposalStore, newProposal } from './proposals';
-import { recoverPurchaseOrderSigner, signPurchaseOrder } from './signOrder';
+import { recoverPurchaseOrderSigner, recoverSafeOwner, signPurchaseOrder } from './signOrder';
 
 vi.mock('expo-crypto', () => ({ getRandomValues: (a: Uint8Array<ArrayBuffer>) => globalThis.crypto.getRandomValues(a) }));
 
 const a = (n: number) => `0x${n.toString(16).padStart(40, '0')}` as const;
-const SETUP = { chainId: 31337, escrow: a(0xe5c0) };
+// The importer of every order is its Safe; the importer key only owns it
+const SAFE = a(0x5afe);
+const SETUP = { chainId: 31337, escrow: a(0xe5c0), safe: SAFE };
 const NOW = 1_792_000_000;
 const PAYOUT = a(0x33);
 
@@ -22,7 +24,7 @@ const exporterSigner = localSigner(newPrivateKey());
 async function proposal() {
   const built = buildOrder(
     {
-      importer: await importerSigner.address(),
+      importer: SAFE,
       supplier: { exporter: await exporterSigner.address(), payoutAddress: PAYOUT },
       orderNumber: 'PO0158',
       currency: 'USD',
@@ -115,13 +117,16 @@ async function signedByExporter() {
 const importerCtx = { signer: importerSigner, setup: SETUP, now: NOW + 60 };
 
 describe('the importer signs last', () => {
-  it('stores a second signature that recovers to the importer, next to the exporter one', async () => {
+  it('stores a Safe signature that recovers to the owner key, next to the exporter one', async () => {
     const { store, p } = await signedByExporter();
     const move = await importerSigns(store, p, importerCtx);
     if (!move.ok) throw new Error(move.checks.join());
     expect(move.proposal.status).toBe('signed');
     expect(move.proposal.signedAt).toBe(NOW + 60);
-    expect(await recoverPurchaseOrderSigner(SETUP, p.po, move.proposal.importerSignature!)).toBe(p.po.importer);
+    expect(await recoverSafeOwner(SETUP, SAFE, p.po, move.proposal.importerSignature!)).toBe(await importerSigner.address());
+    // Not a plain signature of the order: the escrow would never see the Safe in it
+    expect(await recoverPurchaseOrderSigner(SETUP, p.po, move.proposal.importerSignature!)).not.toBe(await importerSigner.address());
+    expect(p.po.importer).toBe(SAFE);
     expect(await recoverPurchaseOrderSigner(SETUP, p.po, move.proposal.exporterSignature!)).toBe(p.po.exporter);
     expect(await store.get(p.orderId)).toEqual(move.proposal);
   });
@@ -164,9 +169,15 @@ describe('the importer signs last', () => {
     expect(!move.ok && move.checks).toContain('bad_exporter_signature');
   });
 
-  it('does not sign with another wallet than the importer of the order, or twice', async () => {
+  it('does not sign for an importer that is not the Safe, without the Safe set up, or twice', async () => {
     const { store, p } = await signedByExporter();
-    expect(await importerSigns(store, p, { ...importerCtx, signer: localSigner(newPrivateKey()) })).toMatchObject({ ok: false, checks: ['wrong_importer'] });
+    // Whether the key owns the Safe is up to the Safe at open; the app checks the Safe is the importer
+    const other = { ...SETUP, safe: a(0xbad) };
+    expect(await importerSigns(store, p, { ...importerCtx, setup: other })).toMatchObject({ ok: false, checks: ['wrong_importer'] });
+    expect(await importerSigns(store, p, { ...importerCtx, setup: { chainId: SETUP.chainId, escrow: SETUP.escrow } })).toMatchObject({
+      ok: false,
+      checks: ['wrong_importer'],
+    });
     expect(await importerSigns(store, { ...p, status: 'signed' }, importerCtx)).toMatchObject({ ok: false, checks: ['not_waiting_for_you'] });
     expect(await importerSigns(store, { ...p, status: 'awaiting_exporter' }, importerCtx)).toMatchObject({ ok: false, checks: ['not_waiting_for_you'] });
     expect(await importerSigns(store, { ...p, status: 'rejected' }, importerCtx)).toMatchObject({ ok: false, checks: ['not_waiting_for_you'] });
@@ -174,9 +185,9 @@ describe('the importer signs last', () => {
 
   it('reviews an order without the escrow but cannot check the supplier signature', async () => {
     const { p } = await signedByExporter();
-    const review = await reviewForImporter(p, { importer: p.po.importer, setup: undefined, now: NOW });
+    const review = await reviewForImporter(p, { owner: await importerSigner.address(), setup: undefined, now: NOW });
     expect(review).toEqual({ checks: [], differences: [] });
-    expect((await reviewForImporter({ ...p, exporterSignature: undefined }, { importer: p.po.importer, setup: undefined, now: NOW })).checks).toEqual([
+    expect((await reviewForImporter({ ...p, exporterSignature: undefined }, { owner: await importerSigner.address(), setup: undefined, now: NOW })).checks).toEqual([
       'bad_exporter_signature',
     ]);
   });

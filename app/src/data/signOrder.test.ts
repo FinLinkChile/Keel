@@ -1,5 +1,6 @@
 // Runs in Node (vitest), not in the app
 
+import { concat, encodeAbiParameters, keccak256, recoverAddress, stringToBytes } from 'viem';
 import { describe, expect, it, vi } from 'vitest';
 
 import { localSigner, newPrivateKey } from '../wallet/localSigner';
@@ -14,9 +15,12 @@ import {
   incotermText,
   orderDifferences,
   payoutHistory,
+  purchaseOrderDigest,
   recoverPurchaseOrderSigner,
+  recoverSafeOwner,
   signingSetup,
   signPurchaseOrder,
+  signPurchaseOrderAsSafeOwner,
 } from './signOrder';
 
 vi.mock('expo-crypto', () => ({ getRandomValues: (a: Uint8Array<ArrayBuffer>) => globalThis.crypto.getRandomValues(a) }));
@@ -170,5 +174,73 @@ describe('what the importer compares', () => {
     expect(payoutHistory([other(o.po.payoutAddress), other(o.po.payoutAddress, a(0x2)), other(a(0x98), a(0x3))], o.po)).toEqual({ same: 2, different: 1 });
     // The order itself and orders with another supplier do not count
     expect(payoutHistory([{ po: o.po }, { po: { ...other(a(0x98)).po, exporter: a(0x77) } }], o.po)).toEqual({ same: 0, different: 0 });
+  });
+});
+
+describe('the importer signature through the Safe (ERC-1271)', () => {
+  const SAFE = a(0x5afe);
+  const setup = { ...SETUP, safe: SAFE };
+
+  async function order() {
+    const built = buildOrder(
+      {
+        importer: SAFE,
+        supplier: { exporter: await exporterSigner.address(), payoutAddress: a(0x33) },
+        orderNumber: 'PO0158',
+        currency: 'USD',
+        amountMinor: 4_800_000,
+        incoterm: 'CIF',
+        hsCodes: ['130231'],
+        shipmentDeadline: NOW + 40 * 86_400,
+        advanceBps: 5000,
+        documentHash: `0x${'ab'.repeat(32)}`,
+      },
+      { token: a(0x44), carrier: a(0x55), arbiter: a(0x66), documentVerifier: a(0x77) },
+      { now: NOW, nonce: 158n },
+    );
+    if (built.kind !== 'ready') throw new Error('not ready');
+    return built.po;
+  }
+
+  // What the Safe's CompatibilityFallbackHandler.isValidSignature(digest, signature) hashes, by hand:
+  // keccak256(0x1901 || domainSeparator || keccak256(abi.encode(SAFE_MSG_TYPEHASH, keccak256(abi.encode(digest)))))
+  function safeMessageHash(digest: `0x${string}`) {
+    const domainSeparator = keccak256(
+      encodeAbiParameters(
+        [{ type: 'bytes32' }, { type: 'uint256' }, { type: 'address' }],
+        [keccak256(stringToBytes('EIP712Domain(uint256 chainId,address verifyingContract)')), BigInt(setup.chainId), SAFE],
+      ),
+    );
+    const msgHash = keccak256(
+      encodeAbiParameters(
+        [{ type: 'bytes32' }, { type: 'bytes32' }],
+        [keccak256(stringToBytes('SafeMessage(bytes message)')), keccak256(encodeAbiParameters([{ type: 'bytes32' }], [digest]))],
+      ),
+    );
+    return keccak256(concat(['0x1901', domainSeparator, msgHash]));
+  }
+
+  it('signs the SafeMessage hash of the order digest, which recovers to the owner key', async () => {
+    const po = await order();
+    const signature = await signPurchaseOrderAsSafeOwner(importerSigner, setup, SAFE, po);
+    const hash = safeMessageHash(purchaseOrderDigest(setup, po));
+    expect(await recoverAddress({ hash, signature })).toBe(await importerSigner.address());
+    expect(await recoverSafeOwner(setup, SAFE, po, signature)).toBe(await importerSigner.address());
+  });
+
+  it('is bound to the Safe, the chain, the escrow and the order', async () => {
+    const po = await order();
+    const signature = await signPurchaseOrderAsSafeOwner(importerSigner, setup, SAFE, po);
+    const owner = await importerSigner.address();
+    expect(await recoverSafeOwner(setup, a(0xbad), po, signature)).not.toBe(owner);
+    expect(await recoverSafeOwner({ ...setup, chainId: 1 }, SAFE, po, signature)).not.toBe(owner);
+    expect(await recoverSafeOwner({ ...setup, escrow: a(0xbad) }, SAFE, po, signature)).not.toBe(owner);
+    expect(await recoverSafeOwner(setup, SAFE, { ...po, totalAmount: po.totalAmount + 1n }, signature)).not.toBe(owner);
+    expect(await recoverSafeOwner(setup, SAFE, po, '0x1234')).toBeUndefined();
+  });
+
+  it('puts the Safe in the setup only when it is configured', () => {
+    expect(signingSetup({ chainId: 1, escrowAddress: ESCROW, importerSafe: SAFE })).toEqual({ chainId: 1, escrow: ESCROW, safe: SAFE });
+    expect(signingSetup({ chainId: 1, escrowAddress: ESCROW })).toEqual({ chainId: 1, escrow: ESCROW });
   });
 });
