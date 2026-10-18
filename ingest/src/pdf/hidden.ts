@@ -49,12 +49,17 @@ export interface VisibilitySplit {
   hidden: { run: TextRun; reason: HiddenReason }[];
 }
 
+// A hidden run without a letter or a digit is dropped, not reported: it cannot carry an
+// instruction, an amount or a destination, and real forms draw boxes and rules that way
+// (the "○○○○" guides of the SHUBIL form are in a 2 pt font).
+const CARRIES_TEXT = /[\p{L}\p{N}]/u;
+
 export function splitByVisibility(runs: TextRun[]): VisibilitySplit {
   const split: VisibilitySplit = { visible: [], hidden: [] };
   for (const run of runs) {
     const reason = hiddenReason(run);
     if (reason === null) split.visible.push(run);
-    else if (run.text.trim().length > 0) split.hidden.push({ run, reason });
+    else if (CARRIES_TEXT.test(run.text)) split.hidden.push({ run, reason });
   }
   return split;
 }

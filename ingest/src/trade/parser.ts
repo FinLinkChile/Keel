@@ -2,8 +2,10 @@
 // Reads only visible text for the extracted fields. Any missing or ambiguous field throws
 // TradeParseError: the document is held, never guessed.
 // Bills of lading have no standard format across carriers. This parser reads documents that
-// print each field after its label ("B/L No.:", "Port of Loading:"), which covers the formats
-// of the corpus (redteam/corpus/trade), not any carrier: that limit is declared.
+// print each field next to its label ("B/L No.:", "Port of Loading:") or under it in the same
+// box, as the carrier forms of CSAV and Hapag-Lloyd do, and skips the pages of terms and
+// conditions. It covers those forms and the corpus (redteam/corpus/trade), not any carrier:
+// that limit is declared.
 import {
   CommercialInvoiceExtraction,
   CURRENCIES,
@@ -15,7 +17,8 @@ import {
 import { foldHomoglyphs, NormalizationError, normalizeRut } from "../normalize";
 import { findPaymentDestinations, mentionsAccountChange, type PaymentDestination } from "../parser";
 import { splitByVisibility, type HiddenReason } from "../pdf/hidden";
-import { PdfReadError, readTextRuns, toLines, type TextRun } from "../pdf/text";
+import { withoutTermsPages } from "../pdf/pages";
+import { lineText, type LayoutLine, PdfReadError, readTextRuns, toLayoutLines, toLines, type TextRun } from "../pdf/text";
 import {
   amountToMinor,
   findDate,
@@ -51,8 +54,11 @@ export class TradeParseError extends Error {
 }
 
 export interface TradeText {
-  // Visible lines after homoglyph folding, uppercase and without accents
+  // Visible lines of the form pages (terms pages skipped) after homoglyph folding, uppercase
+  // and without accents
   visible: string[];
+  // The same lines with the position of each run, to read a value under its label
+  layout: LayoutLine[];
   // Visible and hidden lines after folding, original case: destinations are searched here
   all: string[];
   hiddenReasons: HiddenReason[];
@@ -81,17 +87,23 @@ export async function readTradeText(pdf: Uint8Array): Promise<TradeText> {
   }
   const { visible, hidden } = splitByVisibility(runs);
   let homoglyphs = false;
-  const fold = (lines: string[]) =>
-    lines.map((l) => {
-      const r = foldHomoglyphs(l);
-      homoglyphs ||= r.suspicious;
-      return r.text;
-    });
+  const foldOne = (l: string) => {
+    const r = foldHomoglyphs(l);
+    homoglyphs ||= r.suspicious;
+    return r.text;
+  };
+  const fold = (lines: string[]) => lines.map(foldOne);
+  // Every page, terms included, for the destinations and the account change wording
   const visibleLines = fold(toLines(visible));
   const hiddenLines = fold(toLines(hidden.map((h) => h.run)));
   if (visibleLines.join("").trim() === "") throw new TradeParseError("no_text");
+  const layout = toLayoutLines(withoutTermsPages(visible))
+    .map((line) => ({ ...line, cells: line.cells.map((c) => ({ ...c, text: canon(foldOne(c.text)).trim() })) }))
+    .map((line) => ({ ...line, cells: line.cells.filter((c) => c.text.length > 0) }))
+    .filter((line) => line.cells.length > 0);
   return {
-    visible: visibleLines.map(canon),
+    visible: layout.map(lineText),
+    layout,
     all: [...visibleLines, ...hiddenLines],
     hiddenReasons: [...new Set(hidden.map((h) => h.reason))],
     homoglyphs,
@@ -116,16 +128,72 @@ export function detectDocType(visible: string[]): RequiredDocType | undefined {
 }
 
 // Labels that can follow a value on the same line when two boxes are side by side.
-const NEXT_LABEL =
-  /\s+(?:PORT|PLACE|AIRPORT|VESSEL|VOYAGE|FLIGHT|B\/L|BILL|AWB|SHIPPED|LADEN|ON\s+BOARD|DATE|INVOICE|ORDER|P\.?O\.?|TERMS|INCOTERMS?|HS|CURRENCY|TOTAL|CONSIGNEE|SHIPPER|NOTIFY)\b.*$/;
+const LABEL_WORDS = String.raw`(?:PORT|PLACE|AIRPORT|VESSEL|VOYAGE|FLIGHT|B\/L|BILL|AWB|SHIPPED|LADEN|ON\s+BOARD|DATE|INVOICE|ORDER|P\.?O\.?|TERMS|INCOTERMS?|HS|CURRENCY|TOTAL|CONSIGNEE|SHIPPER|NOTIFY)\b`;
+const NEXT_LABEL = new RegExp(String.raw`\s+${LABEL_WORDS}.*$`);
+// A run that is itself a label: it ends in a colon ("PAGE:") or in "No." ("REFERENCE NO."), or
+// opens with a label word
+const LABEL_CELL = new RegExp(String.raw`(?::\s*$)|(?:\b(?:NO\.?|NUMBER|#)\s*$)|^${LABEL_WORDS}`);
 
-// The text after `label` on each line where it appears, cut at the next label.
-function after(visible: string[], label: RegExp): string[] {
-  return visible.flatMap((line) => {
-    const m = label.exec(line);
-    if (!m) return [];
-    return [line.slice(m.index + m[0].length).replace(/^\s*[:#]?\s*/, "").replace(NEXT_LABEL, "").trim()];
+// A gap wider than this, in glyph heights, separates two boxes of a form on the same line
+const BOX_GAP = 3;
+// How far under a label its value may sit, in glyph heights of the label line
+const BELOW_REACH = 2.6;
+
+// The value printed for `label`, once per place the label appears. A label counts where it
+// opens a run (after an optional box number like "(9)") or is followed by a colon; anywhere
+// else it is a word of a sentence ("from the port of loading, whichever..."). The value is the
+// text after the label in its box, cut at the next label, or when the box holds nothing more,
+// the first line under the label inside the same box. An empty string when neither has text.
+function fieldValues(layout: LayoutLine[], label: RegExp): string[] {
+  const opener = new RegExp(String.raw`^(?:\(?\d{1,2}[.)]?\s*)?(?:${label.source})(?!\s*,)`);
+  const labelled = new RegExp(String.raw`(?:${label.source})(?=\s*[:#])`);
+  const values: string[] = [];
+  layout.forEach((line, i) => {
+    line.cells.forEach((cell, j) => {
+      const m = opener.exec(cell.text) ?? labelled.exec(cell.text);
+      if (!m) return;
+      // The box ends at the next label on the line or at a wide gap
+      const right = line.cells.slice(j + 1);
+      const nextLabel = right.find((c) => LABEL_CELL.test(c.text));
+      const boxEnd = nextLabel?.x ?? Infinity;
+      const inBox = (cells: typeof line.cells, from: number) => {
+        const taken: typeof cells = [];
+        let end = from;
+        for (const c of cells) {
+          if (c.x >= boxEnd || c.x - end > BOX_GAP * line.size) break;
+          taken.push(c);
+          end = c.x1;
+        }
+        return taken;
+      };
+      const rest = cell.text.slice(m.index + m[0].length).replace(/^\s*[:#]?\s*/, "");
+      const inline = [rest, ...inBox(right, cell.x1).map((c) => c.text)]
+        .join(" ")
+        .replace(NEXT_LABEL, "")
+        .trim();
+      if (inline !== "") {
+        values.push(inline);
+        return;
+      }
+      const inColumn = (c: { x: number }) => c.x >= cell.x - line.size && c.x < boxEnd;
+      const under = layout
+        .slice(i + 1)
+        .find((l) => l.page === line.page && line.y - l.y <= BELOW_REACH * line.size && l.cells.some(inColumn));
+      const first = under?.cells.filter(inColumn) ?? [];
+      if (first.length === 0 || LABEL_CELL.test(first[0]!.text)) {
+        values.push("");
+        return;
+      }
+      values.push(
+        [first[0]!, ...inBox(first.slice(1), first[0]!.x1)]
+          .map((c) => c.text)
+          .join(" ")
+          .replace(NEXT_LABEL, "")
+          .trim(),
+      );
+    });
   });
+  return values;
 }
 
 function single<T>(values: T[], field: TradeParsedField): T {
@@ -146,15 +214,21 @@ function normalized<T>(field: TradeParsedField, fn: () => T): T {
 }
 
 const DOC_NUMBER = String.raw`([A-Z0-9][A-Z0-9 \-/.]{4,28}[A-Z0-9])`;
-const TRANSPORT_LABELS: Record<TransportDocType, { number: RegExp; date: RegExp; from: RegExp; to: RegExp }> = {
+const TRANSPORT_LABELS: Record<
+  TransportDocType,
+  { number: RegExp; numberValue: RegExp; date: RegExp; from: RegExp; to: RegExp }
+> = {
   BILL_OF_LADING: {
-    number: new RegExp(String.raw`\b(?:B\/L|BILL\s+OF\s+LADING)\s*(?:NO\.?|NUMBER|#)\s*:?\s*${DOC_NUMBER}`),
+    // "B/L No.", "B/L-No." (CSAV, Hapag-Lloyd), "Bill of Lading Number"
+    number: /\b(?:B\/L|BILL\s+OF\s+LADING)[\s-]*(?:NO\.?|NUMBER|#)/,
+    numberValue: new RegExp(String.raw`^${DOC_NUMBER}`),
     date: /\b(?:SHIPPED|LADEN)?\s*ON\s+BOARD(?:\s+DATE)?\b/,
     from: /\bPORT\s+OF\s+LOADING\b/,
     to: /\bPORT\s+OF\s+DISCHARGE\b/,
   },
   AIR_WAYBILL: {
-    number: /\b(?:AWB|AIR\s*WAYBILL)\s*(?:NO\.?|NUMBER|#)\s*:?\s*(\d{3}[\s-]?\d{4}\s?\d{4})\b/,
+    number: /\b(?:AWB|AIR\s*WAYBILL)[\s-]*(?:NO\.?|NUMBER|#)/,
+    numberValue: /^(\d{3}[\s-]?\d{4}\s?\d{4})\b/,
     date: /\b(?:FLIGHT\s+DATE|DATE\s+OF\s+FLIGHT|EXECUTED\s+ON)\b/,
     from: /\bAIRPORT\s+OF\s+DEPARTURE\b/,
     to: /\bAIRPORT\s+OF\s+DESTINATION\b/,
@@ -170,21 +244,21 @@ export function parseTransportText(text: TradeText): ParsedTransportDocument {
   const labels = TRANSPORT_LABELS[docType];
 
   const number = single(
-    text.visible.flatMap((l) => {
-      const m = labels.number.exec(l);
-      return m ? [normalized("document_number", () => normalizeDocumentNumber(m[1]!.replace(NEXT_LABEL, "")))] : [];
+    fieldValues(text.layout, labels.number).flatMap((v) => {
+      const m = labels.numberValue.exec(v);
+      return m ? [normalized("document_number", () => normalizeDocumentNumber(m[1]!))] : [];
     }),
     "document_number",
   );
   const date = single(
-    after(text.visible, labels.date).flatMap((v) => {
+    fieldValues(text.layout, labels.date).flatMap((v) => {
       const d = normalized("on_board_date", () => findDate(v));
       return d === undefined ? [] : [d];
     }),
     "on_board_date",
   );
   const place = (label: RegExp, field: "port_of_loading" | "port_of_discharge") => {
-    const values = after(text.visible, label);
+    const values = fieldValues(text.layout, label);
     if (values.length === 0) throw new TradeParseError("missing_field", field);
     return single(
       values.map((v) => resolvePlace(v) ?? "?"),
