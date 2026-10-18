@@ -9,10 +9,8 @@ import { proposals, useData, type SupplierRecord } from '@/data';
 import { buildOrder, REQUIRED_DOCS, type BuiltOrder, type FormField } from '@/data/newOrder';
 import { newProposal } from '@/data/proposals';
 import { apiProblem } from '@/data/apiProblem';
-import { agentNotes, type AgentNote } from '@/data/agentNotes';
 import {
   advanceBpsOf,
-  advanceFrom,
   advanceSplit,
   FIELD_WORDS,
   knownLine,
@@ -20,13 +18,14 @@ import {
   nextOrderNumber,
   NOT_ON_PROFORMA,
   parseAmount,
-  parseDay,
   PROBLEM_WORDS,
   proformaNotice,
   screenFormFrom,
   shipByLine,
   termsReadLine,
   toOrderForm,
+  WARNING_ACCOUNT_CHANGE,
+  WARNING_HIDDEN_TEXT,
   type AdvanceChoice,
   type ScreenForm,
 } from '@/data/newOrderForm';
@@ -34,7 +33,6 @@ import { pickProforma, type ProformaSource } from '@/files/pickProforma';
 import { useT } from '@/i18n';
 import { readProforma, type ProformaReading, type ProformaResult } from '@/ingest/proforma';
 import { useSession } from '@/session';
-import { AgentNotes } from '@/ui/AgentNotes';
 import { Avatar } from '@/ui/Avatar';
 import { BottomSheet, SheetOption } from '@/ui/BottomSheet';
 import { Button } from '@/ui/Button';
@@ -89,20 +87,6 @@ function NewOrderScreen() {
   const form = stored ?? (data ? screenFormFrom(undefined, data.nextNumber) : undefined);
   const patch = (changes: Partial<ScreenForm>) => form && setForm({ ...form, ...changes });
   const supplier = data?.suppliers.find((s) => s.party.id === form?.supplierId);
-  const reading = proforma?.reading;
-  const notes =
-    data && form
-      ? agentNotes({
-          supplier: supplier && { name: supplier.party.name, address: supplier.party.address },
-          totalCents: parseAmount(form.amountText),
-          advanceBps: advanceBpsOf(form),
-          shipmentDeadline: parseDay(form.dayText),
-          incoterm: form.incoterm,
-          orders: data.orders,
-          warnings: reading && { accountChange: reading.mentionsAccountChange, hiddenText: reading.hiddenTextDetected },
-          now: Date.now() / 1000,
-        })
-      : [];
 
   async function start(source: ProformaSource) {
     if (!signer || !data || !form) return;
@@ -174,10 +158,12 @@ function NewOrderScreen() {
     // Kept on this phone until the supplier signs, or sent to the Keel API when it is configured
     const asked = proforma?.reading?.proforma;
     const quote = asked && {
+      currency: asked.currency,
       amountCents: asked.amount_minor,
       advanceBps: asked.advance_bps,
       issueDate: asked.issue_date,
       latestShipmentDate: asked.latest_shipment_date,
+      lines: asked.lines,
     };
     const proposal = newProposal(built, form.goods, Date.now() / 1000, quote);
     try {
@@ -252,7 +238,6 @@ function NewOrderScreen() {
           carrier={data.setup.carrier.short}
           supplierName={supplier?.party.short}
           blocked={blocked}
-          notes={notes}
           onReplace={() => {
             setNotice(undefined);
             setPhase('empty');
@@ -375,13 +360,12 @@ type FormProps = {
   carrier: string;
   supplierName?: string;
   blocked?: Blocked;
-  notes: AgentNote[];
   onReplace: () => void;
   onSend: () => void;
 };
 
 // 03: the order from the proforma
-function OrderForm({ proforma, notice, form, patch, carrier, supplierName, blocked, notes, onReplace, onSend }: FormProps) {
+function OrderForm({ proforma, notice, form, patch, carrier, supplierName, blocked, onReplace, onSend }: FormProps) {
   const t = useT();
   const ADVANCES: { value: AdvanceChoice; label: string }[] = [
     { value: '0', label: '0%' },
@@ -472,13 +456,9 @@ function OrderForm({ proforma, notice, form, patch, carrier, supplierName, block
           </Text>
         ) : null}
         {proforma && !reading ? <Warning>{t('The agent could not read this file. Fill in the terms by hand.')}</Warning> : null}
+        {reading?.mentionsAccountChange ? <Warning>{t(WARNING_ACCOUNT_CHANGE)}</Warning> : null}
+        {reading?.hiddenTextDetected ? <Warning>{t(WARNING_HIDDEN_TEXT)}</Warning> : null}
       </View>
-
-      <AgentNotes
-        notes={notes}
-        onApply={(note) => note.suggestion && patch(advanceFrom(note.suggestion.value))}
-        footer={t('The agent compares this order with your company\'s orders. It suggests; you decide and sign.')}
-      />
 
       <View style={{ gap: 10 }}>
         <TextInput

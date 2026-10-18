@@ -13,7 +13,7 @@ import { newProposal, type Proposal } from './proposals';
 const sample = async (): Promise<Proposal> => {
   const [order] = await mockData.orders();
   const po = { ...order!.po, orderId: `0x${'77'.repeat(32)}` as Hex, nonce: 2n ** 200n + 7n };
-  return newProposal({ po, terms: order!.terms }, 'Agar powder', 1_792_000_000, { amountCents: 1, advanceBps: null, issueDate: null, latestShipmentDate: null });
+  return newProposal({ po, terms: order!.terms }, 'Agar powder', 1_792_000_000, { currency: 'USD', amountCents: 1, advanceBps: null, issueDate: null, latestShipmentDate: null });
 };
 
 const signer = (name: string): Signer => ({ address: async () => name as Hex, signTypedData: async () => '0x' });

@@ -1,11 +1,10 @@
-import type { Hex, Incoterm } from '@keel/schemas';
+import type { Hex } from '@keel/schemas';
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { config } from '@/config';
 import { proposals, useData } from '@/data';
-import { agentNotes } from '@/data/agentNotes';
 import { tokenToCents } from '@/data/amounts';
 import { apiProblem } from '@/data/apiProblem';
 import { importerRejects, importerSigns, reviewForImporter, type Review } from '@/data/proposalFlow';
@@ -21,7 +20,6 @@ import {
 } from '@/data/signOrder';
 import { useT } from '@/i18n';
 import { useSession } from '@/session';
-import { AgentNotes } from '@/ui/AgentNotes';
 import { BottomSheet } from '@/ui/BottomSheet';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
@@ -49,19 +47,7 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
       d.partyByAddress(po.arbiter),
       d.orders(),
     ]);
-    if (!supplier || !carrier || !arbiter) return null;
-    // The supplier already signed, so the notes only inform: changing a term would void its signature
-    const notes = agentNotes({
-      supplier: { name: supplier.name, address: po.exporter },
-      totalCents: Number(tokenToCents(po.totalAmount)),
-      advanceBps: po.advanceBps,
-      shipmentDeadline: Number(po.shipmentDeadline),
-      incoterm: incotermText(po.incoterm) as Incoterm,
-      orders,
-      excludeOrderId: po.orderId,
-      now: Date.now() / 1000,
-    });
-    return { proposal, supplier, carrier, arbiter, history: payoutHistory(orders, po), notes };
+    return supplier && carrier && arbiter ? { proposal, supplier, carrier, arbiter, history: payoutHistory(orders, po) } : null;
   }, [orderId, address]);
 
   const [ticked, setTicked] = useState(false);
@@ -198,11 +184,6 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
           </View>
         </View>
       </View>
-
-      <AgentNotes
-        notes={view.notes}
-        footer={t('{name} already signed these terms. To change one, reject and send a new order.', { name: supplier.short })}
-      />
 
       <PayoutPanel
         heading={t('Paid only to this account')}
