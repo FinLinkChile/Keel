@@ -1,10 +1,10 @@
 ---
 type: Decisiones
 title: "Decisiones abiertas"
-description: "Las 14 preguntas que el equipo todavía no cierra. Si un componente toca alguna, se decide con el equipo antes de escribir código."
+description: "Las 17 preguntas que el equipo todavía no cierra. Si un componente toca alguna, se decide con el equipo antes de escribir código."
 tags: [decisiones-abiertas, pendiente]
 modo: ambos
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T01:40:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T16:00:00Z }
 ---
 
 No resolver ninguna por cuenta propia. Cuando el equipo cierra una, se actualiza primero el concepto afectado, luego esta tabla y después el código. Los números son estables: el código y los README los citan.
@@ -25,6 +25,8 @@ No resolver ninguna por cuenta propia. Cuando el equipo cierra una, se actualiza
 | 12 | ¿Se confirman las tareas, las interfaces y el calendario propuestos tras el cambio de rumbo? | | [Trabajo](../trabajo/index.md), [interfaces](../interfaces/index.md) |
 | 13 | ¿Cómo verifica el jurado las transacciones si la red es cerrada? | | [Entregables](../entrega/entregables.md) |
 | 14 | Keel Personal vuelve al alcance: ¿con qué profundidad entra en la entrega (aplicación, contratos, demo) y en qué red y con qué token corre? | | [Keel Personal](../personal/keel-personal.md), [alcance](../flujo/alcance.md) |
+| 15 | ¿Dónde viven la orden firmada, sus `OrderTerms`, los proveedores conocidos y el historial de montos por proveedor, y quién se los entrega al servicio del agente (T2.11)? Supuesto mientras tanto: archivos locales de la demo. Los proveedores conocidos y los terceros de confianza ya viven en el FundingGate y el agente los lee de ahí | Áreas 2, 3 y 4 | [Área 2](../trabajo/area-2-motor.md), [Área 4](../trabajo/area-4-producto.md) |
+| 16 | En un depósito de nivel 3, ¿cómo le llega al agente la firma del cosignatario sobre el `pdrHash` (vista del cosignatario, T4.5) para que envíe `execute` con ella? ¿Quién la envía si el PDR vence antes? Supuesto mientras tanto: el agente se detiene en `en_aprobacion` con el PDR firmado en la evidencia y el acto 1 usa nivel 1 | Áreas 2 y 4 | [Servicio del agente](../arquitectura/servicio-del-agente.md) |
 
 Una celda vacía en "quién decide" significa que las fuentes no lo asignan todavía.
 
@@ -33,3 +35,4 @@ Una celda vacía en "quién decide" significa que las fuentes no lo asignan toda
 - Qué actos de Keel Personal entran en el deck y en el video: [demo](../entrega/demo.md). Depende de la decisión 14.
 - Quién mantiene el registro de órdenes de ingesta (quién puede subir documentos a cada orden y cuáles son las cuentas registradas del exportador) y si debería leerse de los eventos `OrderOpened` del escrow. Supuesto actual del Área 3: un archivo que entrega el Área 4. Ver [carga de documentos](../interfaces/carga-de-documentos.md).
 - Dónde entra Keel Personal en el orden de recorte: [recortes](../trabajo/recortes.md). Depende de la decisión 14.
+| 17 | **Decidida el 18 de octubre (Área 2, Darienn).** `TradeEscrow.open` la envía el relayer del Servicio del agente (Área 2), que paga el gas. `open` no pide permiso y no da autoridad a quien la envía, porque la autoridad son las firmas del importador y del exportador. El Área 4 produce esas firmas y las entrega junto a la orden (`order.json`); el agente solo abre órdenes de su Safe. Es la misma separación de poderes de los demás pasos: la interfaz firma, el motor y el relayer ejecutan. | Área 2 | [Servicio del agente](../arquitectura/servicio-del-agente.md), [Área 2](../trabajo/area-2-motor.md), [Paso 1](../flujo/paso-1-firma-orden.md) |
