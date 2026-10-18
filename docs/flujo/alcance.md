@@ -22,6 +22,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
 
 # Fuera (trabajo futuro, se declara así)
 
+- Modelos predictivos entrenados con datos propios (próxima compra, flujo de caja, riesgo de proveedores), cuando haya meses de órdenes reales.
 - Integración con plataformas de BL electrónico de navieras.
 - Identidad empresarial con credenciales verificables (WeIdentity o similar) y validez legal de la firma (Ley 19.799).
 - Bancos y rampas de entrada y salida de dinero fiat.

@@ -1,5 +1,6 @@
 # Arquitectura
 
+* [El analista: análisis de compras con un modelo, fuera del flujo de pago](analista.md) - Qué recibe el modelo que analiza las compras de la empresa, qué devuelve, cómo se valida, por qué no puede ser manipulado por un documento y qué no puede hacer.
 * [Custodia y rotación de llaves](custodia-de-llaves.md) - Qué llaves existen, quién tiene cada una, qué puede hacer un atacante que robe una, dónde se limita y con qué prueba, cómo se rota y qué falta construir.
 * [Evidencia y bitácora](evidencia-y-bitacora.md) - Qué queda registrado de cada intento, dónde se guardan los PDR y por qué los reverts deliberados son la evidencia más fuerte.
 * [Verificador reproducible](verificador.md) - Cómo `keel verify` comprueba una decisión del motor desde la transacción o desde el archivo de evidencia, cómo la ancla a los contratos desplegados, qué prueba y qué no.

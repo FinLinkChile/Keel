@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { checkStep, DEMO_DRAFT, STEPS, type Draft, type Problems, type Step } from '@/data/onboarding';
+import { BRACKET_WORDS, checkStep, DEMO_DRAFT, INDUSTRIES, INDUSTRY_WORDS, SALES_BRACKETS, STEPS, type Draft, type Problems, type SalesBracket, type Step } from '@/data/onboarding';
 import { useSession } from '@/session';
 import { Button } from '@/ui/Button';
 import { Field } from '@/ui/Field';
@@ -136,6 +136,54 @@ export default function Onboarding() {
             <Field label="Legal name" value={draft.legalName} onChangeText={(legalName) => patch({ legalName })} autoCapitalize="words" placeholder="Importadora Ejemplo SpA" notice={notice('legalName')} />
             <Field label="Email" value={draft.email} onChangeText={(email) => patch({ email })} keyboardType="email-address" autoCapitalize="none" placeholder="name@company.cl" notice={notice('email')} />
             <Field label="Mobile" mono value={draft.phone} onChangeText={(phone) => patch({ phone })} keyboardType="phone-pad" placeholder="+56 9 1234 5678" notice={notice('phone')} />
+            <View style={{ gap: 8 }}>
+              <Text size={14} weight={600}>
+                What does the company do?
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {INDUSTRIES.map((industry) => {
+                  const on = draft.industry === industry;
+                  return (
+                    <Pressable
+                      key={industry}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: on }}
+                      onPress={() => patch({ industry })}
+                      style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 999, backgroundColor: on ? colors.accent : colors.surface }}
+                    >
+                      <Text size={14} weight={600} color={on ? 'onAccent' : 'text'}>
+                        {INDUSTRY_WORDS[industry]}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {notice('industry') ? (
+                <Text size={13} style={{ color: colors.danger }}>
+                  {notice('industry')!.text}
+                </Text>
+              ) : null}
+            </View>
+            <View style={{ gap: 8 }}>
+              <Text size={14} weight={600}>
+                Annual sales
+              </Text>
+              <Segmented
+                options={SALES_BRACKETS.map((b) => ({ value: b, label: BRACKET_WORDS[b].label }))}
+                value={draft.salesBracket ?? ('' as SalesBracket)}
+                onChange={(salesBracket) => patch({ salesBracket })}
+                accessibilityLabel="Annual sales"
+                role="radiogroup"
+              />
+              <Text size={13} color="textFaint">
+                {draft.salesBracket ? BRACKET_WORDS[draft.salesBracket].range : 'As the SII brackets companies.'} The agent uses it to fit its advice to your size.
+              </Text>
+              {notice('salesBracket') ? (
+                <Text size={13} style={{ color: colors.danger }}>
+                  {notice('salesBracket')!.text}
+                </Text>
+              ) : null}
+            </View>
             <Text size={13} leading={1.5} color="textFaint">
               Filled in with the demo company, Pacífico Foods SpA. The documents of the test orders carry this RUT, so change it only to try the form.
             </Text>

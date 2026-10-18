@@ -100,6 +100,12 @@ export class IngestStore {
         received_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS proforma_uploads_by_importer ON proforma_uploads (importer, received_at);
+      -- Every authorized request for the agent's analysis, for the daily limit. Nothing else is kept.
+      CREATE TABLE IF NOT EXISTS insights_requests (
+        importer    TEXT NOT NULL,
+        received_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS insights_by_importer ON insights_requests (importer, received_at);
     `);
   }
 
@@ -199,6 +205,18 @@ export class IngestStore {
   proformaUploadsToday(importer: Hex): number {
     const row = this.db
       .prepare("SELECT count(*) AS n FROM proforma_uploads WHERE importer = ? AND received_at > ?")
+      .get(importer.toLowerCase(), this.now().getTime() - DAY_MS) as { n: number };
+    return row.n;
+  }
+
+  recordInsights(importer: Hex): void {
+    this.db.prepare("INSERT INTO insights_requests (importer, received_at) VALUES (?, ?)").run(importer.toLowerCase(), this.now().getTime());
+  }
+
+  // Authorized analysis requests of this importer in the last 24 hours
+  insightsToday(importer: Hex): number {
+    const row = this.db
+      .prepare("SELECT count(*) AS n FROM insights_requests WHERE importer = ? AND received_at > ?")
       .get(importer.toLowerCase(), this.now().getTime() - DAY_MS) as { n: number };
     return row.n;
   }

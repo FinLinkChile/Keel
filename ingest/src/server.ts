@@ -21,6 +21,7 @@ import type { AliasTable } from "./parser";
 import { MAX_PDF_BYTES } from "./pdf/text";
 import { receiveTradeDocument, type TradeOutcome } from "./trade/receive";
 import { receiveProforma, staticImporters, type ImporterRegistry, type ProformaOutcome } from "./trade/proforma";
+import { MAX_INPUT_BYTES, receiveInsights, type InsightsOutcome } from "./trade/insights";
 import { staticOrders, type OrderRegistry, type TradeOrderEntry } from "./trade/upload";
 import { baseUrlsFromEnv, initialSettings, keysFromEnv, SettingsError, SettingsStore, type SettingsAudit } from "./settings";
 import { IngestStore } from "./store";
@@ -64,6 +65,15 @@ const TradeUploadBody = z
     signature: z.string().regex(/^0x[0-9a-fA-F]{130}$/),
     // The PDF, base64
     file: z.string().max(MAX_TRADE_BODY_BYTES),
+  })
+  .strict();
+
+const InsightsBody = z
+  .object({
+    issuedAt: z.number().int().positive(),
+    signature: z.string().regex(/^0x[0-9a-fA-F]{130}$/),
+    // The metrics as JSON text, exactly as signed
+    input: z.string().max(MAX_INPUT_BYTES),
   })
   .strict();
 
@@ -147,6 +157,13 @@ export interface ProformaLogEntry {
   reason?: string;
 }
 
+export interface InsightsLogEntry {
+  at: string;
+  kind: "trade_insights";
+  status: InsightsOutcome["status"];
+  reason?: string;
+}
+
 export interface ServerDeps {
   webhookToken: string;
   adminToken?: string;
@@ -161,7 +178,7 @@ export interface ServerDeps {
   // The app's origin (Area 4), e.g. https://app.keel.example. Only the trade routes answer CORS.
   appOrigin?: string;
   // The activity log. Receives typed fields only, never message content.
-  log?: (entry: LogEntry | SettingsAudit | TradeLogEntry | ProformaLogEntry) => void;
+  log?: (entry: LogEntry | SettingsAudit | TradeLogEntry | ProformaLogEntry | InsightsLogEntry) => void;
 }
 
 const digest = (s: string) => createHash("sha256").update(s).digest();
@@ -295,6 +312,30 @@ export function createHandler(deps: ServerDeps): RequestListener {
     reply(res, 200, outcome);
   };
 
+  // The agent's analysis of the importer's purchases: a report, nothing is decided here
+  const insights = async (req: IncomingMessage, res: ServerResponse, trade: NonNullable<ServerDeps["trade"]>) => {
+    const raw = await readBody(req, MAX_INPUT_BYTES * 2);
+    if (raw === null) return reply(res, 413, { error: "too_large" });
+    let body: z.infer<typeof InsightsBody>;
+    try {
+      body = InsightsBody.parse(JSON.parse(raw.toString("utf8")));
+    } catch {
+      return reply(res, 400, { error: "invalid_request" });
+    }
+    const outcome = await receiveInsights(
+      { issuedAt: body.issuedAt, signature: body.signature as `0x${string}`, input: body.input },
+      trade.importers ?? staticImporters([]),
+      await deps.settings.getExtractor(),
+      { store: deps.store, chainId: trade.chainId },
+    );
+    log({ at: new Date().toISOString(), kind: "trade_insights", status: outcome.status, reason: "reason" in outcome ? String(outcome.reason) : undefined });
+    if (outcome.status === "rejected") {
+      const code = { too_large: 413, invalid_request: 400, bad_signature: 401, stale_signature: 401, not_an_importer: 403, rate_limited: 429 }[outcome.reason];
+      return reply(res, code, outcome);
+    }
+    reply(res, 200, outcome);
+  };
+
   // The base URL is shown so the admin knows where documents go; it cannot be changed here
   const adminView = () => ({
     ...deps.settings.get(),
@@ -331,7 +372,7 @@ export function createHandler(deps: ServerDeps): RequestListener {
     try {
       if (req.url === "/inbound" && req.method === "POST") return await inbound(req, res);
       if (req.url === "/admin/settings" && deps.adminToken) return await admin(req, res, deps.adminToken);
-      if ((req.url === "/trade/documents" || req.url === "/trade/proforma") && deps.trade) {
+      if ((req.url === "/trade/documents" || req.url === "/trade/proforma" || req.url === "/trade/insights") && deps.trade) {
         cors(req, res);
         if (req.method === "OPTIONS" && deps.appOrigin) {
           res.writeHead(204, {
@@ -342,6 +383,7 @@ export function createHandler(deps: ServerDeps): RequestListener {
           return res.end();
         }
         if (req.method === "POST" && req.url === "/trade/documents") return await tradeUpload(req, res, deps.trade);
+        if (req.method === "POST" && req.url === "/trade/insights") return await insights(req, res, deps.trade);
         if (req.method === "POST") return await proformaUpload(req, res, deps.trade);
       }
       reply(res, 404, { error: "not_found" });
@@ -375,7 +417,7 @@ export async function startServer(env: Record<string, string | undefined> = proc
     const importers = [...orders.flatMap((o) => o.uploaders.filter((u) => u.party === "importer").map((u) => u.address)), ...extra];
     trade = { orders: staticOrders(orders), chainId, importers: staticImporters(importers) };
   }
-  const log = (entry: LogEntry | SettingsAudit | TradeLogEntry | ProformaLogEntry | BotLogEntry) => console.log(JSON.stringify(entry));
+  const log = (entry: LogEntry | SettingsAudit | TradeLogEntry | ProformaLogEntry | InsightsLogEntry | BotLogEntry) => console.log(JSON.stringify(entry));
   const bot = botNotifierFromEnv(env, log);
   const settings = await SettingsStore.open({
     fallback: initialSettings(env),
