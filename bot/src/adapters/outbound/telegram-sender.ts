@@ -4,6 +4,8 @@ import { RetryableSendError, type ChatId, type MessageSender } from "../../appli
 import type { Message } from "../../domain/message";
 import { placeLink, textWithLink } from "./link";
 
+export const SEND_TIMEOUT_SECONDS = 10;
+
 export class TelegramSender implements MessageSender {
   constructor(
     private readonly api: Api,
@@ -11,7 +13,9 @@ export class TelegramSender implements MessageSender {
   ) {}
 
   static fromToken(token: string, appBaseUrl: string | undefined): TelegramSender {
-    return new TelegramSender(new Api(token), appBaseUrl);
+    // A hung call must fail well before the notify Lambda's own timeout (60 s): grammY turns a
+    // timeout into an HttpError, which is retryable.
+    return new TelegramSender(new Api(token, { timeoutSeconds: SEND_TIMEOUT_SECONDS }), appBaseUrl);
   }
 
   async send(chatId: ChatId, message: Message): Promise<void> {

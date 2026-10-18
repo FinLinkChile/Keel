@@ -13,6 +13,7 @@ import { ApiError, type ApiClient, type OrderView } from './api';
 import {
   approveBalance,
   attestationHashOf,
+  balanceApprovalDetails,
   canApproveBalance,
   canCancel,
   currentCancelNonce,
@@ -93,11 +94,25 @@ describe('closing signatures', () => {
     expect(attestationHashOf(view({ shipment: undefined }))).toBeUndefined();
   });
 
+  it('shows the importer the balance and the attested fields before it signs', () => {
+    expect(balanceApprovalDetails(view())).toEqual({
+      balance: '0.00',
+      onBoardDate: '2026-09-21',
+      portOfLoading: 'HKHKG',
+      blNumberHash: `${attestation.blNumberHash.slice(0, 8)}…${attestation.blNumberHash.slice(-6)}`,
+    });
+    expect(balanceApprovalDetails(view({ locked: '35000000000' }))?.balance).toBe('35,000.00');
+    // Without a shipment there is nothing to confirm, so the sheet cannot open
+    expect(balanceApprovalDetails(view({ shipment: undefined }))).toBeUndefined();
+  });
+
   it('knows when each action applies', () => {
     expect(canApproveBalance(view())).toBe(true);
     expect(canApproveBalance(view({ closing: { balanceApproval: { sigImporter: '0x', attestationHash: ORDER } } }))).toBe(false);
     expect(canApproveBalance(view({ state: 'ADVANCE_PAID' }))).toBe(false);
     expect(['OPEN', 'ADVANCE_PAID', 'DISPUTED', 'SHIPPED', 'SETTLED'].map(canCancel)).toEqual([true, true, true, false, false]);
+    // The escrow's cancel reverts in NONE, so it is never offered
+    expect(canCancel('NONE')).toBe(false);
   });
 });
 

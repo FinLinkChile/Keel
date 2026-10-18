@@ -11,7 +11,8 @@
 // leaves an audit item with the actor, the time and each entry before and after.
 //
 // Not atomic across entries: a store failure halfway leaves the entries written so far. The
-// operator sends the same change again, which is idempotent.
+// audit item is written first, as the intent, so the change is on record even then. The operator
+// sends the same change again, which is idempotent.
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { Parties } from "../../domain/notice";
@@ -138,24 +139,48 @@ export class RecipientsAdmin {
       }
     }
 
+    // An account stored orders still name cannot go: every notice for those orders would be
+    // rejected as unknown_account without a word. Orders changed in this request are judged by
+    // their new entry above (a replaced order is checked by exists, a deleted one is gone).
+    const deleted = accounts.filter(([, a]) => a === null).map(([id]) => id);
+    if (deleted.length > 0) {
+      const touched = new Set(orders.map(([id]) => id));
+      const stored = (await this.view()).orders;
+      const blocking = new Map<string, string[]>();
+      for (const [orderId, o] of Object.entries(stored)) {
+        if (touched.has(orderId)) continue;
+        for (const account of [o.importer, o.exporter, ...(o.arbiter ? [o.arbiter] : [])]) {
+          if (deleted.includes(account)) blocking.set(account, [...(blocking.get(account) ?? []), o.label]);
+        }
+      }
+      if (blocking.size > 0) {
+        const parts = [...blocking].map(([account, labels]) => `account ${account} is used by order ${[...new Set(labels)].join(", ")}`);
+        throw new RecipientsError(`cannot delete: ${parts.join("; ")} (delete or change those orders in the same request)`);
+      }
+    }
+
+    // Read everything first, then write the audit as the intent, then apply: if the audit cannot
+    // be written nothing changes, and if an entry fails halfway the intent is already on record.
     const changes: RecipientsAudit["changes"] = {};
+    const writes: Array<() => Promise<void>> = [];
     for (const [id, to] of accounts) {
       const from = await this.account(id);
       if (same(from, to)) continue;
-      await this.writeAccount(id, to);
+      writes.push(() => this.writeAccount(id, to));
       (changes.accounts ??= {})[id] = { from, to };
     }
     for (const [id, to] of orders) {
       const from = await this.order(id);
       if (same(from, to)) continue;
-      await this.writeOrder(id, to);
+      writes.push(() => this.writeOrder(id, to));
       (changes.orders ??= {})[id] = { from, to };
     }
-    if (!changes.accounts && !changes.orders) return null;
+    if (writes.length === 0) return null;
 
     const at = new Date(this.now()).toISOString();
     const audit: RecipientsAudit = { type: "recipients_changed", at, actor, changes };
     await this.kv.put(keys.audit, `${at}#${randomBytes(4).toString("hex")}`, { ...audit });
+    for (const write of writes) await write();
     return audit;
   }
 

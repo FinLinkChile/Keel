@@ -30,8 +30,16 @@ export class MemoryNotifyState implements NotifyState {
     return true;
   }
 
+  // Claims never expire in memory: the process either lives or the whole state is gone
+  async confirm(): Promise<void> {}
+
   async release(noticeId: string, chatId: ChatId): Promise<void> {
     this.claims.delete(`${noticeId}\n${chatId}`);
+  }
+
+  async refund(chatId: ChatId, now: number): Promise<void> {
+    const w = this.windows.get(chatId);
+    if (w && now - w.start < HOUR_MS && w.count > 0) w.count--;
   }
 
   async documentHold(orderRef: string, side: string): Promise<boolean> {

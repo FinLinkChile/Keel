@@ -6,7 +6,7 @@ import { config } from '@/config';
 import { api, refreshData, useData, type Role } from '@/data';
 import { isApiError, type OrderView } from '@/data/api';
 import { apiProblem } from '@/data/apiProblem';
-import { approveBalance, canApproveBalance, canCancel, canDispute, signCancellation } from '@/data/closing';
+import { approveBalance, balanceApprovalDetails, canApproveBalance, canCancel, canDispute, signCancellation } from '@/data/closing';
 import { SIGNING_NOT_SET_UP, signingSetup } from '@/data/signOrder';
 import { useSession } from '@/session';
 import { BottomSheet } from '@/ui/BottomSheet';
@@ -18,12 +18,26 @@ import { colors, radius } from '@/ui/theme';
 // approves the balance of a shipped order; either side signs a mutual cancellation. The API
 // stores the signature and the agent submits it; the escrow checks it again. A dispute is a
 // transaction of a party (raiseDispute), which this app does not send: it explains how instead.
+function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+      <Text size={13} color="textMuted">
+        {label}
+      </Text>
+      <Text size={13} {...(mono ? { mono: true as const } : { weight: 700 as const })} selectable>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 export function ClosingActions({ orderId, role }: { orderId: Hex; role: Role }) {
   const { signer, address } = useSession();
   const [busy, setBusy] = useState<'approve' | 'cancel'>();
   const [problem, setProblem] = useState<string>();
   const [disputeHelp, setDisputeHelp] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmApprove, setConfirmApprove] = useState(false);
 
   const view = useData(async () => {
     if (!api || !signer) return null;
@@ -67,6 +81,7 @@ export function ClosingActions({ orderId, role }: { orderId: Hex; role: Role }) 
   const showCancel = canCancel(order.state);
   const showDispute = canDispute(order.state);
   const approved = !!order.closing?.balanceApproval;
+  const details = balanceApprovalDetails(order);
 
   if (!showApprove && !showCancel && !showDispute && order.state !== 'DISPUTED' && !approved) return null;
 
@@ -98,7 +113,7 @@ export function ClosingActions({ orderId, role }: { orderId: Hex; role: Role }) 
           <Button
             label={busy === 'approve' ? 'Signing' : 'Approve balance'}
             disabled={!!busy || !signer || !setup}
-            onPress={() => run('approve', () => approveBalance(api!, signer!, setup!, order))}
+            onPress={() => setConfirmApprove(true)}
           />
         </View>
       ) : null}
@@ -137,6 +152,31 @@ export function ClosingActions({ orderId, role }: { orderId: Hex; role: Role }) 
           {problem}
         </Text>
       ) : null}
+
+      <BottomSheet visible={confirmApprove && !!details} title="Approve the balance?" onClose={() => setConfirmApprove(false)}>
+        <View style={{ gap: 14, paddingTop: 6 }}>
+          <Text size={14} leading={1.45} color="textMuted">
+            Your signature pays the balance to the supplier&apos;s signed account now, without waiting for the document check or the
+            dispute window. It names this shipment attestation:
+          </Text>
+          {details ? (
+            <View style={{ gap: 6 }}>
+              <DetailRow label="Balance" value={`${details.balance} USDC`} />
+              <DetailRow label="On board" value={details.onBoardDate} />
+              <DetailRow label="Port of loading" value={details.portOfLoading} />
+              <DetailRow label="B/L number hash" value={details.blNumberHash} mono />
+            </View>
+          ) : null}
+          <Button
+            label="Approve balance"
+            onPress={() => {
+              setConfirmApprove(false);
+              void run('approve', () => approveBalance(api!, signer!, setup!, order));
+            }}
+          />
+          <Button label="Not now" variant="secondary" onPress={() => setConfirmApprove(false)} />
+        </View>
+      </BottomSheet>
 
       <BottomSheet visible={confirmCancel} title="Sign the cancellation?" onClose={() => setConfirmCancel(false)}>
         <View style={{ gap: 14, paddingTop: 6 }}>

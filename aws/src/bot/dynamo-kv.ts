@@ -95,6 +95,23 @@ export class DynamoKeyValueStore implements KeyValueStore {
     }
   }
 
+  async decrement(pk: string, sk: string, attr: string): Promise<void> {
+    try {
+      await this.client.send(
+        new UpdateCommand({
+          TableName: this.tableName,
+          Key: { pk, sk },
+          UpdateExpression: "SET #a = #a - :one",
+          ConditionExpression: "#a > :zero",
+          ExpressionAttributeNames: { "#a": attr },
+          ExpressionAttributeValues: { ":zero": 0, ":one": 1 },
+        }),
+      );
+    } catch (e) {
+      if (!isConditionFailed(e)) throw e;
+    }
+  }
+
   async setOnce(pk: string, sk: string, attr: string, ttl: number): Promise<boolean> {
     try {
       await this.client.send(

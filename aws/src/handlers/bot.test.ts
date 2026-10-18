@@ -3,7 +3,7 @@
 import type { SSMClient } from "@aws-sdk/client-ssm";
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2, SQSEvent } from "aws-lambda";
 import { MemoryKeyValueStore, RecipientsAdmin, RetryableSendError, type Message } from "@keel/bot";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { deployment, resetDeploymentCache } from "../config";
 import { setSqs } from "../notices";
 import { setBotRuntime } from "../bot/runtime";
@@ -137,6 +137,21 @@ describe("botNotify", () => {
     expect(result).toEqual({ batchItemFailures: [] });
     expect(sent).toHaveLength(0);
   });
+
+  it("logs every dropped message as queue_invalid with its id and code", async () => {
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((l: string) => void lines.push(l));
+    try {
+      await notifyBatch(sqsEvent("{not json" as unknown as object, { kind: "nope" }), {});
+    } finally {
+      spy.mockRestore();
+    }
+    const invalid = lines.map((l) => JSON.parse(l)).filter((e) => e.event === "queue_invalid");
+    expect(invalid).toEqual([
+      expect.objectContaining({ messageId: "m-0", code: "invalid_json" }),
+      expect.objectContaining({ messageId: "m-1", code: "invalid_envelope" }),
+    ]);
+  });
 });
 
 describe("noticesIn", () => {
@@ -182,6 +197,16 @@ describe("botAdmin", () => {
     expect(view.body.accounts.lingnan.roles).toEqual({ owner: [444], operator: [555] });
     expect((await kv.query("audit#recipients", "")).map((a) => a.actor)).toEqual(["test", "ops@keel"]);
     expect(await call(botAdmin, http("PUT /bot/recipients", change, auth))).toEqual({ status: 200, body: { changed: false } });
+  });
+
+  it("refuses to delete an account that a stored order names", async () => {
+    const order = { label: "PO-0142", importer: "acme-imports", exporter: "lingnan", shipmentDeadline: 1_800_000_000 };
+    const id = `0x${"12".repeat(32)}`;
+    expect((await call(botAdmin, http("PUT /bot/recipients", { orders: { [id]: order } }, auth))).status).toBe(200);
+    const r = await call(botAdmin, http("PUT /bot/recipients", { accounts: { lingnan: null } }, auth));
+    expect(r.status).toBe(400);
+    expect(r.body.error).toBe("invalid_recipients");
+    expect(r.body.message).toContain("PO-0142");
   });
 
   it("refuses a change the rules reject", async () => {

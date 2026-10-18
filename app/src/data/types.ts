@@ -89,6 +89,9 @@ export type Order = {
   // Escrow state as the Keel API's indexer mirrors it ("NONE", "OPEN", "SHIPPED", "DISPUTED"…),
   // only for orders read from the API. DISPUTED shows as stage 'shipped'; RESOLVED as 'settled'.
   escrowState?: string;
+  // The carrier's attestation of the shipment as the API holds it (attestation fields as strings),
+  // only for orders read from the API once the shipment is attested
+  shipment?: { attestation: Record<string, unknown>; sigCarrier: string };
 };
 
 export type Wallet = {
