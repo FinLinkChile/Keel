@@ -6,6 +6,7 @@ import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2, SQSEvent } from "aws-lambda";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
+  ExtractionError,
   fileHash,
   initialSettings,
   MAX_DOCUMENTS_PER_ORDER_PER_DAY,
@@ -28,13 +29,13 @@ import type { NoticeMessage } from "../notices";
 import { documentKey, s3Objects, S3_CLIENT_CONFIG } from "../ingest/objects";
 import { appendOrderDocument, repoOrders } from "../ingest/orders";
 import { DynamoIngestRepo, ingestKey } from "../ingest/repo";
-import { llmKeys, settingsLoader, type IngestRuntime } from "../ingest/runtime";
+import { DEFAULT_LLM_TIMEOUT_MS, llmKeys, llmTimeoutMs, settingsLoader, type IngestRuntime } from "../ingest/runtime";
 import { dynamoSettingsBackend } from "../ingest/settings";
 import { FakeDynamo } from "../testing/fakeDynamo";
 import { fakeObjects, type FakeObjects } from "../testing/fakeObjects";
 import { createAdminHandler } from "./admin";
 import { runDigest } from "./digest";
-import { createExtractorHandler } from "./extractor";
+import { createExtractorHandler, EXTRACTOR_MAX_RECEIVE, READ_CLAIM_STALE_MS } from "./extractor";
 import { createInboundHandler } from "./inbound";
 import { createProformaHandler } from "./proforma";
 import { createUploadHandler } from "./upload";
@@ -68,11 +69,12 @@ const httpEvent = (routeKey: string, body: string, headers: Record<string, strin
     requestContext: { http: { method: routeKey.split(" ")[0] } },
   }) as unknown as APIGatewayProxyEventV2;
 
-const s3Event = (keys: string[], messageId = "m1") =>
+const s3Event = (keys: string[], messageId = "m1", receiveCount = 1) =>
   ({
     Records: [
       {
         messageId,
+        attributes: { ApproximateReceiveCount: String(receiveCount) },
         body: JSON.stringify({
           Records: keys.map((key) => ({ eventName: "ObjectCreated:Put", s3: { bucket: { name: "docs" }, object: { key, size: 1 } } })),
         }),
@@ -224,7 +226,10 @@ describe("presigned upload, end to end", () => {
     expect(await h.repo.claimReading(O1.order.orderId, fileHash(invoice), 1)).toBe(true);
     expect(await h.extract(s3Event([key], "busy"))).toEqual({ batchItemFailures: [{ itemIdentifier: "busy" }] });
     expect(outcomes(h)).toHaveLength(0);
-    h.advance(16 * 60 * 1000);
+    h.advance(READ_CLAIM_STALE_MS - 2);
+    expect(await h.extract(s3Event([key], "early"))).toEqual({ batchItemFailures: [{ itemIdentifier: "early" }] });
+    // Stale after 6 minutes, so the second delivery (visibility 720 s) already reads
+    h.advance(3);
     expect(await h.extract(s3Event([key], "later"))).toEqual({ batchItemFailures: [] });
     expect(outcomes(h)).toMatchObject([{ outcome: { status: "ready" } }]);
   });
@@ -264,6 +269,20 @@ describe("presigned upload, end to end", () => {
     expect(dup).toEqual({ status: 409, body: expect.objectContaining({ status: "duplicate", reason: "same_file" }) });
   });
 
+  it("counts the daily limit per party: the importer's presigns do not block the exporter", async () => {
+    const importer = testAccount(`${O1.id}:importer`);
+    const hash = (i: number) => `0x${(i + 1).toString(16).padStart(64, "0")}` as Hex;
+    for (let i = 0; i < MAX_DOCUMENTS_PER_ORDER_PER_DAY; i++) {
+      expect((await presign(h, { ...(await signedUpload(h, O1.order.orderId, "COMMERCIAL_INVOICE", hash(i), importer)), size: 1000 })).status).toBe(200);
+    }
+    const over = await presign(h, { ...(await signedUpload(h, O1.order.orderId, "COMMERCIAL_INVOICE", hash(50), importer)), size: 1000 });
+    expect(over).toMatchObject({ status: 429, body: { reason: "rate_limited" } });
+    const exporter = await presign(h, { ...(await signedUpload(h, O1.order.orderId, "COMMERCIAL_INVOICE", hash(51))), size: 1000 });
+    expect(exporter.status).toBe(200);
+    expect(await h.repo.uploadsForOrder(O1.order.orderId, "importer")).toBe(MAX_DOCUMENTS_PER_ORDER_PER_DAY);
+    expect(await h.repo.uploadsForOrder(O1.order.orderId, "exporter")).toBe(1);
+  });
+
   it("rejects what is not signed by a party of the order, or not for this order", async () => {
     const hash = `0x${"77".repeat(32)}` as Hex;
     const outsider = await presign(h, { ...(await signedUpload(h, O1.order.orderId, "COMMERCIAL_INVOICE", hash, testAccount("outsider"))), size: 10 });
@@ -271,7 +290,9 @@ describe("presigned upload, end to end", () => {
     const unknown = await presign(h, { ...(await signedUpload(h, `0x${"99".repeat(32)}`, "COMMERCIAL_INVOICE", hash)), size: 10 });
     expect(unknown).toEqual({ status: 404, body: { status: "rejected", reason: "unknown_order" } });
     const tooBig = await presign(h, { ...(await signedUpload(h, O1.order.orderId, "COMMERCIAL_INVOICE", hash)), size: 11 * 1024 * 1024 });
-    expect(tooBig.status).toBe(400);
+    expect(tooBig).toEqual({ status: 413, body: { status: "rejected", reason: "too_large" } });
+    const malformed = await presign(h, { ...(await signedUpload(h, O1.order.orderId, "COMMERCIAL_INVOICE", hash)), size: 0 });
+    expect(malformed.status).toBe(400);
     expect(await h.repo.uploadsForOrder(O1.order.orderId)).toBe(0);
   });
 
@@ -314,6 +335,132 @@ describe("presigned upload, end to end", () => {
     expect(outcomes(h)).toMatchObject([{ outcome: { status: "ready" } }]);
     const again = (await h.upload(httpEvent("POST /trade/documents", body))) as APIGatewayProxyStructuredResultV2;
     expect(JSON.parse(again.body!)).toMatchObject({ status: "duplicate", reason: "same_file" });
+  });
+});
+
+describe("a reading that cannot finish is retried, never lost", () => {
+  let h: Harness;
+  beforeEach(async () => {
+    h = harness();
+    await h.addOrder(O1.order.entry);
+  });
+
+  const presigned = async (bytes: Uint8Array, docType: RequiredDocType) => {
+    const r = await presign(h, { ...(await signedUpload(h, O1.order.orderId, docType, fileHash(bytes))), size: bytes.byteLength });
+    expect(r.status).toBe(200);
+    return h.objects.clientPut(r.body.uploadUrl as string, bytes);
+  };
+  const withRuntime = (over: Partial<IngestRuntime>) => createExtractorHandler(() => ({ ...h.rt, ...over }));
+
+  it("finishes a bill of lading accepted by a delivery whose append to the order failed, without reading it again", async () => {
+    const bl = await renderTransport(O1.transport);
+    const docType = O1.order.requiredDocs[0]!;
+    const key = await presigned(bl, docType);
+    let appends = 0;
+    const flaky = withRuntime({
+      appendOrderDocument: async (doc) => {
+        if (appends++ === 0) throw new Error("ProvisionedThroughputExceededException");
+        return appendOrderDocument("orders", doc, h.db);
+      },
+    });
+    expect(await flaky(s3Event([key], "first"))).toEqual({ batchItemFailures: [{ itemIdentifier: "first" }] });
+    const calls = h.llmCalls();
+    expect(calls).toBeGreaterThan(0);
+    expect(h.db.get("orders", { orderId: O1.order.orderId })!.documents).toBeUndefined();
+    expect(outcomes(h)).toHaveLength(0);
+
+    h.advance(READ_CLAIM_STALE_MS + 1);
+    expect(await flaky(s3Event([key], "second", 2))).toEqual({ batchItemFailures: [] });
+    expect(h.llmCalls()).toBe(calls);
+    expect(h.db.get("orders", { orderId: O1.order.orderId })).toMatchObject({
+      documents: { extractions: { transport: O1.truth.transport }, fileHashes: [fileHash(bl)] },
+    });
+    expect(outcomes(h)).toMatchObject([{ outcome: { status: "ready", fileHash: fileHash(bl), docType, blNumberHash: blNumberHash(O1.order.entry.carrier, O1.truth.transport.document_number) } }]);
+    expect(await h.repo.upload(O1.order.orderId, fileHash(bl))).toMatchObject({ readStatus: "ready" });
+  });
+
+  it("retries a transient model failure instead of finishing it, and lets the uploader upload again once the retries run out", async () => {
+    const invoice = await renderCommercialInvoice(O1.invoice);
+    const key = await presigned(invoice, "COMMERCIAL_INVOICE");
+    const down = withRuntime({
+      extractor: async () => ({
+        provider: "down",
+        model: "none",
+        complete: async () => {
+          throw new ExtractionError("provider_error");
+        },
+      }),
+    });
+    // The first deliveries fail and give the upload back; nothing is finished or notified
+    expect(await down(s3Event([key], "d1", 1))).toEqual({ batchItemFailures: [{ itemIdentifier: "d1" }] });
+    expect(await h.repo.upload(O1.order.orderId, fileHash(invoice))).not.toHaveProperty("readClaimedAt");
+    expect(await h.repo.upload(O1.order.orderId, fileHash(invoice))).not.toHaveProperty("readStatus");
+    expect(outcomes(h)).toHaveLength(0);
+    // The model is back: the very next delivery reads it, with no stale wait
+    expect(await h.extract(s3Event([key], "d2", 2))).toEqual({ batchItemFailures: [] });
+    expect(outcomes(h)).toMatchObject([{ outcome: { status: "ready" } }]);
+
+    // Another file, with the model down for every delivery
+    const invoice2 = await renderCommercialInvoice({ ...O1.invoice, seed: "two" });
+    const key2 = await presigned(invoice2, "COMMERCIAL_INVOICE");
+    expect(await down(s3Event([key2], "e1", EXTRACTOR_MAX_RECEIVE - 1))).toEqual({ batchItemFailures: [{ itemIdentifier: "e1" }] });
+    expect(await down(s3Event([key2], "e2", EXTRACTOR_MAX_RECEIVE))).toEqual({ batchItemFailures: [] });
+    expect(outcomes(h).at(-1)).toMatchObject({ outcome: { status: "held", reason: "extractor_failed", failure: "provider_error", fileHash: fileHash(invoice2) } });
+    expect(await h.repo.upload(O1.order.orderId, fileHash(invoice2))).toMatchObject({ readStatus: "held:extractor_failed" });
+
+    // The same file again is allowed (not a 409), not counted, and is read when it lands
+    const before = await h.repo.uploadsForOrder(O1.order.orderId);
+    const retry = await presign(h, { ...(await signedUpload(h, O1.order.orderId, "COMMERCIAL_INVOICE", fileHash(invoice2))), size: invoice2.byteLength });
+    expect(retry.status).toBe(200);
+    expect(await h.repo.uploadsForOrder(O1.order.orderId)).toBe(before);
+    h.objects.clientPut(retry.body.uploadUrl as string, invoice2);
+    expect(await h.extract(s3Event([key2], "e3"))).toEqual({ batchItemFailures: [] });
+    expect(outcomes(h).at(-1)).toMatchObject({ outcome: { status: "ready", fileHash: fileHash(invoice2) } });
+    expect(await h.repo.upload(O1.order.orderId, fileHash(invoice2))).toMatchObject({ readStatus: "ready" });
+  });
+
+  it("does not finish a reading whose notice could not be queued: the message is retried and sends it", async () => {
+    const invoice = await renderCommercialInvoice(O1.invoice);
+    const key = await presigned(invoice, "COMMERCIAL_INVOICE");
+    const lossy = withRuntime({ notify: async () => false });
+    expect(await lossy(s3Event([key], "n1"))).toEqual({ batchItemFailures: [{ itemIdentifier: "n1" }] });
+    expect(await h.repo.upload(O1.order.orderId, fileHash(invoice))).not.toHaveProperty("readStatus");
+    expect(outcomes(h)).toHaveLength(0);
+    h.advance(READ_CLAIM_STALE_MS + 1);
+    expect(await h.extract(s3Event([key], "n2", 2))).toEqual({ batchItemFailures: [] });
+    expect(outcomes(h)).toMatchObject([{ outcome: { status: "ready" } }]);
+    expect(await h.repo.upload(O1.order.orderId, fileHash(invoice))).toMatchObject({ readStatus: "ready" });
+    expect(h.db.get("orders", { orderId: O1.order.orderId })!.documents).toMatchObject({ fileHashes: [fileHash(invoice)] });
+  });
+
+  it("lets POST /trade/documents be retried when storing the object failed", async () => {
+    const invoice = await renderCommercialInvoice(O1.invoice);
+    const { fileHash: _h, ...signed } = await signedUpload(h, O1.order.orderId, "COMMERCIAL_INVOICE", fileHash(invoice));
+    const body = JSON.stringify({ ...signed, file: Buffer.from(invoice).toString("base64") });
+    const send = (handler: typeof h.upload) => handler(httpEvent("POST /trade/documents", body)) as Promise<APIGatewayProxyStructuredResultV2>;
+    let puts = 0;
+    const flaky = createUploadHandler(() => ({
+      ...h.rt,
+      objects: {
+        ...h.objects,
+        put: async (key, bytes, type) => {
+          if (puts++ === 0) throw new Error("S3 unavailable");
+          return h.objects.put(key, bytes, type);
+        },
+      },
+    }));
+    expect((await send(flaky)).statusCode).toBe(500);
+    const key = documentKey(O1.order.orderId, fileHash(invoice));
+    expect(h.objects.objects.has(key)).toBe(false);
+    const retry = await send(flaky);
+    expect(retry.statusCode).toBe(202);
+    expect(h.objects.objects.has(key)).toBe(true);
+    // Admitted once: the retry did not spend another upload of the day
+    expect(await h.repo.uploadsForOrder(O1.order.orderId)).toBe(1);
+    expect(await h.extract(s3Event([key]))).toEqual({ batchItemFailures: [] });
+    expect(outcomes(h)).toMatchObject([{ outcome: { status: "ready" } }]);
+    // Once read, the same file is a duplicate again
+    expect(JSON.parse((await send(flaky)).body!)).toMatchObject({ status: "duplicate", reason: "same_file" });
   });
 });
 
@@ -439,6 +586,19 @@ describe("daily digest", () => {
     await runDigest(rt);
     h.advance(60_000);
     expect(await runDigest(h.rt)).toMatchObject({ changes: 1 });
+  });
+});
+
+describe("LLM_TIMEOUT_MS", () => {
+  it("defaults when unset, takes a positive integer, and fails loudly on anything else", () => {
+    expect(llmTimeoutMs({})).toBe(DEFAULT_LLM_TIMEOUT_MS);
+    expect(llmTimeoutMs({ LLM_TIMEOUT_MS: "" })).toBe(DEFAULT_LLM_TIMEOUT_MS);
+    expect(llmTimeoutMs({ LLM_TIMEOUT_MS: "45000" })).toBe(45_000);
+    for (const bad of ["abc", "0", "-5", "1.5", "60s", "NaN"]) {
+      expect(() => llmTimeoutMs({ LLM_TIMEOUT_MS: bad })).toThrow(/LLM_TIMEOUT_MS/);
+    }
+    const repo = new DynamoIngestRepo("ingest", { client: new FakeDynamo({ ingest: { pk: "pk", sk: "sk" } }) });
+    expect(() => settingsLoader(repo, async () => ({}), { LLM_TIMEOUT_MS: "soon" })).toThrow(/LLM_TIMEOUT_MS/);
   });
 });
 

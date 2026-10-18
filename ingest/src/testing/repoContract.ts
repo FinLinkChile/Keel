@@ -10,6 +10,7 @@ import {
   DAY_MS,
   MAX_DOCUMENTS_PER_ORDER_PER_DAY,
   MAX_EMAILS_PER_SENDER_PER_DAY,
+  READ_EXTRACTOR_FAILED,
   type IngestRepo,
   type UploadEntry,
 } from "../repo";
@@ -173,6 +174,20 @@ export function describeIngestRepo(name: string, make: RepoFactory): void {
         expect(await repo.upload(ORDER_A, word(2))).toBeUndefined();
       });
 
+      it("counts the daily limit per party: one party cannot exhaust the other's uploads", async () => {
+        const { repo, advance } = await setup();
+        for (let i = 0; i < MAX_DOCUMENTS_PER_ORDER_PER_DAY; i++) {
+          expect(await repo.admitUpload(entry(ORDER_A, i, { party: "importer", uploader: addr(8) }))).toBe("admitted");
+        }
+        expect(await repo.admitUpload(entry(ORDER_A, 100, { party: "importer", uploader: addr(8) }))).toBe("rate_limited");
+        expect(await repo.admitUpload(entry(ORDER_A, 101, { party: "exporter" }))).toBe("admitted");
+        expect(await repo.uploadsForOrder(ORDER_A, "importer")).toBe(MAX_DOCUMENTS_PER_ORDER_PER_DAY);
+        expect(await repo.uploadsForOrder(ORDER_A, "exporter")).toBe(1);
+        expect(await repo.uploadsForOrder(ORDER_A)).toBe(MAX_DOCUMENTS_PER_ORDER_PER_DAY + 1);
+        advance(DAY_MS + 1);
+        expect(await repo.admitUpload(entry(ORDER_A, 102, { party: "importer", uploader: addr(8) }))).toBe("admitted");
+      });
+
       it(`refuses the upload after ${MAX_DOCUMENTS_PER_ORDER_PER_DAY} in a day, records nothing, and lets other orders through`, async () => {
         const { repo, advance } = await setup();
         for (let i = 0; i < MAX_DOCUMENTS_PER_ORDER_PER_DAY; i++) expect(await repo.admitUpload(entry(ORDER_A, i))).toBe("admitted");
@@ -209,8 +224,49 @@ export function describeIngestRepo(name: string, make: RepoFactory): void {
       });
     });
 
+    describe("giving a reading back", () => {
+      it("drops the claim of an unfinished reading so the next reader takes it at once", async () => {
+        const { repo } = await setup();
+        expect(await repo.releaseReading(ORDER_A, word(1))).toBe(false);
+        await repo.admitUpload(entry(ORDER_A, 1));
+        expect(await repo.claimReading(ORDER_A, word(1), 60_000)).toBe(true);
+        expect(await repo.claimReading(ORDER_A, word(1), 60_000)).toBe(false);
+        expect(await repo.releaseReading(ORDER_A.toLowerCase() as Hex, word(1))).toBe(true);
+        expect(await repo.upload(ORDER_A, word(1))).not.toHaveProperty("readClaimedAt");
+        expect(await repo.claimReading(ORDER_A, word(1), 60_000)).toBe(true);
+      });
+
+      it("reopens a reading that ended as extractor_failed, and never one that ended otherwise", async () => {
+        const { repo } = await setup();
+        await repo.admitUpload(entry(ORDER_A, 1));
+        await repo.admitUpload(entry(ORDER_A, 2));
+        await repo.claimReading(ORDER_A, word(1), 60_000);
+        await repo.finishReading(ORDER_A, word(1), READ_EXTRACTOR_FAILED);
+        await repo.claimReading(ORDER_A, word(2), 60_000);
+        await repo.finishReading(ORDER_A, word(2), "ready");
+        expect(await repo.claimReading(ORDER_A, word(1), 0)).toBe(false);
+        expect(await repo.releaseReading(ORDER_A, word(2))).toBe(false);
+        expect(await repo.upload(ORDER_A, word(2))).toMatchObject({ readStatus: "ready" });
+        expect(await repo.releaseReading(ORDER_A, word(1))).toBe(true);
+        const reopened = await repo.upload(ORDER_A, word(1));
+        expect(reopened).not.toHaveProperty("readStatus");
+        expect(reopened).not.toHaveProperty("readClaimedAt");
+        expect(await repo.claimReading(ORDER_A, word(1), 60_000)).toBe(true);
+      });
+    });
+
     describe("accepted documents and the package", () => {
       const BL = word(0xb1);
+
+      it("returns the accepted record of a file, for a reading that is retried", async () => {
+        const { repo } = await setup();
+        expect(await repo.acceptedDocument(ORDER_A, word(1))).toBeUndefined();
+        await repo.acceptDocument({ orderId: ORDER_A, fileHash: word(1), docType: "BILL_OF_LADING", blHash: BL, extraction: { n: 1 } });
+        await repo.acceptDocument({ orderId: ORDER_A, fileHash: word(2), docType: "COMMERCIAL_INVOICE", extraction: { n: 2 } });
+        expect(await repo.acceptedDocument(ORDER_A.toLowerCase() as Hex, word(1))).toEqual({ docType: "BILL_OF_LADING", blHash: BL, extraction: { n: 1 } });
+        expect(await repo.acceptedDocument(ORDER_A, word(2))).toEqual({ docType: "COMMERCIAL_INVOICE", extraction: { n: 2 } });
+        expect(await repo.acceptedDocument(ORDER_B, word(1))).toBeUndefined();
+      });
 
       it("accepts a bill of lading for one order only", async () => {
         const { repo } = await setup();

@@ -11,7 +11,7 @@
 //   changes                             <createdMs>#<id>        change requests, by creation
 //   changeid#<id>                       ref                     where request <id> lives
 //   upload#<orderId>                    file#<fileHash>         an admitted upload, and its reading
-//   upload#<orderId>#<day>              count                   admitted uploads of an order that day (ttl)
+//   upload#<orderId>#<party>#<day>      count                   admitted uploads of one party to an order that day (ttl)
 //   order#<orderId>                     entry                   TradeOrderEntry, written by the orders API
 //   order#<orderId>                     doc#<fileHash>          a document both readers agreed on
 //   bl#<blNumberHash>                   bl                      the one order a bill of lading settles
@@ -35,6 +35,7 @@ import {
   DAY_MS,
   MAX_DOCUMENTS_PER_ORDER_PER_DAY,
   packageFrom,
+  READ_EXTRACTOR_FAILED,
   TradeOrderEntrySchema,
   utcDay,
   type AcceptedDocument,
@@ -43,6 +44,7 @@ import {
   type ChangeResolution,
   type IngestRepo,
   type StoredChangeRequest,
+  type StoredDocument,
   type StoredUpload,
   type TradeOrderEntry,
   type TradePackage,
@@ -68,7 +70,7 @@ export const ingestKey = {
   change: (createdMs: number, id: number) => ({ pk: "changes", sk: `${at(createdMs)}#${pad(id, 12)}` }),
   changeRef: (id: number) => ({ pk: `changeid#${id}`, sk: "ref" }),
   upload: (orderId: string, fileHash: string) => ({ pk: `upload#${lower(orderId)}`, sk: `file#${lower(fileHash)}` }),
-  uploadCount: (orderId: string, day: string) => ({ pk: `upload#${lower(orderId)}#${day}`, sk: "count" }),
+  uploadCount: (orderId: string, party: string, day: string) => ({ pk: `upload#${lower(orderId)}#${party}#${day}`, sk: "count" }),
   orderEntry: (orderId: string) => ({ pk: `order#${lower(orderId)}`, sk: "entry" }),
   document: (orderId: string, fileHash: string) => ({ pk: `order#${lower(orderId)}`, sk: `doc#${lower(fileHash)}` }),
   bl: (blHash: string) => ({ pk: `bl#${lower(blHash)}`, sk: "bl" }),
@@ -318,7 +320,7 @@ export class DynamoIngestRepo implements IngestRepo {
         },
       },
       {
-        Update: this.increment(ingestKey.uploadCount(u.orderId, utcDay(now)), {
+        Update: this.increment(ingestKey.uploadCount(u.orderId, u.party, utcDay(now)), {
           condition: "attribute_not_exists(#n) OR #n < :max",
           values: { ":max": max },
         }),
@@ -328,8 +330,11 @@ export class DynamoIngestRepo implements IngestRepo {
     return r.failed[0] ? "duplicate" : "rate_limited";
   }
 
-  async uploadsForOrder(orderId: Hex): Promise<number> {
-    return this.count(ingestKey.uploadCount(orderId, utcDay(this.now())));
+  async uploadsForOrder(orderId: Hex, party?: StoredUpload["party"]): Promise<number> {
+    const day = utcDay(this.now());
+    const parties = party ? [party] : (["importer", "exporter"] as const);
+    const counts = await Promise.all(parties.map((p) => this.count(ingestKey.uploadCount(orderId, p, day))));
+    return counts.reduce((a, b) => a + b, 0);
   }
 
   async upload(orderId: Hex, fileHash: Hex): Promise<StoredUpload | undefined> {
@@ -373,6 +378,18 @@ export class DynamoIngestRepo implements IngestRepo {
     );
   }
 
+  async releaseReading(orderId: Hex, fileHash: Hex): Promise<boolean> {
+    return this.conditional(
+      new UpdateCommand({
+        TableName: this.table,
+        Key: ingestKey.upload(orderId, fileHash),
+        UpdateExpression: "REMOVE readClaimedAt, readStatus",
+        ConditionExpression: "attribute_exists(pk) AND (attribute_not_exists(readStatus) OR readStatus = :failed)",
+        ExpressionAttributeValues: { ":failed": READ_EXTRACTOR_FAILED },
+      }),
+    );
+  }
+
   async orderForBl(blHash: Hex): Promise<Hex | undefined> {
     return (await this.get(ingestKey.bl(blHash)))?.orderId as Hex | undefined;
   }
@@ -409,6 +426,16 @@ export class DynamoIngestRepo implements IngestRepo {
     const r = await this.transact(items);
     // A concurrent reading of the same file won the race: it is accepted all the same
     return r.ok || r.failed[0] === true;
+  }
+
+  async acceptedDocument(orderId: Hex, fileHash: Hex): Promise<StoredDocument | undefined> {
+    const item = await this.get(ingestKey.document(orderId, fileHash));
+    if (!item) return undefined;
+    return {
+      docType: item.docType as RequiredDocType,
+      ...(item.blHash ? { blHash: item.blHash as Hex } : {}),
+      extraction: item.extraction as object,
+    };
   }
 
   async tradePackage(orderId: Hex, required: readonly RequiredDocType[]): Promise<TradePackage> {

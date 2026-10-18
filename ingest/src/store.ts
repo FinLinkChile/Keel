@@ -10,16 +10,19 @@ import {
   DAY_MS,
   MAX_DOCUMENTS_PER_ORDER_PER_DAY,
   packageFrom,
+  READ_EXTRACTOR_FAILED,
   type AcceptedDocument,
   type ChangeResolution,
   type IngestRepo,
   type StoredChangeRequest,
+  type StoredDocument,
   type StoredUpload,
   type TradePackage,
   type UploadAdmission,
   type UploadEntry,
 } from "./repo";
 import type { AccountAlert } from "./trade/accountAlert";
+import type { Party } from "./trade/upload";
 
 export {
   CHANGE_COOLDOWN_DAYS,
@@ -201,8 +204,8 @@ export class IngestStore implements IngestRepo {
       return "duplicate";
     }
     const { n } = this.db
-      .prepare("SELECT count(*) AS n FROM trade_uploads WHERE order_id = ? AND received_at > ?")
-      .get(orderId, this.dayAgo()) as { n: number };
+      .prepare("SELECT count(*) AS n FROM trade_uploads WHERE order_id = ? AND party = ? AND received_at > ?")
+      .get(orderId, u.party, this.dayAgo()) as { n: number };
     if (n >= max) return "rate_limited";
     this.db
       .prepare(
@@ -212,10 +215,10 @@ export class IngestStore implements IngestRepo {
     return "admitted";
   }
 
-  async uploadsForOrder(orderId: Hex): Promise<number> {
+  async uploadsForOrder(orderId: Hex, party?: Party): Promise<number> {
     const row = this.db
-      .prepare("SELECT count(*) AS n FROM trade_uploads WHERE order_id = ? AND received_at > ?")
-      .get(orderId.toLowerCase(), this.dayAgo()) as { n: number };
+      .prepare(`SELECT count(*) AS n FROM trade_uploads WHERE order_id = ? AND received_at > ?${party ? " AND party = ?" : ""}`)
+      .get(...([orderId.toLowerCase(), this.dayAgo(), ...(party ? [party] : [])] as [string, number, ...string[]])) as { n: number };
     return row.n;
   }
 
@@ -260,6 +263,13 @@ export class IngestStore implements IngestRepo {
       .run(status, orderId.toLowerCase(), fileHash);
   }
 
+  async releaseReading(orderId: Hex, fileHash: Hex): Promise<boolean> {
+    const r = this.db
+      .prepare("DELETE FROM trade_reads WHERE order_id = ? AND file_hash = ? AND (status IS NULL OR status = ?)")
+      .run(orderId.toLowerCase(), fileHash, READ_EXTRACTOR_FAILED);
+    return r.changes === 1;
+  }
+
   async orderForBl(blHash: Hex): Promise<Hex | undefined> {
     const row = this.db.prepare("SELECT order_id FROM trade_documents WHERE bl_hash = ?").get(blHash) as
       | { order_id: Hex }
@@ -283,6 +293,14 @@ export class IngestStore implements IngestRepo {
       if (e instanceof Error && /UNIQUE/.test(e.message)) return false;
       throw e;
     }
+  }
+
+  async acceptedDocument(orderId: Hex, fileHash: Hex): Promise<StoredDocument | undefined> {
+    const row = this.db
+      .prepare("SELECT doc_type, bl_hash, extraction FROM trade_documents WHERE order_id = ? AND file_hash = ?")
+      .get(orderId.toLowerCase(), fileHash) as { doc_type: RequiredDocType; bl_hash: Hex | null; extraction: string } | undefined;
+    if (!row) return undefined;
+    return { docType: row.doc_type, ...(row.bl_hash ? { blHash: row.bl_hash } : {}), extraction: JSON.parse(row.extraction) as object };
   }
 
   async tradePackage(orderId: Hex, required: readonly RequiredDocType[]): Promise<TradePackage> {
