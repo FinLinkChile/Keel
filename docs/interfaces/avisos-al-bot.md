@@ -5,7 +5,7 @@ description: "Cómo le entregan el motor, la ingesta y otros productores los avi
 tags: [bot, avisos, telegram, ingesta, motor, t4-3, t4-6]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T22:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T22:00:00Z }
 ---
 
 **[PROPUESTA]** Diseño del Área 4 (T4.3 y T4.6) para que lo usen las Áreas 2 y 3. El código ya existe en `bot/` **[HECHO]**. Está por confirmar con las Áreas 2 y 3.
@@ -37,7 +37,7 @@ Los dos tokens miden al menos 32 caracteres, son distintos entre sí y distintos
 
 Avisar es opcional y nunca es un paso del camino de pago. Un productor llama al bot solo si tiene configurados la URL y el token del bot. Si el bot está caído o tarda, el correo, el documento o la decisión se procesan igual: timeout corto y el error solo se registra.
 
-Mandar dos veces lo mismo no repite el mensaje: cada aviso tiene un `id` y el bot envía cada `id` una sola vez. La deduplicación vive en memoria, así que un reinicio del bot puede reenviar.
+Mandar dos veces lo mismo no repite el mensaje: cada aviso tiene un `id` y el bot envía cada `id` una sola vez a cada chat. En local la deduplicación vive en memoria, así que un reinicio del bot puede reenviar; en AWS vive en DynamoDB (abajo).
 
 # Salida de ingesta
 
@@ -80,5 +80,7 @@ En la rama `AWS` los avisos viajan por una cola SQS con el mismo cuerpo de estas
 
 * `POST /notices` y `POST /ingest/outcomes` siguen existiendo para productores externos, con un solo token (`bot_inbound_token`), y solo encolan: responden `202 {"queued":true}`, sin el resultado por aviso.
 * El directorio (cuentas, chats por rol, etiquetas de orden) lo carga el operador con `PUT /bot/recipients` y se lee con `GET /bot/recipients`, con token `bot_admin_token` y la cabecera `x-admin-actor`; cada cambio queda auditado. Si una orden no se registra aquí, los avisos de ingesta de esa orden se descartan (`mapper_failed`) sin avisar a nadie.
-* La deduplicación, el tope por chat (por hora de reloj) y las retenciones quedan en DynamoDB. Un fallo reintentable de Telegram vuelve a la cola solo para los chats pendientes.
+* La deduplicación, el tope por chat (por hora de reloj) y las retenciones quedan en DynamoDB. Un fallo reintentable de Telegram vuelve a la cola solo para los chats pendientes y devuelve el cupo de la hora. Cada chat se reserva por 5 minutos mientras se envía y queda marcado como enviado solo al terminar, así que una caída a mitad de envío no pierde el aviso: puede repetirlo una vez (al menos una vez, no como máximo una vez).
+* Un mensaje de la cola con forma inválida se descarta sin reintento y se registra como `queue_invalid`, que tiene alarma.
+* `PUT /bot/recipients` escribe la auditoría antes de aplicar el cambio, y rechaza borrar una cuenta que una orden guardada todavía nombra (400 `invalid_recipients`).
 * `open` y `resolve` del agente todavía no tienen aviso: propuesta al Área 4.

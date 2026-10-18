@@ -5,7 +5,7 @@ description: "Cómo se propone correr Keel en AWS sin servidores propios: princi
 tags: [aws, serverless, despliegue, api, waf, throttling]
 modo: trade
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-10-18T15:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T22:00:00Z }
 ---
 
 **[PROPUESTA]** del Área 2 (Darienn), 17 de octubre de 2026. Falta que el equipo la confirme.
@@ -17,7 +17,7 @@ Keel corre en una cuenta AWS con servicios administrados, sin servidores propios
 1. **La red es una URL de RPC.** Todo lo que habla con la cadena la recibe por configuración, hoy la de Base Sepolia (84532). Cambiar de red es cambiar la URL, el `chainId` y `contracts/deployments/<chainId>.json`.
 2. **El motor no cambia.** Es una librería pura que las Lambdas del agente y del monitor importan, sin red ni LLM propios. Lo que cambia es dónde corre y dónde guarda su estado.
 3. **La cadena es la fuente de verdad del estado.** Las tablas guardan lo que la cadena no tiene: la orden firmada, las extracciones y los avisos.
-4. **Las llaves de servidor van en KMS y la del dueño nunca entra a AWS.** Una llave por rol y un rol de IAM por función.
+4. **Las llaves de servidor van en KMS y la del dueño nunca entra a AWS.** Una llave por rol y un rol de IAM por función. En la rama `AWS`, mientras el Área 1 no registre las direcciones de KMS, la demo toma las llaves actuales de Systems Manager (ver la sección de implementación).
 5. **Cada capa asume que la anterior pudo fallar.** Sin un PDR válido el gate y el escrow revierten, y cada decisión deja evidencia con su hash antes de enviarse.
 
 ## Dónde está cada cosa
@@ -75,7 +75,7 @@ Código del 18 de octubre (Área 5 con Claude, sobre esta propuesta del Área 2)
 
 Diferencias con esta propuesta, y por qué:
 
-* **Secretos en Systems Manager, no en Secrets Manager.** SecureString no tiene costo en la cuenta gratuita; Secrets Manager cobra unos 0,40 USD por secreto al mes. Cada función lee solo los suyos (`infra/terraform/locals.tf`).
+* **Secretos en Systems Manager, no en Secrets Manager.** SecureString no tiene costo en la cuenta gratuita; Secrets Manager cobra unos 0,40 USD por secreto al mes. Cada función lee solo los suyos (`infra/terraform/locals.tf`). Terraform no los crea: un parámetro gestionado por Terraform guarda su valor descifrado en el estado, así que se crean a mano (`infra/terraform/README.md`).
 * **Llaves por rol en KMS o en SSM.** El código acepta las dos (`KEY_SOURCE_*`). La demo usa SSM porque las direcciones registradas en la cadena son las de las llaves actuales; pasar a KMS exige que el Área 1 registre antes las direcciones de KMS (`setPolicySigner`, `setGuardian`, relayer).
 * **El bot solo envía, y los chats los registra el operador** con `PUT /bot/recipients` (token y auditoría), sin editar archivos. Sin webhook ni ruta desde Telegram.
 * **Un candado por relayer en DynamoDB** además de la cola por Safe: cubre el choque de nonce si un relayer sirve a varias Safes, y no depende de la concurrencia reservada, que una cuenta nueva puede no permitir.

@@ -5,7 +5,7 @@ description: "Cómo prueba la app, la naviera o el árbitro quién hace cada pet
 tags: [api, autenticacion, eip-712, aws, app]
 modo: trade
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T03:30:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T22:00:00Z }
 ---
 
 **[PROPUESTA]** Diseño de la rama `AWS` (Área 5 con Claude, sobre la arquitectura ampliada del Área 2). Código: `schemas/src/api.ts` y `aws/src/auth.ts` **[HECHO]**. Lo confirman el Área 2 (dueña de `schemas/`) y el Área 4 (la app lo firma).
@@ -48,4 +48,4 @@ Prueba quién pide, para quién vale y por cuánto tiempo. No autoriza nada por 
 
 Ninguna petición mueve fondos. Lo que llega a la cadena son las firmas de las partes sobre los structs del escrow (orden, aprobación del saldo, cancelación, resolución), que el contrato verifica de nuevo.
 
-Riesgo declarado: una firma capturada se puede repetir dentro de los 10 minutos sobre la misma ruta y el mismo cuerpo. Las rutas que escriben son idempotentes (escrituras condicionales), así que repetirla no duplica nada. Lo prueba `aws/src/auth.test.ts`.
+Riesgo declarado: una firma capturada se puede repetir dentro de los 10 minutos sobre la misma ruta y el mismo cuerpo. Para quién vale: cualquiera que la intercepte. Dónde se contiene: las rutas que escriben son idempotentes; repetir una petición idéntica no crea nada nuevo ni cambia la orden (escrituras condicionales en `aws/src/orders/`). Qué lo prueba: `aws/src/orders/hardening.test.ts`, bloque "a replayed signed request has no second effect" (repite la misma petición firmada a `POST /proposals`, `POST /orders/{orderId}/approve-balance` y `POST /shipments`). Que la firma no sirve en otra ruta, con otro cuerpo, fuera de plazo o en otra cadena lo prueba `aws/src/auth.test.ts`.

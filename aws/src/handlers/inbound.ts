@@ -4,8 +4,8 @@
 // runs: authentication (SPF/DKIM/DMARC), duplicates, sender limit, parser, quarantined
 // extractor, agreement, alias binding, change requests. The outcome goes to the bot as
 // { kind: "ingest_outcome", payload: { source: "email", outcome } }.
-// The envelope comes in x-envelope-ip, x-envelope-helo and x-envelope-from. API Gateway's 10 MB
-// payload limit is below ingest's MAX_EMAIL_BYTES, so a larger email never reaches here.
+// The envelope comes in x-envelope-ip, x-envelope-helo and x-envelope-from. The body is capped at
+// MAX_BODY_BYTES (5.5 MB, aws/src/http.ts), below ingest's MAX_EMAIL_BYTES, so a larger email is refused with 413.
 import { createHash } from "node:crypto";
 import { AliasTableSchema, MAX_EMAIL_BYTES, MIN_TOKEN_LENGTH, receiveEmail, type AliasTable } from "@keel/ingest";
 import { api, bearerMatches, HttpError, type Reply, type Request } from "../http";

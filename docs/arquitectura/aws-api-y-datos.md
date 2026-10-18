@@ -21,8 +21,10 @@ La regla común: la API no decide nada y cada ruta exige su firma o su token. Un
 | POST | `/proposals/{orderId}/exporter-signature`, `/importer-signature`, `/reject` | Propuestas | Exportador o importador | Firma de la `PurchaseOrder` | Nuevo |
 | GET | `/orders`, `/orders/{orderId}` | Consulta de órdenes | Las partes | Petición firmada | Nuevo |
 | GET | `/needs-you`, `/wallet` | Consulta de órdenes | Importador o exportador | Petición firmada | Nuevo |
-| GET | `/suppliers`, `/trade-setup` | Directorio | Importador | Petición firmada | Nuevo |
+| GET | `/suppliers` | Directorio | Importador | Petición firmada | Nuevo |
+| GET | `/trade-setup` | Directorio | Cualquiera (datos públicos del despliegue: escrow, gate, Safe, token, `chainId`) | Ninguna | Nuevo |
 | POST | `/suppliers` | Directorio | Operador | Token de administración | Nuevo |
+| POST, GET | `/importers`, `/importers/{safe}` **[PROPUESTA]** | Directorio | Operador | Token de administración | Nuevo: registra quién representa a la Safe del importador |
 | POST | `/shipments` | Atestaciones | Naviera | Firma de la `ShipmentAttestation` | Nuevo |
 | POST | `/orders/{orderId}/approve-balance` | Firmas de cierre | Importador | Firma del importador, EOA o ERC-1271 | Nuevo |
 | POST | `/orders/{orderId}/cancel-signature` | Firmas de cierre | Las partes | Firma sobre `cancelNonceOf` | Nuevo |

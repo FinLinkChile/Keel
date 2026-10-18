@@ -10,7 +10,8 @@
 //     as a notice.
 //   POST /trade/documents   { orderId, docType, issuedAt, signature, file }   (compatibility)
 //     The same authorization with the file in the body (base64): stored at the same key and
-//     read the same way. API Gateway's 10 MB payload limit applies to the base64 body.
+//     read the same way. The body is capped at MAX_BODY_BYTES (5.5 MB, aws/src/http.ts: a synchronous
+//     Lambda takes at most 6 MB), so this route carries a PDF of about 4 MB; larger files use /trade/uploads.
 //
 // Asking again for a file that was admitted but not read (the PUT or the store failed, or the
 // reading ended as extractor_failed), by the same uploader with the same type, is allowed and

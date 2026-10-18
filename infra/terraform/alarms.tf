@@ -38,7 +38,8 @@ resource "aws_cloudwatch_log_metric_filter" "agent_error" {
 
   name           = "${local.name}-agent-error"
   log_group_name = aws_cloudwatch_log_group.fn["agent"].name
-  pattern        = "\"AGENT_ERROR\""
+  # Un pase fallido ya no hace fallar la funcion (no retiene la cola de la Safe), asi que se cuenta aqui
+  pattern = "?\"AGENT_ERROR\" ?\"pass_failed\""
 
   metric_transformation {
     name      = "AgentError"
@@ -51,7 +52,7 @@ resource "aws_cloudwatch_metric_alarm" "agent_error" {
   count = var.enable_alarms ? 1 : 0
 
   alarm_name          = "${local.name}-agent-error"
-  alarm_description   = "El agente registro AGENT_ERROR"
+  alarm_description   = "El agente registro AGENT_ERROR o un pase fallido"
   namespace           = "Keel"
   metric_name         = "AgentError"
   statistic           = "Sum"
