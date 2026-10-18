@@ -183,7 +183,7 @@ function NewOrderScreen() {
     try {
       await proposals.save(proposal);
     } catch (e) {
-      return setNotice(apiProblem(e) ?? 'The order could not be saved. Try again.');
+      return setNotice(apiProblem(e) ?? t('The order could not be saved. Try again.'));
     }
     router.replace({ pathname: '/new-order-sent', params: { orderId: proposal.orderId } });
   }

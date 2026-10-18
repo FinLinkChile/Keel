@@ -1,5 +1,6 @@
 import type { Hex } from '@keel/schemas';
 
+import { t } from '../i18n/translate';
 import type { Signer, Signers } from '../wallet/signer';
 
 import { tokenToCents } from './amounts';
@@ -32,7 +33,7 @@ export function orderFromView(v: OrderView, carrier: string, goods?: string): Or
   const stage = STAGE[v.state] ?? 'signed';
   return {
     label,
-    goods: goods || `Order ${label}`,
+    goods: goods || t('Order {label}', { label }),
     goodsShort: goods || label,
     quantity: '',
     carrier,
