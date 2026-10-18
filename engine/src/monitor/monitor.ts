@@ -16,6 +16,7 @@ import { type Hex, keelDomain } from "@keel/schemas";
 import { typedDataDigest } from "@keel/schemas/hash";
 import { decodeEventLog, encodeFunctionData, parseAbi } from "viem";
 import { CallReverted } from "../agent/agent";
+import { errorDetail } from "../agent/detail";
 import { loadEvidence } from "../verify";
 
 export const MONITOR_EVENTS_ABI = parseAbi([
@@ -48,6 +49,9 @@ export interface MonitorChain {
   logs(addresses: readonly Hex[], fromBlock: bigint, toBlock: bigint): Promise<MonitorLog[]>;
   // The attestation the escrow accepted for an order: what the importer's BalanceApproval signs
   attestationHash(escrow: Hex, orderId: Hex): Promise<Hex>;
+  // The importer of an order (po.importer): the escrow is shared, so a release is the monitor's
+  // concern only when the order is its Safe's
+  importerOf(escrow: Hex, orderId: Hex): Promise<Hex>;
 }
 
 // Sends the pause. Throws CallReverted when the key may not pause (simulated first, no gas spent).
@@ -60,11 +64,18 @@ export interface MonitorConfig {
   chainId: number;
   gate: Hex;
   escrow: Hex;
+  // The importer Safe this monitor watches. The TradeEscrow is shared by every importer, so a
+  // BalanceReleased of an order of another Safe is not an incident here and never pauses this gate.
+  safe: Hex;
   evidenceDir: string;
   // First block to read; later ticks continue from the last block read
   fromBlock: bigint;
   // Most blocks read in one request, for RPC providers that limit the range
   maxRange?: bigint;
+  // Most requests of `maxRange` blocks in one tick (default: no limit). A tick that stops there
+  // continues from `cursor` on the next one, so a host with a time limit (Lambda) never starts
+  // a run it cannot finish when it is far behind.
+  maxRangesPerTick?: number;
   // Whether an earlier run of this monitor already paused the gate (and no GateUnpaused followed).
   // A process that restarts between ticks, such as a Lambda, persists it with `cursor`.
   pausedHere?: boolean;
@@ -138,7 +149,7 @@ export class Monitor {
   async tick(): Promise<MonitorEvent[]> {
     const latest = await this.deps.chain.latestBlock();
     const events: MonitorEvent[] = [];
-    while (this.next <= latest) {
+    for (let ranges = 0; this.next <= latest && ranges < (this.config.maxRangesPerTick ?? Infinity); ranges++) {
       const to = latest < this.next + (this.config.maxRange ?? 2000n) - 1n ? latest : this.next + (this.config.maxRange ?? 2000n) - 1n;
       const logs = await this.deps.chain.logs([this.config.gate, this.config.escrow], this.next, to);
       logs.sort((a, b) => (a.blockNumber === b.blockNumber ? a.logIndex - b.logIndex : a.blockNumber < b.blockNumber ? -1 : 1));
@@ -176,6 +187,15 @@ export class Monitor {
         if (!fromEscrow) return null;
         const digest = a.authorizationDigest as Hex;
         const orderId = a.orderId as Hex;
+        // Another importer's order on the shared escrow is none of this monitor's business
+        let importer: Hex;
+        try {
+          importer = await this.deps.chain.importerOf(this.config.escrow, orderId);
+        } catch (e) {
+          // Whose order it is cannot be told: alert the people, but never pause on a guess
+          return { ...at, kind: "incident", reason: "UNKNOWN_DOCUMENT_DECISION", orderId, pdrHash: digest, action: "alerted", pauseRevert: `ORDER_READ_FAILED: ${errorDetail(e)}` };
+        }
+        if (low(importer) !== low(this.config.safe)) return null;
         if ((await this.issuedByEngine(digest)) || (await this.importerApproved(orderId, digest))) return null;
         return this.incident({ ...at, kind: "incident", reason: "UNKNOWN_DOCUMENT_DECISION", orderId, pdrHash: digest });
       }
@@ -234,7 +254,7 @@ export class Monitor {
       return { ...event, action: "paused", pauseTx: hash };
     } catch (e) {
       if (e instanceof CallReverted) return { ...event, action: "alerted", pauseRevert: e.reason };
-      return { ...event, action: "alerted", pauseRevert: (e as Error).message };
+      return { ...event, action: "alerted", pauseRevert: errorDetail(e) };
     }
   }
 }

@@ -22,6 +22,9 @@ function revertData(e: unknown): { data?: Hex } | null {
 export interface RpcChainOptions {
   // First block searched for escrow logs, such as the escrow deployment block. Default: earliest.
   fromBlock?: bigint;
+  // Most milliseconds to wait for a receipt. Default: viem's (180 s), which suits the CLI; a Lambda
+  // with a shorter timeout passes less, and the next pass finds the order where the chain left it.
+  receiptTimeoutMs?: number;
 }
 
 export function rpcChain(rpcUrl: string, relayer: LocalAccount, options: RpcChainOptions = {}): AgentChain & { chainId(): Promise<number> } {
@@ -47,7 +50,7 @@ export function rpcChain(rpcUrl: string, relayer: LocalAccount, options: RpcChai
     },
     async send(c) {
       const hash = await wallet.sendTransaction({ to: c.to, data: c.data, chain: null });
-      const { status } = await client.waitForTransactionReceipt({ hash });
+      const { status } = await client.waitForTransactionReceipt({ hash, ...(options.receiptTimeoutMs !== undefined && { timeout: options.receiptTimeoutMs }) });
       return { hash, status };
     },
   };

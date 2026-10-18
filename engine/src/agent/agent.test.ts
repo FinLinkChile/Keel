@@ -529,6 +529,96 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
       expect(sent).toHaveLength(0);
     });
 
+    it("a cancel the escrow rejects is reported but does not block the refund of the same pass", async () => {
+      const order = await openOrder();
+      await fundOrder(order);
+      const nonce = await cancelNonce(order.orderId);
+      const typed = { domain: domain(), types: { CancelOrder: EIP712_TYPES.CancelOrder }, primaryType: "CancelOrder" as const, message: { orderId: order.orderId, nonce } };
+      // The exporter's signature is a forger's: right nonce, so the agent tries it and the escrow rejects it
+      writeOrder(order, { closing: { cancel: { cancelNonce: nonce, sigImporter: await safeSign(typed), sigExporter: await forger.signTypedData(typed) } } });
+      chain.setTime(DEADLINE + GRACE + 1n);
+      const events = await agent().tick();
+      expect(events).toMatchObject([
+        { state: "ADVANCE_PAID", outcome: "held", reason: "SIMULATION_REVERTED", action: "cancel" },
+        { state: "ADVANCE_PAID", outcome: "sent", action: "refundAfterDeadline", status: "success" },
+      ]);
+      expect(sent).toHaveLength(1);
+      expect(await stateOf(order.orderId)).toBe("REFUNDED");
+      expect(notices.filter((n) => n.action === "cancel")).toHaveLength(1);
+    });
+
+    it("an approval the escrow rejects is reported and the agent's own release still goes out in the same pass", async () => {
+      const order = await openOrder();
+      await fundOrder(order);
+      const { attestation } = await storeShipment(order);
+      storeDocuments(order);
+      chain.setTime(ON_BOARD + DAY);
+      const keel = agent();
+      await keel.tick();
+      const attestationHash = structHash("ShipmentAttestation", attestation);
+      const typed = { domain: domain(), types: { BalanceApproval: EIP712_TYPES.BalanceApproval }, primaryType: "BalanceApproval" as const, message: { orderId: order.orderId, attestationHash } };
+      writeOrder(order, { closing: { balanceApproval: { sigImporter: await exporter.signTypedData(typed), attestationHash } } });
+      expect(await keel.tick()).toMatchObject([
+        { outcome: "held", reason: "SIMULATION_REVERTED", action: "approveBalance", revert: "BadImporterSignature" },
+        { outcome: "sent", action: "releaseBalance", status: "success" },
+      ]);
+      expect(await stateOf(order.orderId)).toBe("SETTLED");
+    });
+
+    it("a malformed closing entry is dropped instead of blocking the order", async () => {
+      const order = await openOrder();
+      await fundOrder(order);
+      writeOrder(order, {
+        closing: {
+          cancel: { cancelNonce: "not a number", sigImporter: "0x00", sigExporter: "0x00" },
+          resolution: { toImporter: "1.5", toExporter: {}, sigArbiter: "0x00" },
+          balanceApproval: { sigImporter: 5, attestationHash: "nope" },
+        },
+      });
+      chain.setTime(DEADLINE + GRACE + 1n);
+      expect(await agent().tick()).toMatchObject([{ state: "ADVANCE_PAID", outcome: "sent", action: "refundAfterDeadline", status: "success" }]);
+    });
+
+    it("an AGENT_ERROR detail never carries the RPC URL", async () => {
+      await openOrder();
+      const failing: AgentChain = {
+        ...agentChain(),
+        call: async () => {
+          throw Object.assign(new Error("HTTP request failed.\n\nURL: https://rpc.example/v2/SECRETKEY\nVersion: viem@2"), { shortMessage: "HTTP request failed." });
+        },
+      };
+      const keel = new Agent(
+        { chainId: 1, escrow, safe, policy: tradePolicy(word("roles-config-v1")), decisionTtlSeconds: 3600, evidenceDir: join(dir, "evidence") },
+        { chain: failing, store: new FileStore(dir), signer: policySigner },
+      );
+      const [event] = await keel.tick();
+      expect(event).toMatchObject({ outcome: "failed", reason: "AGENT_ERROR", detail: "HTTP request failed." });
+      const plain: AgentChain = { ...failing, call: async () => Promise.reject(new Error("fetch failed: https://rpc.example/v2/SECRETKEY")) };
+      const again = new Agent(
+        { chainId: 1, escrow, safe, policy: tradePolicy(word("roles-config-v1")), decisionTtlSeconds: 3600, evidenceDir: join(dir, "evidence") },
+        { chain: plain, store: new FileStore(dir), signer: policySigner },
+      );
+      expect(JSON.stringify(await again.tick())).not.toContain("SECRETKEY");
+    });
+
+    it("documents with only one of the two extractions are still pending, not an error", async () => {
+      const order = await openOrder();
+      await fundOrder(order);
+      await storeShipment(order);
+      chain.setTime(ON_BOARD + DAY);
+      const keel = agent();
+      await keel.tick();
+      const full = extractions();
+      writeStoreFile(dir, ["orders", order.orderId, "documents.json"], { extractions: { transport: full.transport }, fileHashes: FILES });
+      expect((await keel.tick())[0]).toMatchObject({ outcome: "waiting", reason: "DOCUMENTS_PENDING" });
+      writeStoreFile(dir, ["orders", order.orderId, "documents.json"], { extractions: { invoice: full.invoice }, fileHashes: FILES });
+      expect((await keel.tick())[0]).toMatchObject({ outcome: "waiting", reason: "DOCUMENTS_PENDING" });
+      writeStoreFile(dir, ["orders", order.orderId, "documents.json"], { extractions: {}, fileHashes: [] });
+      expect((await keel.tick())[0]).toMatchObject({ outcome: "waiting", reason: "DOCUMENTS_PENDING" });
+      storeDocuments(order);
+      expect((await keel.tick())[0]).toMatchObject({ outcome: "sent", action: "releaseBalance" });
+    });
+
     it("relays the arbiter's resolution of a dispute", async () => {
       const arbiter = privateKeyToAccount(word("arbiter"));
       const order = await openOrder({ arbiter: arbiter.address });

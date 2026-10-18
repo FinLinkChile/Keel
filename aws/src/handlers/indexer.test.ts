@@ -49,6 +49,7 @@ describe("escrow indexer", () => {
       return logs.filter((l) => l.blockNumber >= from && l.blockNumber <= to && addresses.some((a) => a.toLowerCase() === l.address));
     },
     attestationHash: async () => word("unused"),
+    importerOf: async () => word("unused").slice(0, 42) as Hex,
   };
   const deps = {
     env: TEST_ENV,

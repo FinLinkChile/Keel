@@ -216,7 +216,7 @@ async function monitor(args: string[]): Promise<number> {
   const pauser = pauserKey && pauserOn(rpcChain(rpc, pauserKey), pauserKey.address);
   const fromBlock = values["from-block"] !== undefined ? BigInt(values["from-block"]) : (await chain.latestBlock()) + 1n;
   const watch = new Monitor(
-    { chainId, gate, escrow, evidenceDir: values.evidence ?? DEFAULT_EVIDENCE, fromBlock },
+    { chainId, gate, escrow, safe, evidenceDir: values.evidence ?? DEFAULT_EVIDENCE, fromBlock },
     {
       chain,
       pauser,

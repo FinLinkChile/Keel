@@ -16,6 +16,7 @@ import { decodeEventLog } from "viem";
 import { type Env, table } from "../config";
 import { ddb, isConditionFailed } from "../db";
 import { acquire } from "../lock";
+import { redactedError } from "../redact";
 import type { OrderItem } from "../tables";
 import { logLine } from "../agent/clients";
 import { type RuntimeDeployment, rpcUrl, runtimeDeployment } from "../agent/deployment";
@@ -81,7 +82,7 @@ export async function applyEvent(orderId: Hex, state: EscrowState, log: Pick<Mon
 
 export interface IndexerPassDeps {
   context(): Promise<RuntimeDeployment>;
-  chain(ctx: RuntimeDeployment): Promise<MonitorChain>;
+  chain(ctx: RuntimeDeployment): Promise<Pick<MonitorChain, "latestBlock" | "logs">>;
   log(line: Record<string, unknown>): void;
   env: Env;
 }
@@ -134,6 +135,11 @@ export async function runIndexerPass(deps: IndexerPassDeps): Promise<IndexerPass
   }
 }
 
+// An error that leaves this function reaches the Lambda runtime log: no RPC URL in it
 export const handler = async (): Promise<void> => {
-  await runIndexerPass(defaultDeps());
+  try {
+    await runIndexerPass(defaultDeps());
+  } catch (e) {
+    throw redactedError(e);
+  }
 };

@@ -75,7 +75,12 @@ export function deployment(env: Env = process.env, ssm: SSMClient = new SSMClien
     } while (NextToken);
     return parseDeployment(values);
   })();
-  return cached;
+  // A failed read is retried on the next call instead of being cached
+  const attempt = cached;
+  attempt.catch(() => {
+    if (cached === attempt) cached = undefined;
+  });
+  return attempt;
 }
 
 // For tests
