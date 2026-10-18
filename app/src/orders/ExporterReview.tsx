@@ -6,6 +6,7 @@ import { View } from 'react-native';
 import { config } from '@/config';
 import { proposals, useData } from '@/data';
 import { tokenToCents } from '@/data/amounts';
+import { apiProblem } from '@/data/apiProblem';
 import { exporterRejects, exporterSigns } from '@/data/proposalFlow';
 import {
   CHECK_WORDS,
@@ -90,8 +91,8 @@ export function ExporterReview({ orderId }: { orderId: Hex }) {
     try {
       const move = await exporterSigns(proposals, proposal, { signer, setup, registeredPayout, now: Date.now() / 1000 });
       if (!move.ok) setFailed(move.checks);
-    } catch {
-      setProblem('The wallet could not sign. Try again.');
+    } catch (e) {
+      setProblem(apiProblem(e) ?? 'The wallet could not sign. Try again.');
     }
     setBusy(false);
   }
@@ -218,7 +219,7 @@ export function ExporterReview({ orderId }: { orderId: Hex }) {
             label="Reject the order"
             onPress={async () => {
               setRejecting(false);
-              await exporterRejects(proposals, proposal);
+              await exporterRejects(proposals, proposal).catch((e) => setProblem(apiProblem(e) ?? 'The order could not be rejected. Try again.'));
             }}
           />
           <Button label="Keep reviewing" variant="secondary" onPress={() => setRejecting(false)} />

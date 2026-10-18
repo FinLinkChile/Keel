@@ -86,6 +86,9 @@ export type Order = {
   po: PurchaseOrder;
   terms: OrderTerms;
   quote?: Quote;
+  // Escrow state as the Keel API's indexer mirrors it ("NONE", "OPEN", "SHIPPED", "DISPUTED"…),
+  // only for orders read from the API. DISPUTED shows as stage 'shipped'; RESOLVED as 'settled'.
+  escrowState?: string;
 };
 
 export type Wallet = {
@@ -99,7 +102,11 @@ export type Wallet = {
 export type NeedsYou =
   | { kind: 'sign_order'; orderId: Hex }
   | { kind: 'verify_supplier'; party: PartyId }
-  | { kind: 'upload_documents'; orderId: Hex };
+  | { kind: 'upload_documents'; orderId: Hex }
+  // From the Keel API (GET /needs-you): the shipment is attested, the importer may release the
+  // balance; and the other side signed a cancellation this side has not signed yet
+  | { kind: 'approve_balance'; orderId: Hex }
+  | { kind: 'sign_cancel'; orderId: Hex; cancelNonce?: string };
 
 // A supplier that went through the supplier check, with the payout account registered then. The
 // payout address is the only place an order takes its payee from.

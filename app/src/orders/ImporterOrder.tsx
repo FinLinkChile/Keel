@@ -15,6 +15,7 @@ import { Text } from '@/ui/Text';
 import { colors } from '@/ui/theme';
 import { tokenToCents } from '@/data/amounts';
 
+import { ClosingActions } from './ClosingActions';
 import { Frame } from './parts';
 
 // 05 Order in progress, for the importer: the same timeline for every order, whether it came from
@@ -41,7 +42,9 @@ export function ImporterOrder({ orderId }: { orderId: Hex }) {
   const { order, supplier, carrier, proposal, history } = view;
   const { po, terms } = order;
 
-  const items: TimelineItem[] = proposal ? proposalTimeline(proposal, supplier) : importerTimeline(order, supplier, carrier, Date.now() / 1000);
+  // An order read from the Keel API shows its escrow progress, not the signatures it once waited for
+  const signing = proposal && !(order.escrowState !== undefined && proposal.status === 'signed') ? proposal : undefined;
+  const items: TimelineItem[] = signing ? proposalTimeline(signing, supplier) : importerTimeline(order, supplier, carrier, Date.now() / 1000);
   const amounts = orderAmounts(order);
   const total = tokenToCents(po.totalAmount);
   const demoOnly = !proposal && order.stage === 'awaiting_signature' && order.waitingOn === 'importer';
@@ -123,6 +126,8 @@ export function ImporterOrder({ orderId }: { orderId: Hex }) {
         </Text>
         <Steps steps={steps} />
       </View>
+
+      <ClosingActions orderId={po.orderId} role="importer" />
 
       <PayoutPanel
         heading={signedBoth ? 'Paid only to this account' : 'The account in this order'}

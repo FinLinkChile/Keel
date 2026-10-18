@@ -5,7 +5,9 @@ import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { config } from '@/config';
-import { proposals, useData, type Order, type OrderDocument, type Party } from '@/data';
+import { api, proposals, useData, type Order, type OrderDocument, type Party } from '@/data';
+import { uploadViaApi } from '@/ingest/apiUpload';
+import { ClosingActions } from '@/orders/ClosingActions';
 import { tokenToCents } from '@/data/amounts';
 import { pickPdf } from '@/files/pickPdf';
 import type { PickedFile } from '@/files/pickPdf.types';
@@ -34,7 +36,11 @@ export default function OrderScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: Hex }>();
   const { role } = useSession();
   // An order proposed on this phone is reviewed and signed before it is an order in progress
-  const proposed = useData(async () => !!(await proposals.get(orderId)), [orderId]);
+  // With the Keel API a fully signed proposal is an order in progress: it opens as one
+  const proposed = useData(async () => {
+    const p = await proposals.get(orderId);
+    return !!p && !(api && p.status === 'signed');
+  }, [orderId]);
   if (proposed === undefined) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   // The importer sees the same timeline for every order; the review is a step inside it
   if (role === 'importer') return <ImporterOrder orderId={orderId} />;
@@ -197,6 +203,8 @@ function ExporterOrder({ orderId }: { orderId: Hex }) {
         <Steps size="compact" steps={steps(order, total, balance, deadline)} />
       </View>
 
+      <ClosingActions orderId={order.po.orderId} role="exporter" />
+
       <PayoutNote payout={order.po.payoutAddress} me={me} />
     </ScrollView>
   );
@@ -271,12 +279,10 @@ function DocumentRow({ order, docType, existing, last }: { order: Order; docType
     if (!signer) return;
     setPending(undefined);
     setUpload({ phase: 'signing', fileName: file.name });
-    const result = await uploadDocument({
-      ingestUrl: config.ingestUrl,
-      chainId: config.chainId,
+    const upload = {
       signer: {
         address: () => signer.address(),
-        signTypedData: async (...args) => {
+        signTypedData: async (...args: Parameters<typeof signer.signTypedData>) => {
           const signature = await signer.signTypedData(...args);
           setUpload({ phase: 'uploading', fileName: file.name });
           return signature;
@@ -285,9 +291,13 @@ function DocumentRow({ order, docType, existing, last }: { order: Order; docType
       orderId: order.po.orderId,
       docType,
       file: file.bytes,
-    }).catch((): UploadResult => ({ kind: 'failed', reason: 'server' }));
-    setUpload({ phase: 'done', fileName: file.name, at: Date.now() / 1000, result });
-  }
+    };
+    // With the Keel API: a presigned upload, read later; without it, straight to ingest
+    const result = await (api
+      ? uploadViaApi({ api, chainId: config.chainId, ...upload })
+      : uploadDocument({ ingestUrl: config.ingestUrl, chainId: config.chainId, ...upload })
+    ).catch((): UploadResult => ({ kind: 'failed', reason: 'server' }));
+    setUpload({ phase: 'done', fileName: file.name, at: Date.now() / 1000, result });  }
 
   const outcome = upload?.phase === 'done' ? uploadStatus(upload.result) : undefined;
   const word =
