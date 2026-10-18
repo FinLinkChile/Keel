@@ -4,7 +4,7 @@ title: "Amenazas que el flujo debe resistir"
 description: "Modelo de amenazas de Keel Trade: cada amenaza con su ejemplo, la defensa y el riesgo residual declarado."
 tags: [amenazas, seguridad, riesgo-residual]
 modo: trade
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T15:30:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T06:00:00Z }
 ---
 
 | Amenaza | Ejemplo | Defensa | Riesgo residual |
@@ -37,6 +37,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T15:30:00Z }
 | Congelamiento del emisor | La stablecoin bloquea una dirección | Riesgo de emisor declarado; los fondos quedan en el escrow | |
 | Suplantación de empresa | Alguien se hace pasar por el proveedor | Registro de partes verificadas e [identidad de empresas](../arquitectura/identidad-de-empresas.md) | |
 | Caída o degradación del LLM | El extractor no responde | El motor determinista no depende del LLM | Las operaciones se retienen y se avisa |
+| Nota del agente engañosa **[PROPUESTA]** | Un historial alterado en el teléfono hace que la nota sugiera un anticipo más alto | Las notas salen de reglas fijas y plantillas, sin modelo ni texto del documento; solo pueden sugerir el anticipo y la persona lo ve antes de firmar; el motor vuelve a aplicar sus reglas al financiar (`app/src/data/agentNotes.ts`, prueba `agentNotes.test.ts`) | Una persona que acepta una sugerencia sin leerla |
 
 Una celda vacía en riesgo residual significa que las fuentes todavía no lo declaran, no que no exista (D9).
 

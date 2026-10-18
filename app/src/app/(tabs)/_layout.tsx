@@ -11,8 +11,8 @@ export default function TabsLayout() {
       <TabList style={{ display: 'none' }}>
         <TabTrigger name="home" href="/home" />
         <TabTrigger name="orders" href="/orders" />
+        <TabTrigger name="agent" href="/agent" />
         <TabTrigger name="suppliers" href="/suppliers" />
-        <TabTrigger name="activity" href="/activity" />
       </TabList>
     </Tabs>
   );

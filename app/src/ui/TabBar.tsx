@@ -9,8 +9,8 @@ import { useSession } from '@/session';
 import { Icon, type IconName } from './Icon';
 import { colors } from './theme';
 
-// Main navigation of 02 and 14: four tabs around a raised New order button. Only the
-// importer opens orders, so the exporter gets the four tabs alone.
+// Main navigation of 02 and 14: two tabs on each side of a raised New order button. Only
+// the importer opens orders, so the exporter gets the four tabs alone. Activity lives on Home.
 export function TabBar() {
   const insets = useSafeAreaInsets();
   const { role } = useSession();
@@ -39,11 +39,11 @@ export function TabBar() {
           <TabButton icon="orders" label="Orders" />
         </TabTrigger>
         {role === 'importer' ? <View style={{ flex: 1 }} /> : null}
+        <TabTrigger name="agent" asChild>
+          <TabButton icon="agent" label="Agent" />
+        </TabTrigger>
         <TabTrigger name="suppliers" asChild>
           <TabButton icon="suppliers" label="Suppliers" />
-        </TabTrigger>
-        <TabTrigger name="activity" asChild>
-          <TabButton icon="activity" label="Activity" />
         </TabTrigger>
       </View>
       {role === 'importer' ? (
