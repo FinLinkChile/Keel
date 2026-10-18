@@ -188,7 +188,7 @@ describe("closing signatures", () => {
     chainState.cancelNonce = (2n << 8n) | 2n;
     const next = await signAs(exporter, "CancelOrder", { orderId: po.orderId, nonce: 514n });
     r = await call(signatures, exporter, "POST /orders/{orderId}/cancel-signature", { params, body: { nonce: "514", signature: next } });
-    expect(r.body.closing.cancel).toEqual({ cancelNonce: "514", sigExporter: next });
+    expect(r.body.closing.cancel).toEqual({ cancelNonce: "514", state: "ADVANCE_PAID", sigExporter: next });
   });
 
   it("resolution: only the arbiter, splitting exactly the remaining balance", async () => {

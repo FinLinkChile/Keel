@@ -72,6 +72,9 @@ async function update(orderId: string, env: Env | undefined, apply: (o: OrderIte
     const o = await loadOrder(orderId, env);
     const change = await apply(o);
     if (!change) return o;
+    // The same signed request again (a retry, or a replay inside the freshness window) stores the
+    // same value: no write, so `rev` does not move
+    if (JSON.stringify(change.value) === JSON.stringify(o[change.field])) return o;
     if (await writeIfUnchanged(o, change.field, change.value, env)) return { ...o, [change.field]: change.value, rev: (o.rev ?? 0) + 1 };
   }
   throw new HttpError(409, "conflict");
@@ -148,8 +151,9 @@ export async function cancelSignature(signer: Hex, orderId: string, body: z.infe
     const closing = closingOf(o);
     // A pair for an older nonce is dropped: the escrow would refuse it
     const kept = closing.cancel && closing.cancel.cancelNonce === current.toString() ? closing.cancel : { cancelNonce: current.toString() };
+    // The state the nonce was read in; the app is only asked to sign while the mirror still shows it
     const key = side === "importer" ? "sigImporter" : "sigExporter";
-    return { field: "closing", value: { ...closing, cancel: { ...kept, [key]: body.signature } } };
+    return { field: "closing", value: { ...closing, cancel: { ...kept, state, [key]: body.signature } } };
   });
   const cancel = saved.closing?.cancel;
   return { orderId: saved.orderId, closing: saved.closing, complete: !!(cancel?.sigImporter && cancel?.sigExporter) };

@@ -210,6 +210,9 @@ export class FakeDdb {
   get(name: string, key: Item): Item | undefined {
     return clone(this.table(name).get(this.keyOf(name, key)));
   }
+  del(name: string, key: Item) {
+    this.table(name).delete(this.keyOf(name, key));
+  }
   all(name: string): Item[] {
     return [...this.table(name).values()].map(clone);
   }
