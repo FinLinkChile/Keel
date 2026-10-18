@@ -1,28 +1,37 @@
 // Ingest state for flood protection and deduplication. T3.2, issue #19.
 // node:sqlite, so there is no extra dependency. Stores hashes, domains, aliases and change
-// requests; never email bodies or invoice text.
+// requests; never email bodies or invoice text. The local implementation of IngestRepo
+// (./repo.ts): node:sqlite is synchronous, so each method settles at once.
 import { DatabaseSync } from "node:sqlite";
 import type { AliasId, Hex, RequiredDocType } from "@keel/schemas";
-import { docsHash } from "@keel/schemas/hash";
 import type { ChangeRequest } from "./beneficiaryChange";
+import {
+  CHANGE_COOLDOWN_DAYS,
+  DAY_MS,
+  MAX_DOCUMENTS_PER_ORDER_PER_DAY,
+  packageFrom,
+  type AcceptedDocument,
+  type ChangeResolution,
+  type IngestRepo,
+  type StoredChangeRequest,
+  type StoredUpload,
+  type TradePackage,
+  type UploadAdmission,
+  type UploadEntry,
+} from "./repo";
 import type { AccountAlert } from "./trade/accountAlert";
 
-export const MAX_EMAILS_PER_SENDER_PER_DAY = 20;
-// Keel Trade: authorized uploads per order in 24 hours. A legitimate order needs two or three.
-export const MAX_DOCUMENTS_PER_ORDER_PER_DAY = 10;
-export const CHANGE_COOLDOWN_DAYS = 7;
-const DAY_MS = 24 * 60 * 60 * 1000;
+export {
+  CHANGE_COOLDOWN_DAYS,
+  CHANGE_RESOLUTIONS,
+  MAX_DOCUMENTS_PER_ORDER_PER_DAY,
+  MAX_EMAILS_PER_SENDER_PER_DAY,
+  type ChangeResolution,
+  type StoredChangeRequest,
+  type TradePackage,
+} from "./repo";
 
-export const CHANGE_RESOLUTIONS = ["approved", "rejected", "vetoed"] as const;
-export type ChangeResolution = (typeof CHANGE_RESOLUTIONS)[number];
-
-export interface StoredChangeRequest extends ChangeRequest {
-  id: number;
-  status: "pending" | ChangeResolution;
-  resolvedAt?: string;
-}
-
-export class IngestStore {
+export class IngestStore implements IngestRepo {
   private readonly db: DatabaseSync;
 
   // ":memory:" loses deduplication on restart: use a file outside tests
@@ -55,7 +64,7 @@ export class IngestStore {
       CREATE UNIQUE INDEX IF NOT EXISTS one_pending_per_alias
         ON change_requests (alias_id) WHERE status = 'pending';
 
-      -- Keel Trade. Every authorized upload, read or not: who uploaded which file to which order
+      -- Keel Trade. Every admitted upload, read or not: who uploaded which file to which order
       CREATE TABLE IF NOT EXISTS trade_uploads (
         order_id    TEXT NOT NULL,
         file_hash   TEXT NOT NULL,
@@ -66,6 +75,14 @@ export class IngestStore {
         PRIMARY KEY (order_id, file_hash)
       );
       CREATE INDEX IF NOT EXISTS trade_uploads_by_order ON trade_uploads (order_id, received_at);
+      -- The asynchronous reader's claim on an upload, and how the reading ended
+      CREATE TABLE IF NOT EXISTS trade_reads (
+        order_id   TEXT NOT NULL,
+        file_hash  TEXT NOT NULL,
+        claimed_at INTEGER NOT NULL,
+        status     TEXT,
+        PRIMARY KEY (order_id, file_hash)
+      );
       -- Documents both readers agreed on: the package the engine compares with the order
       CREATE TABLE IF NOT EXISTS trade_documents (
         order_id    TEXT NOT NULL,
@@ -107,41 +124,42 @@ export class IngestStore {
     this.db.close();
   }
 
-  // false if this exact message was already received
-  recordEmail(messageHash: string, fromDomain: string): boolean {
+  private dayAgo(): number {
+    return this.now().getTime() - DAY_MS;
+  }
+
+  async recordEmail(messageHash: string, fromDomain: string): Promise<boolean> {
     const r = this.db
       .prepare("INSERT OR IGNORE INTO emails (message_hash, from_domain, received_at) VALUES (?, ?, ?)")
       .run(messageHash, fromDomain, this.now().getTime());
     return r.changes === 1;
   }
 
-  // Messages accepted from this domain in the last 24 hours
-  emailsFromSender(fromDomain: string): number {
+  async emailsFromSender(fromDomain: string): Promise<number> {
     const row = this.db
       .prepare("SELECT count(*) AS n FROM emails WHERE from_domain = ? AND received_at > ?")
-      .get(fromDomain, this.now().getTime() - DAY_MS) as { n: number };
+      .get(fromDomain, this.dayAgo()) as { n: number };
     return row.n;
   }
 
-  hasInvoice(invoiceKey: string): boolean {
+  async hasInvoice(invoiceKey: string): Promise<boolean> {
     return this.db.prepare("SELECT 1 FROM invoices WHERE invoice_key = ?").get(invoiceKey) !== undefined;
   }
 
-  recordInvoice(invoiceKey: string, messageHash: string): void {
+  async recordInvoice(invoiceKey: string, messageHash: string): Promise<void> {
     this.db
       .prepare("INSERT OR IGNORE INTO invoices (invoice_key, message_hash, received_at) VALUES (?, ?, ?)")
       .run(invoiceKey, messageHash, this.now().getTime());
   }
 
-  pendingChange(aliasId: AliasId): StoredChangeRequest | undefined {
+  async pendingChange(aliasId: AliasId): Promise<StoredChangeRequest | undefined> {
     const row = this.db
       .prepare("SELECT * FROM change_requests WHERE alias_id = ? AND status = 'pending'")
       .get(aliasId) as ChangeRow | undefined;
     return row && fromRow(row);
   }
 
-  // A rejected or vetoed change blocks new requests for the alias for CHANGE_COOLDOWN_DAYS
-  inCooldown(aliasId: AliasId): boolean {
+  async inCooldown(aliasId: AliasId): Promise<boolean> {
     const row = this.db
       .prepare(
         "SELECT 1 FROM change_requests WHERE alias_id = ? AND status IN ('rejected', 'vetoed') AND resolved_at > ?",
@@ -150,8 +168,7 @@ export class IngestStore {
     return row !== undefined;
   }
 
-  // Returns the stored request, or undefined if the alias already has one pending
-  addChangeRequest(request: ChangeRequest): StoredChangeRequest | undefined {
+  async addChangeRequest(request: ChangeRequest): Promise<StoredChangeRequest | undefined> {
     const r = this.db
       .prepare("INSERT OR IGNORE INTO change_requests (alias_id, created_at, body) VALUES (?, ?, ?)")
       .run(request.aliasId, this.now().getTime(), JSON.stringify(request));
@@ -160,132 +177,166 @@ export class IngestStore {
   }
 
   // Called when the owner decides in Area 4's app, or when the on-chain veto is observed
-  resolveChange(id: number, resolution: ChangeResolution): boolean {
+  async resolveChange(id: number, resolution: ChangeResolution): Promise<boolean> {
     const r = this.db
       .prepare("UPDATE change_requests SET status = ?, resolved_at = ? WHERE id = ? AND status = 'pending'")
       .run(resolution, this.now().getTime(), id);
     return r.changes === 1;
   }
 
-  // Requests created since `since`, for one daily summary instead of a notification each
-  changeDigest(since: Date): StoredChangeRequest[] {
+  async changeDigest(since: Date): Promise<StoredChangeRequest[]> {
     const rows = this.db
-      .prepare("SELECT * FROM change_requests WHERE created_at >= ? ORDER BY created_at")
+      .prepare("SELECT * FROM change_requests WHERE created_at >= ? ORDER BY created_at, id")
       .all(since.getTime()) as unknown as ChangeRow[];
     return rows.map(fromRow);
   }
 
   // Keel Trade ---------------------------------------------------------------------------
 
-  // false if this exact file was already uploaded to this order
-  recordUpload(u: { orderId: Hex; fileHash: Hex; docType: RequiredDocType; uploader: Hex; party: string }): boolean {
+  // The three steps run synchronously, with no await between them, so another upload's
+  // cannot interleave
+  async admitUpload(u: UploadEntry, max = MAX_DOCUMENTS_PER_ORDER_PER_DAY): Promise<UploadAdmission> {
+    const orderId = u.orderId.toLowerCase();
+    if (this.db.prepare("SELECT 1 FROM trade_uploads WHERE order_id = ? AND file_hash = ?").get(orderId, u.fileHash)) {
+      return "duplicate";
+    }
+    const { n } = this.db
+      .prepare("SELECT count(*) AS n FROM trade_uploads WHERE order_id = ? AND received_at > ?")
+      .get(orderId, this.dayAgo()) as { n: number };
+    if (n >= max) return "rate_limited";
+    this.db
+      .prepare(
+        "INSERT INTO trade_uploads (order_id, file_hash, doc_type, uploader, party, received_at) VALUES (?, ?, ?, ?, ?, ?)",
+      )
+      .run(orderId, u.fileHash, u.docType, u.uploader.toLowerCase(), u.party, this.now().getTime());
+    return "admitted";
+  }
+
+  async uploadsForOrder(orderId: Hex): Promise<number> {
+    const row = this.db
+      .prepare("SELECT count(*) AS n FROM trade_uploads WHERE order_id = ? AND received_at > ?")
+      .get(orderId.toLowerCase(), this.dayAgo()) as { n: number };
+    return row.n;
+  }
+
+  async upload(orderId: Hex, fileHash: Hex): Promise<StoredUpload | undefined> {
+    const row = this.db
+      .prepare(
+        `SELECT u.*, r.claimed_at, r.status FROM trade_uploads u
+         LEFT JOIN trade_reads r ON r.order_id = u.order_id AND r.file_hash = u.file_hash
+         WHERE u.order_id = ? AND u.file_hash = ?`,
+      )
+      .get(orderId.toLowerCase(), fileHash) as UploadRow | undefined;
+    if (!row) return undefined;
+    return {
+      orderId: row.order_id,
+      fileHash: row.file_hash,
+      docType: row.doc_type,
+      uploader: row.uploader,
+      party: row.party,
+      receivedAt: new Date(row.received_at).toISOString(),
+      ...(row.claimed_at !== null ? { readClaimedAt: new Date(row.claimed_at).toISOString() } : {}),
+      ...(row.status !== null ? { readStatus: row.status } : {}),
+    };
+  }
+
+  async claimReading(orderId: Hex, fileHash: Hex, staleAfterMs: number): Promise<boolean> {
+    const id = orderId.toLowerCase();
+    if (!this.db.prepare("SELECT 1 FROM trade_uploads WHERE order_id = ? AND file_hash = ?").get(id, fileHash)) return false;
+    const now = this.now().getTime();
     const r = this.db
       .prepare(
-        "INSERT OR IGNORE INTO trade_uploads (order_id, file_hash, doc_type, uploader, party, received_at) VALUES (?, ?, ?, ?, ?, ?)",
+        `INSERT INTO trade_reads (order_id, file_hash, claimed_at) VALUES (?, ?, ?)
+         ON CONFLICT (order_id, file_hash) DO UPDATE SET claimed_at = excluded.claimed_at
+         WHERE trade_reads.status IS NULL AND trade_reads.claimed_at < ?`,
       )
-      .run(u.orderId.toLowerCase(), u.fileHash, u.docType, u.uploader.toLowerCase(), u.party, this.now().getTime());
+      .run(id, fileHash, now, now - staleAfterMs);
     return r.changes === 1;
   }
 
-  // Keel Trade, proforma (T3.9) ----------------------------------------------------------
-
-  recordProformaUpload(importer: Hex, fileHash: Hex): void {
+  async finishReading(orderId: Hex, fileHash: Hex, status: string): Promise<void> {
     this.db
-      .prepare("INSERT INTO proforma_uploads (importer, file_hash, received_at) VALUES (?, ?, ?)")
-      .run(importer.toLowerCase(), fileHash, this.now().getTime());
+      .prepare("UPDATE trade_reads SET status = ? WHERE order_id = ? AND file_hash = ?")
+      .run(status, orderId.toLowerCase(), fileHash);
   }
 
-  // Authorized proforma uploads of this importer in the last 24 hours
-  proformaUploadsToday(importer: Hex): number {
-    const row = this.db
-      .prepare("SELECT count(*) AS n FROM proforma_uploads WHERE importer = ? AND received_at > ?")
-      .get(importer.toLowerCase(), this.now().getTime() - DAY_MS) as { n: number };
-    return row.n;
-  }
-
-  proformaReading<T>(importer: Hex, fileHash: Hex): T | undefined {
-    const row = this.db
-      .prepare("SELECT reading FROM proforma_reads WHERE importer = ? AND file_hash = ?")
-      .get(importer.toLowerCase(), fileHash) as { reading: string } | undefined;
-    return row ? (JSON.parse(row.reading) as T) : undefined;
-  }
-
-  saveProformaReading(importer: Hex, fileHash: Hex, reading: unknown): void {
-    this.db
-      .prepare("INSERT OR REPLACE INTO proforma_reads (importer, file_hash, reading, read_at) VALUES (?, ?, ?, ?)")
-      .run(importer.toLowerCase(), fileHash, JSON.stringify(reading), this.now().getTime());
-  }
-
-  // Authorized uploads to this order in the last 24 hours
-  uploadsForOrder(orderId: Hex): number {
-    const row = this.db
-      .prepare("SELECT count(*) AS n FROM trade_uploads WHERE order_id = ? AND received_at > ?")
-      .get(orderId.toLowerCase(), this.now().getTime() - DAY_MS) as { n: number };
-    return row.n;
-  }
-
-  // The order a bill of lading was accepted for, if any
-  orderForBl(blHash: Hex): Hex | undefined {
+  async orderForBl(blHash: Hex): Promise<Hex | undefined> {
     const row = this.db.prepare("SELECT order_id FROM trade_documents WHERE bl_hash = ?").get(blHash) as
       | { order_id: Hex }
       | undefined;
     return row?.order_id;
   }
 
-  // false if the bill of lading was accepted for another order in the meantime
-  acceptDocument(d: { orderId: Hex; fileHash: Hex; docType: RequiredDocType; blHash?: Hex; extraction: object }): boolean {
+  async acceptDocument(d: AcceptedDocument): Promise<boolean> {
+    const orderId = d.orderId.toLowerCase();
+    if (this.db.prepare("SELECT 1 FROM trade_documents WHERE order_id = ? AND file_hash = ?").get(orderId, d.fileHash)) {
+      return true;
+    }
     try {
-      const r = this.db
+      this.db
         .prepare(
-          "INSERT OR IGNORE INTO trade_documents (order_id, file_hash, doc_type, bl_hash, extraction, accepted_at) VALUES (?, ?, ?, ?, ?, ?)",
+          "INSERT INTO trade_documents (order_id, file_hash, doc_type, bl_hash, extraction, accepted_at) VALUES (?, ?, ?, ?, ?, ?)",
         )
-        .run(d.orderId.toLowerCase(), d.fileHash, d.docType, d.blHash ?? null, JSON.stringify(d.extraction), this.now().getTime());
-      return r.changes === 1;
+        .run(orderId, d.fileHash, d.docType, d.blHash ?? null, JSON.stringify(d.extraction), this.now().getTime());
+      return true;
     } catch (e) {
       if (e instanceof Error && /UNIQUE/.test(e.message)) return false;
       throw e;
     }
   }
 
-  // The document package of an order: one accepted document per required type, and the
-  // docsHash the carrier's attestation and the engine's DocumentDecision must carry.
-  tradePackage(orderId: Hex, required: readonly RequiredDocType[]): TradePackage {
+  async tradePackage(orderId: Hex, required: readonly RequiredDocType[]): Promise<TradePackage> {
     const rows = this.db
       .prepare("SELECT doc_type, file_hash, bl_hash, extraction FROM trade_documents WHERE order_id = ? ORDER BY accepted_at")
       .all(orderId.toLowerCase()) as unknown as { doc_type: RequiredDocType; file_hash: Hex; bl_hash: Hex | null; extraction: string }[];
-    const missing = required.filter((t) => !rows.some((r) => r.doc_type === t));
-    if (missing.length > 0) return { status: "incomplete", missing };
-    const repeated = required.find((t) => rows.filter((r) => r.doc_type === t).length > 1);
-    if (repeated) return { status: "ambiguous", docType: repeated };
-    const documents = required.map((t) => {
-      const r = rows.find((row) => row.doc_type === t)!;
-      return { docType: t, fileHash: r.file_hash, extraction: JSON.parse(r.extraction) as object };
-    });
-    const bl = rows.find((r) => required.includes(r.doc_type) && r.bl_hash)?.bl_hash ?? undefined;
-    return { status: "complete", docsHash: docsHash(documents.map((d) => d.fileHash)), blNumberHash: bl, documents };
+    return packageFrom(
+      rows.map((r) => ({ docType: r.doc_type, fileHash: r.file_hash, blHash: r.bl_hash, extraction: JSON.parse(r.extraction) as object })),
+      required,
+    );
   }
 
-  addAlert(alert: AccountAlert): number {
+  async addAlert(alert: AccountAlert): Promise<number> {
     const r = this.db
       .prepare("INSERT INTO trade_alerts (order_id, created_at, body) VALUES (?, ?, ?)")
       .run(alert.orderId.toLowerCase(), this.now().getTime(), JSON.stringify(alert));
     return Number(r.lastInsertRowid);
   }
 
-  // Alerts created since `since`, for one summary instead of a notification each
-  alertDigest(since: Date): (AccountAlert & { id: number })[] {
+  async alertDigest(since: Date): Promise<(AccountAlert & { id: number })[]> {
     const rows = this.db
-      .prepare("SELECT id, body FROM trade_alerts WHERE created_at >= ? ORDER BY created_at")
+      .prepare("SELECT id, body FROM trade_alerts WHERE created_at >= ? ORDER BY created_at, id")
       .all(since.getTime()) as unknown as { id: number; body: string }[];
     return rows.map((r) => ({ ...(JSON.parse(r.body) as AccountAlert), id: r.id }));
   }
-}
 
-export type TradePackage =
-  | { status: "complete"; docsHash: Hex; blNumberHash?: Hex; documents: { docType: RequiredDocType; fileHash: Hex; extraction: object }[] }
-  | { status: "incomplete"; missing: RequiredDocType[] }
-  // Two accepted documents of the same type: a person decides which one counts
-  | { status: "ambiguous"; docType: RequiredDocType };
+  // Keel Trade, proforma (T3.9) ----------------------------------------------------------
+
+  async recordProformaUpload(importer: Hex, fileHash: Hex): Promise<void> {
+    this.db
+      .prepare("INSERT INTO proforma_uploads (importer, file_hash, received_at) VALUES (?, ?, ?)")
+      .run(importer.toLowerCase(), fileHash, this.now().getTime());
+  }
+
+  async proformaUploadsToday(importer: Hex): Promise<number> {
+    const row = this.db
+      .prepare("SELECT count(*) AS n FROM proforma_uploads WHERE importer = ? AND received_at > ?")
+      .get(importer.toLowerCase(), this.dayAgo()) as { n: number };
+    return row.n;
+  }
+
+  async proformaReading<T>(importer: Hex, fileHash: Hex): Promise<T | undefined> {
+    const row = this.db
+      .prepare("SELECT reading FROM proforma_reads WHERE importer = ? AND file_hash = ?")
+      .get(importer.toLowerCase(), fileHash) as { reading: string } | undefined;
+    return row ? (JSON.parse(row.reading) as T) : undefined;
+  }
+
+  async saveProformaReading(importer: Hex, fileHash: Hex, reading: unknown): Promise<void> {
+    this.db
+      .prepare("INSERT OR REPLACE INTO proforma_reads (importer, file_hash, reading, read_at) VALUES (?, ?, ?, ?)")
+      .run(importer.toLowerCase(), fileHash, JSON.stringify(reading), this.now().getTime());
+  }
+}
 
 interface ChangeRow {
   id: number;
@@ -294,6 +345,17 @@ interface ChangeRow {
   created_at: number;
   resolved_at: number | null;
   body: string;
+}
+
+interface UploadRow {
+  order_id: Hex;
+  file_hash: Hex;
+  doc_type: RequiredDocType;
+  uploader: Hex;
+  party: StoredUpload["party"];
+  received_at: number;
+  claimed_at: number | null;
+  status: string | null;
 }
 
 function fromRow(row: ChangeRow): StoredChangeRequest {

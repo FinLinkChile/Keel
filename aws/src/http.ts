@@ -27,6 +27,9 @@ export interface Request {
   query: Record<string, string>;
   headers: Record<string, string | undefined>;
   body: string;
+  // The body bytes exactly as received, for a route whose body is not UTF-8 text (a raw email:
+  // re-encoding it would break its DKIM signature)
+  rawBody: Buffer;
   // Present when the route requires a signed request
   signer?: Hex;
   chainId: number;
@@ -61,8 +64,9 @@ export function api(routes: Record<string, Route>, options: Record<string, Route
       const route = routes[event.routeKey];
       if (!route) return json(404, { error: "not_found" });
       const raw = event.body ?? "";
-      const body = event.isBase64Encoded ? Buffer.from(raw, "base64").toString("utf8") : raw;
-      if (Buffer.byteLength(body) > MAX_BODY_BYTES) return json(413, { error: "too_large" });
+      const rawBody = event.isBase64Encoded ? Buffer.from(raw, "base64") : Buffer.from(raw, "utf8");
+      const body = rawBody.toString("utf8");
+      if (rawBody.byteLength > MAX_BODY_BYTES) return json(413, { error: "too_large" });
       const { chainId } = await deployment();
       const req: Request = {
         method: event.requestContext.http.method,
@@ -72,6 +76,7 @@ export function api(routes: Record<string, Route>, options: Record<string, Route
         query: (event.queryStringParameters ?? {}) as Record<string, string>,
         headers: event.headers ?? {},
         body,
+        rawBody,
         chainId,
       };
       if (options[event.routeKey]?.auth !== false) {

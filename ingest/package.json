@@ -3,7 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing/*": "./src/testing/*.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "serve": "node --env-file-if-exists=../.env --import tsx scripts/serve.ts",
