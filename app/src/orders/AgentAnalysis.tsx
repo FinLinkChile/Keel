@@ -5,14 +5,13 @@ import { config } from '@/config';
 import { useData } from '@/data';
 import { analysisInput, type AnalysisInput } from '@/data/analysisInput';
 import { displayText, metricLabel, type Names } from '@/data/analysisText';
+import { useT } from '@/i18n';
 import { requestInsights, type InsightsResult } from '@/ingest/insights';
 import { useSession } from '@/session';
 import { Button } from '@/ui/Button';
 import { formatLocalDayTime } from '@/ui/format';
 import { Text } from '@/ui/Text';
 import { colors, radius } from '@/ui/theme';
-
-const DOT = { important: colors.danger, attention: colors.yourTurn, info: colors.accent } as const;
 
 const PROBLEM: Record<string, string> = {
   not_configured: 'The analysis needs ingest, which is not set up in this build.',
@@ -33,9 +32,14 @@ const last = new Map<string, { result: InsightsResult; input: AnalysisInput }>()
 // "What the agent sees": the analyst model reads the numbers computed on this phone and writes
 // findings with advice. It sees no documents and no names, and it cannot move money.
 export function AgentAnalysis() {
+  const t = useT();
+  // Read while rendering, so it follows the theme
+  const DOT = { important: colors.danger, attention: colors.yourTurn, info: colors.accent } as const;
   const { role, signer, onboarding } = useSession();
   const [busy, setBusy] = useState(false);
-  const [shown, setShown] = useState(last.get(role));
+  const [, setShownAt] = useState(0);
+  // Looked up by role on every render, so changing role never shows the other role's analysis
+  const shown = last.get(role);
   const data = useData(async (d) => {
     const orders = await d.orders();
     const { input, counterparties } = analysisInput({ orders, role, profile: onboarding?.profile ?? null, now: Date.now() / 1000 });
@@ -56,7 +60,7 @@ export function AgentAnalysis() {
     );
     const entry = { result, input: data.input };
     last.set(role, entry);
-    setShown(entry);
+    setShownAt(Date.now());
     setBusy(false);
   }
 
@@ -67,19 +71,19 @@ export function AgentAnalysis() {
     <View style={{ backgroundColor: colors.surface, borderRadius: radius.card, padding: 18, gap: 14 }}>
       <View style={{ gap: 4 }}>
         <Text size={20} weight={800} accessibilityRole="header">
-          What the agent sees
+          {t('What the agent sees')}
         </Text>
         <Text size={14} leading={1.45} color="textMuted">
           {result?.kind === 'ok'
-            ? `Analysis of ${formatLocalDayTime(result.at)}.`
-            : 'The agent reads your purchases, how they change and what is coming, and suggests what to do.'}
+            ? t('Analysis of {when}.', { when: formatLocalDayTime(result.at) })
+            : t('The agent reads your purchases, how they change and what is coming, and suggests what to do.')}
         </Text>
       </View>
 
       {result?.kind === 'ok' ? (
         result.findings.length === 0 ? (
           <Text size={14} color="textMuted">
-            Nothing worth acting on right now.
+            {t('Nothing worth acting on right now.')}
           </Text>
         ) : (
           result.findings.map((f, i) => (
@@ -94,14 +98,14 @@ export function AgentAnalysis() {
                 {displayText(f.recommendation, data?.names ?? { counterparty: {}, product: {} })}
               </Text>
               <Text size={12} leading={1.4} color="textFaint" style={{ paddingLeft: 18 }}>
-                Based on {f.metric_ids.map((id) => (byId.get(id) && data ? metricLabel(byId.get(id)!, data.names) : id)).join(' · ')}
+                {t('Based on {what}', { what: f.metric_ids.map((id) => (byId.get(id) && data ? metricLabel(byId.get(id)!, data.names) : id)).join('; ') })}
               </Text>
             </View>
           ))
         )
       ) : result ? (
         <Text size={14} leading={1.45} style={{ color: colors.danger }}>
-          {PROBLEM[result.reason]}
+          {t(PROBLEM[result.reason]!)}
         </Text>
       ) : null}
 
@@ -109,12 +113,12 @@ export function AgentAnalysis() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <ActivityIndicator color={colors.accent} />
           <Text size={14} color="textMuted">
-            The agent is analyzing your purchases
+            {t('The agent is analyzing your purchases')}
           </Text>
         </View>
       ) : (
         <Button
-          label={result?.kind === 'ok' ? 'Analyze again' : 'Analyze my purchases'}
+          label={result?.kind === 'ok' ? t('Analyze again') : t('Analyze my purchases')}
           variant={result?.kind === 'ok' ? 'secondary' : 'go'}
           onPress={analyze}
           disabled={!data || !signer || data.orders === 0}
@@ -122,11 +126,11 @@ export function AgentAnalysis() {
       )}
       {data && data.orders === 0 ? (
         <Text size={13} color="textMuted">
-          The agent needs some orders to analyze. They appear as you send and sign them.
+          {t('The agent needs some orders to analyze. They appear as you send and sign them.')}
         </Text>
       ) : null}
       <Text size={12} leading={1.4} color="textFaint">
-        The agent gets only numbers computed on this phone, with suppliers as S1, S2. It sees no documents and no names, and it cannot sign or move money.
+        {t('The agent gets only numbers computed on this phone, with suppliers as S1, S2. It sees no documents and no names, and it cannot sign or move money.')}
       </Text>
     </View>
   );

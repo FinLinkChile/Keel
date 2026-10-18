@@ -1,3 +1,5 @@
+import { getLanguage, t } from '../i18n/translate';
+
 import type { Metric, MetricKind } from './analysisInput';
 
 // How the analysis reads on screen: the ids the model used (S1, HS codes) become the names this
@@ -37,16 +39,22 @@ const LABELS: Record<MetricKind, string> = {
   negotiated_amount_pct: 'Total negotiated',
 };
 
+// 48,000 in English, 48.000 in Spanish
+const grouped = (n: number) => {
+  const text = n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  return getLanguage() === 'es' ? text.replace(/,/g, '.') : text;
+};
+
 const value = (m: Metric) => {
   switch (m.unit) {
     case 'usd':
-      return `USD ${m.value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+      return `USD ${grouped(m.value)}`;
     case 'pct':
       return `${m.value}%`;
     case 'days':
-      return `${m.value} days`;
+      return t('{n} days', { n: m.value });
     case 'points':
-      return `${m.value} pts`;
+      return `${m.value} ${t('pts')}`;
     default:
       return String(m.value);
   }
@@ -55,5 +63,5 @@ const value = (m: Metric) => {
 // "Share of spend, Lingnan: 71.4%"
 export function metricLabel(m: Metric, names: Names): string {
   const subject = m.subject ? (names.counterparty[m.subject] ?? names.product[m.subject.split('/')[0]!] ?? m.subject) : undefined;
-  return `${LABELS[m.kind]}${subject ? `, ${subject}` : ''}${m.kind === 'spend_month' && m.period ? ` ${m.period}` : ''}: ${value(m)}`;
+  return `${t(LABELS[m.kind])}${subject ? `, ${subject}` : ''}${m.kind === 'spend_month' && m.period ? ` ${m.period}` : ''}: ${value(m)}`;
 }
