@@ -82,4 +82,18 @@ describe('analysisInput', () => {
       if (m.period) expect(m.period).toMatch(/^(\d{4}-\d{2}|last_90d|previous_90d|last_365d)$/);
     }
   });
+
+  it('measures the change in price per unit only within one currency', () => {
+    const quoted = (daysAgo: number, cents: number, currency: 'USD' | 'CNY' = 'USD') =>
+      order(daysAgo, cents, LINGNAN, {
+        quote: { currency, amountCents: cents, advanceBps: 3000, issueDate: null, latestShipmentDate: null, lines: [{ hs_code: '130231', quantity: 6000, unit: 'KGM', amount_minor: cents }] },
+      });
+    const usd = [quoted(150, 4_200_000), quoted(100, 4_200_000), quoted(50, 4_800_000)];
+    const metric = (orders: Order[]) =>
+      analysisInput({ orders, role: 'importer', profile: null, now: NOW }).input.metrics.find((m) => m.kind === 'unit_price_change_pct');
+    // USD 8.00/kg against 7.00 on average
+    expect(metric(usd)).toMatchObject({ subject: '130231/KGM', value: 14.3 });
+    // The latest quote is in yuan: there are not enough earlier quotes in yuan to compare
+    expect(metric([...usd, quoted(10, 35_000_000, 'CNY')])).toBeUndefined();
+  });
 });

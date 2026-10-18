@@ -132,7 +132,11 @@ export function analysisInput({ orders, role, profile, now }: Input): { input: A
     if (prevP > 0) add({ kind: 'product_spend_change_pct', value: pct(((lastP - prevP) / prevP) * 100), unit: 'pct', subject: hs, period: 'last_90d' });
 
     const sorted = [...list].sort((a, b) => a.signedAt! - b.signedAt!);
-    const prices = sorted.flatMap((o) => (o.quote?.lines ?? []).map(unitPrice).filter((p) => p && p.hsCode === hs).slice(0, 1));
+    // Prices of the latest quote's currency only: another currency needs a rate nobody agreed
+    const currency = [...sorted].reverse().find((o) => o.quote?.lines?.length)?.quote?.currency;
+    const prices = sorted
+      .filter((o) => o.quote?.currency === currency)
+      .flatMap((o) => (o.quote?.lines ?? []).map(unitPrice).filter((p) => p && p.hsCode === hs).slice(0, 1));
     if (prices.length >= 3) {
       const latest = prices[prices.length - 1]!;
       const before = prices.slice(0, -1).filter((p) => p!.unit === latest.unit);
