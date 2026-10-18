@@ -1,15 +1,11 @@
-import type { Incoterm } from '@keel/schemas';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useData } from '@/data';
-import { agentNotes } from '@/data/agentNotes';
-import { tokenToCents } from '@/data/amounts';
 import { insights, type Period } from '@/data/insights';
 import { negotiation } from '@/data/negotiation';
-import { incotermText } from '@/data/signOrder';
 import { supplierScore } from '@/data/supplierScore';
 import { useSession } from '@/session';
 import { BarList } from '@/ui/BarList';
@@ -52,28 +48,10 @@ export default function Agent() {
       now,
       counterparty: (a) => ({ label: names.get(a.toLowerCase()) ?? 'Unknown company', stars: supplierScore(orders, a).stars }),
     });
-    // Notes the agent has on orders waiting for this person's signature
+    // Orders waiting for this person's signature
     const waiting = orders.filter((o) => o.stage === 'awaiting_signature' && o.waitingOn === role);
-    const notes = role === 'importer'
-      ? waiting.reduce(
-          (sum, o) =>
-            sum +
-            agentNotes({
-              supplier: { name: names.get(o.po.exporter.toLowerCase()) ?? '', address: o.po.exporter },
-              totalCents: Number(tokenToCents(o.po.totalAmount)),
-              advanceBps: o.po.advanceBps,
-              shipmentDeadline: Number(o.po.shipmentDeadline),
-              incoterm: incotermText(o.po.incoterm) as Incoterm,
-              lines: o.quote?.lines,
-              orders,
-              excludeOrderId: o.po.orderId,
-              now,
-            }).length,
-          0,
-        )
-      : 0;
     const labels = new Map(orders.map((o) => [o.po.orderId, `${o.label}, ${o.goodsShort || o.goods}`]));
-    return { data, wallet, waiting: waiting.length, notes, labels, deal: negotiation(orders) };
+    return { data, wallet, waiting: waiting.length, labels, deal: negotiation(orders) };
   }, [role, period]);
 
   return (
@@ -215,9 +193,7 @@ export default function Agent() {
             <Text size={14} leading={1.45} color="textSoft" style={{ flex: 1 }}>
               {view.waiting === 0
                 ? 'No order is waiting for your signature.'
-                : role === 'importer'
-                  ? `${view.waiting} ${view.waiting === 1 ? 'order waits' : 'orders wait'} for your signature, with ${view.notes} ${view.notes === 1 ? 'note' : 'notes'} from the agent.`
-                  : `${view.waiting} ${view.waiting === 1 ? 'order waits' : 'orders wait'} for your signature.`}
+                : `${view.waiting} ${view.waiting === 1 ? 'order waits' : 'orders wait'} for your signature.`}
             </Text>
             <Icon name="chevron" size={16} color="textFaint" />
           </Pressable>

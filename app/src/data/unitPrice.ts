@@ -34,20 +34,3 @@ export function unitPrice(line: ProformaLine): UnitPrice | undefined {
   return { hsCode: line.hs_code, unit: base.unit, centsPerUnit: line.amount_minor / (line.quantity * base.factor) };
 }
 
-export const UNIT_WORDS: Record<ProformaUnit, string> = {
-  KGM: 'kg',
-  TNE: 'ton',
-  GRM: 'g',
-  LBR: 'lb',
-  PCE: 'unit',
-  SET: 'set',
-  PR: 'pair',
-  DZN: 'dozen',
-  CT: 'carton',
-  BG: 'bag',
-  RO: 'roll',
-  LTR: 'litre',
-  MTR: 'metre',
-  MTK: 'square metre',
-  MTQ: 'cubic metre',
-};
