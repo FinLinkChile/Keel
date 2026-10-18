@@ -1,11 +1,11 @@
 ---
 type: Área de trabajo
 title: "Área 2: motor de política, PDR, tipo de cambio y claves"
-description: "Objetivo, entregables y tareas T2.1 a T2.10: interfaces, reglas del motor, tipo de cambio, firma del PDR, simulación, custodia de llaves, monitor, verificador y plazos."
+description: "Objetivo, entregables y tareas T2.1 a T2.11: interfaces, reglas del motor, tipo de cambio, firma del PDR, simulación, custodia de llaves, monitor, verificador, plazos y servicio del agente."
 tags: [area-2, motor, pdr, llaves, t2]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T02:20:00Z }
 ---
 
 **Perfil sugerido:** backend en TypeScript con interés en criptografía.
@@ -88,6 +88,7 @@ En Trade no aplica: el monto se pacta en la orden directamente en el token de pa
 **T2.6 Estados y aviso al fallar cerrado (crítica 19).**
 * **Personal (base):** estados del pago: `pagado`, `retenido`, `en_aprobacion`, `cambio_en_cola`, `bloqueado`. Un programador revisa cada día los pagos retenidos y avisa (vía el bot del Área 4) a 5, 3 y 1 día del vencimiento, con el motivo y las instrucciones de pago manual.
 * **Trade (agregado):** estados fuera de cadena que acompañan a los del escrow: `retenida`, `en_aprobacion`, `cambio_en_cola`, `bloqueada`. El programador revisa cada día las órdenes abiertas y avisa cuando se acerca la fecha límite de embarque, con el motivo y qué puede hacer la persona.
+* **Trade, cómo quedó:** el servicio del agente (T2.11) revisa las órdenes en cada vuelta y recuerda la fecha límite de embarque a 5, 3 y 1 día. Un adaptador del motor traduce sus eventos a los avisos del bot y los envía a `POST /notices`. Detalle y tabla de traducción: [servicio del agente](../arquitectura/servicio-del-agente.md).
 
 **T2.7 Custodia y rotación de llaves (crítica 13).**
 Escribir y aplicar esta tabla:
@@ -108,6 +109,7 @@ Para la demo, las llaves viven en archivos `.env` fuera del repositorio. En el d
 **T2.8 Monitor de uso fuera del sistema (crítica 13).**
 * Un vigía escucha los eventos del Roles Modifier y del gate; en Trade, también los del escrow.
 * Si aparece una ejecución con el rol AGENTE que no corresponde a ningún PDR emitido por el motor, llama automáticamente al botón de pánico: revoca el rol (T1.3) usando la llave del cosignatario automático, o avisa al cosignatario humano.
+* **Decisión del Área 2 (16 de octubre):** en Trade, el monitor pausa el FundingGate con una llave que solo puede pausar (un rol propio en el gate, pedido al Área 1), nunca con la del cosignatario, que también cofirma el nivel 3. Mientras ese rol no exista, el monitor solo avisa al cosignatario humano, que pausa desde la app. Detecta: un `FundingExecuted` cuyo PDR no está en la evidencia del motor, y un `BalanceReleased` autorizado por un `DocumentDecision` que el motor no emitió. Además avisa, sin actuar, de cambios en cola en los registros del gate y de cambios de firmante, versión de reglas o cosignatario.
 * Es el cierre del acto 4.
 
 **T2.9 Verificador reproducible.**
@@ -122,12 +124,22 @@ Es la herramienta que se le muestra al jurado para pasar de "tenemos logs" a "nu
 **T2.10 Vigilancia de plazos (agregada por Trade).**
 Para cada orden en curso, el agente ejecuta `refundAfterDeadline` cuando pasó la fecha límite más el margen, y presenta la atestación con `submitShipment` cuando está disponible. Ambas llamadas las puede hacer cualquiera, así que no dan autoridad nueva al relayer.
 
+**T2.11 Servicio del agente (agregada por Trade). [PROPUESTA]**
+El proceso que une la ingesta, el motor, el PDR y el relayer. Sin él no hay orden de punta a punta (punto de integración del viernes 16, acto 1 de la demo). Vive en `engine/`, separado de las funciones puras: el motor sigue sin red y el servicio es el único que lee la cadena y envía transacciones.
+* **Depósito (paso 2):** detecta una orden abierta en el escrow, lee el estado de la orden, los registros y el cupo del FundingGate, arma el `FundingContext`, llama a `evaluateFunding`, firma el PDR (T2.4), simula la llamada (T2.5) y la envía con el relayer al gate de Trade. Nivel 3: entrega la solicitud de cofirma al Área 4. Nivel 2 o 4: retiene y avisa (T2.6).
+* **Gatillo 2 (paso 5):** recibe las extracciones y el hash de cada archivo del Área 3, lee la atestación registrada (`ShipmentAccepted`) y los `OrderTerms` de la orden, llama a `issueDocumentPdr`, guarda la evidencia y envía `releaseBalance`. Si los documentos no son conformes, retiene y avisa; la salida manual es la `BalanceApproval` del importador.
+* **Plazos:** corre la vigilancia de T2.10.
+* **Llaves:** el relayer solo paga gas y envía; el firmante de política firma en un proceso separado ([custodia de llaves](../arquitectura/custodia-de-llaves.md)). El servicio no gana autoridad nueva: sin un PDR o una firma válida, el gate y el escrow revierten.
+* De dónde salen la orden, los términos, los proveedores conocidos y el historial de montos es la [decisión abierta 15](../decisiones/abiertas.md). Mientras no se cierre, el servicio los lee de archivos locales de la demo.
+* Cómo funciona, qué archivos lee y qué avisos emite: [servicio del agente](../arquitectura/servicio-del-agente.md).
+
 # Listo cuando
 
 * Las interfaces están congeladas y probadas en TS y Solidity.
 * El motor tiene una prueba unitaria por regla y pasa los corpus del Área 3.
 * El verificador reproduce al menos 5 decisiones reales de la red de prueba.
 * La tabla de llaves está en el informe de seguridad.
+* El servicio del agente lleva una orden de la red de prueba desde el depósito hasta el saldo sin intervención manual.
 
 # Dependencias
 

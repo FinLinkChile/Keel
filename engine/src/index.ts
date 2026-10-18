@@ -7,6 +7,9 @@ export * from "./keys";
 export * from "./pdr";
 export * from "./policy";
 export * from "./verify";
+export * from "./agent/agent";
+export * from "./agent/escrow";
+export * from "./agent/store";
 
 export interface RuleResult<R extends string = string, C extends string = string> {
   rule: R;

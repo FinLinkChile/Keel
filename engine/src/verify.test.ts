@@ -297,8 +297,27 @@ describe("keel verify: the deployment file", () => {
   it("reads the official addresses of a chain, and nothing when the file is missing", () => {
     const dir = mkdtempSync(join(tmpdir(), "keel-deployments-"));
     writeFileSync(join(dir, "84532.json"), JSON.stringify({ chainId: 84532, pdrGate: GATE, fundingGate: GATE.toUpperCase().replace("0X", "0x"), safe: OTHER, tradeEscrow: "not an address" }));
-    expect(loadDeployment(dir, 84532)).toEqual({ chainId: 84532, pdrGate: GATE, fundingGate: GATE, tradeEscrow: undefined });
+    expect(loadDeployment(dir, 84532)).toEqual({ chainId: 84532, pdrGate: GATE, fundingGate: GATE, tradeEscrow: undefined, safe: OTHER });
     expect(loadDeployment(dir, 1)).toBeNull();
+  });
+
+  it("reads what the agent runs on from the shape DeployTrade records", () => {
+    const dir = mkdtempSync(join(tmpdir(), "keel-deployments-"));
+    const agentKey = word("agent allowance");
+    const cosignedKey = word("cosigned allowance");
+    writeFileSync(
+      join(dir, "84532.json"),
+      JSON.stringify({ chainId: 84532, pdrGate: null, fundingGate: GATE, tradeEscrow: ESCROW, safe: OTHER, deployBlock: 48233746, trade: { agentAllowanceKey: agentKey, cosignedAllowanceKey: cosignedKey, saltNonce: "43036773539347174997" } }),
+    );
+    expect(loadDeployment(dir, 84532)).toEqual({
+      chainId: 84532,
+      fundingGate: GATE,
+      tradeEscrow: ESCROW,
+      safe: OTHER,
+      deployBlock: 48233746n,
+      agentAllowanceKey: agentKey,
+      cosignedAllowanceKey: cosignedKey,
+    });
   });
 
   it("refuses a file whose chainId is not the one of its name", () => {

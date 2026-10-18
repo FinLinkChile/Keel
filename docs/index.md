@@ -5,7 +5,7 @@ okf_version: "0.2"
 # Rutas por necesidad
 
 * [Voy a idear o crear un componente](flujo/checklist-componente.md) - Ocho preguntas, cada una con el concepto que la responde. Empezar aquí.
-* [¿Toca una decisión abierta?](decisiones/abiertas.md) - Las 14 preguntas que el equipo no ha cerrado. No resolverlas por cuenta propia.
+* [¿Toca una decisión abierta?](decisiones/abiertas.md) - Las 15 preguntas que el equipo no ha cerrado. No resolverlas por cuenta propia.
 * [¿Está dentro del alcance?](flujo/alcance.md) - Dentro, fuera, lo que no prometemos y hoja de ruta.
 * [¿Cómo funciona el flujo completo?](flujo/flujo-clave.md) - Los seis pasos de Keel Trade con enlace a cada uno.
 * [¿Qué se firma y qué expone el contrato?](flujo/datos-firmados-e-interfaz.md) - Structs y funciones de TradeEscrow.
