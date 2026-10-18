@@ -37,7 +37,8 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-10-18T15:00:00Z }
 | 4 Producto | Alta de chats sin editar archivos ni variables a mano | Nuevo |
 | 1 Contratos | `ConfigGuard` (T1.5): sin él un dueño puede saltarse el Delay | Nuevo |
 | 1 Contratos | Publicar el despliegue en Systems Manager en cada release | Cambia |
-| Equipo | Producción: REST API con AWS WAF; ahora HTTP API con throttling ([despliegue](despliegue-aws.md)) | Cambia |
+| Equipo | Producción: REST API con AWS WAF y CloudFront delante; ahora HTTP API con throttling ([despliegue](despliegue-aws.md)) | Futuro: [promesa de seguridad](../flujo/mvp-y-seguridad-por-pais.md) |
+| Equipo | Autenticación de personas con proveedores terceros legales de cada país: hoy la identidad de la app es simulada | Futuro **[ABIERTO]**: qué proveedor en cada país |
 
 # Decisiones abiertas que toca
 

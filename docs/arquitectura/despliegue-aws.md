@@ -35,7 +35,9 @@ Keel corre en una cuenta AWS con servicios administrados, sin servidores propios
 | Etapa | Servicio | Protección contra inundaciones |
 | --- | --- | --- |
 | Ahora (demo y pruebas) | API Gateway **HTTP API** | Throttling por stage y por ruta (tasa y ráfaga), más los límites que ya aplican ingesta y las Lambdas |
-| Producción | API Gateway **REST API** con **AWS WAF** | Regla de tasa por IP, límite de tamaño del cuerpo y reglas administradas, aplicadas antes de invocar una Lambda |
+| Producción | API Gateway **REST API** con **AWS WAF** y **CloudFront** delante | Regla de tasa por IP, límite de tamaño del cuerpo y reglas administradas, aplicadas antes de invocar una Lambda |
+
+Pasar a REST API con WAF y CloudFront delante es una de las promesas de seguridad a futuro del MVP ([MVP y seguridad por país](../flujo/mvp-y-seguridad-por-pais.md)).
 
 Por qué:
 
