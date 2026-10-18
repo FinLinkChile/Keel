@@ -1,5 +1,7 @@
 import type { Hex, OrderTerms, PurchaseOrder } from '@keel/schemas';
 
+import type { Quote } from './types';
+
 // An order the importer sent to the exporter, kept on this device while it waits for both
 // signatures. Nothing here is secret (the signatures are public once given), so it is a plain
 // file and not SecureStore. No backend: the order travels importer, exporter, importer on the
@@ -25,6 +27,8 @@ export type Proposal = {
   sentAt: number;
   exporterSignedAt?: number;
   signedAt?: number;
+  // What the proforma asked for, to compare with what was agreed
+  quote?: Quote;
 };
 
 // "PO0158" -> "PO-0158"
@@ -33,7 +37,7 @@ export const proposalLabel = (orderNumber: string): string => orderNumber.replac
 const copyOrder = ({ po, terms }: { po: PurchaseOrder; terms: OrderTerms }) => ({ po: { ...po }, terms: { ...terms, hsCodes: [...terms.hsCodes] } });
 
 // The proposal the importer sends: awaiting the exporter, with the order frozen as `proposed`
-export function newProposal(order: { po: PurchaseOrder; terms: OrderTerms }, goods: string, now: number): Proposal {
+export function newProposal(order: { po: PurchaseOrder; terms: OrderTerms }, goods: string, now: number, quote?: Quote): Proposal {
   return {
     orderId: order.po.orderId,
     label: proposalLabel(order.terms.orderNumber),
@@ -42,6 +46,7 @@ export function newProposal(order: { po: PurchaseOrder; terms: OrderTerms }, goo
     proposed: copyOrder(order),
     status: 'awaiting_exporter',
     sentAt: Math.floor(now),
+    ...(quote ? { quote } : {}),
   };
 }
 

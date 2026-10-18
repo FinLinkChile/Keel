@@ -2,6 +2,7 @@
 
 * [Despliegue en AWS](despliegue-aws.md) - Cómo se propone correr Keel en AWS sin servidores propios y por dónde entran las peticiones a la API: HTTP API con throttling ahora, REST API con WAF en producción.
 * [Custodia y rotación de llaves](custodia-de-llaves.md) - Qué llaves existen, quién tiene cada una, qué puede hacer un atacante que robe una, dónde se limita y con qué prueba, cómo se rota y qué falta construir.
+* [Datos personales y privacidad (Ley 21.719)](datos-personales.md) - Qué datos de personas y empresas guarda Keel, dónde vive cada uno, para qué, a quién se transfiere, qué queda en la cadena, qué pueden usar los análisis y qué falta definir.
 * [Evidencia y bitácora](evidencia-y-bitacora.md) - Qué queda registrado de cada intento, dónde se guardan los PDR y por qué los reverts deliberados son la evidencia más fuerte.
 * [Verificador reproducible](verificador.md) - Cómo `keel verify` comprueba una decisión del motor desde la transacción o desde el archivo de evidencia, cómo la ancla a los contratos desplegados, qué prueba y qué no.
 * [Identidad de las empresas](identidad-de-empresas.md) - Cómo se vincula una billetera con una empresa verificada: registros de la Safe en el gate de Trade en el prototipo, credenciales verificables y WeIdentity en producción.

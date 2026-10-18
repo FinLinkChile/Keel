@@ -35,6 +35,7 @@ const ICONS = {
     </>
   ),
   activity: <Path d="M3 12h4l3-7 4 14 3-7h4" />,
+  agent: <Path d="M4 20V11M10 20V5M16 20v-6M20 20H3" />,
   camera: (
     <>
       <Path d="M4 8h3l2-3h6l2 3h3v11H4z" />
