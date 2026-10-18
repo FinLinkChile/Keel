@@ -2,6 +2,7 @@
 // No tools, fixed prompt, schema-only output, strict validation in contract.ts.
 import type { CommercialInvoiceExtraction, InvoiceExtraction, TransportDocumentExtraction } from "@keel/schemas";
 import { splitByVisibility } from "../pdf/hidden";
+import { withoutTermsPages } from "../pdf/pages";
 import { MAX_PDF_BYTES, PdfReadError, pdfHeaderOffset, readTextRuns, toLines } from "../pdf/text";
 import { logTransfer, redactForLlm, rehydrate, type LlmPurpose } from "../privacy";
 import {
@@ -111,8 +112,8 @@ export async function createExtractor(config: ExtractorConfig): Promise<Extracto
   }
 }
 
-// An invoice or a bill of lading is a page or two; anything far longer is padding for an
-// injection or a cost attack
+// An invoice or the form pages of a bill of lading are a page or two; anything far longer is
+// padding for an injection or a cost attack. Counted after the terms pages are skipped.
 export const MAX_LLM_INPUT_CHARS = 20_000;
 
 type Restore = (value: string) => string;
@@ -128,7 +129,7 @@ async function extract<T>(
 ): Promise<T> {
   let text: string;
   try {
-    text = toLines(await readTextRuns(pdf)).join("\n");
+    text = toLines(withoutTermsPages(await readTextRuns(pdf))).join("\n");
   } catch (e) {
     throw new ExtractionError("unreadable_input", { cause: e });
   }
