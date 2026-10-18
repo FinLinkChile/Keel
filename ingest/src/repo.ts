@@ -12,7 +12,8 @@ import type { AccountAlert } from "./trade/accountAlert";
 import type { Party } from "./trade/upload";
 
 export const MAX_EMAILS_PER_SENDER_PER_DAY = 20;
-// Keel Trade: authorized uploads per order in a day. A legitimate order needs two or three.
+// Keel Trade: authorized uploads per order and party in a day, so one party cannot spend the
+// other's quota. A legitimate order needs two or three per party.
 export const MAX_DOCUMENTS_PER_ORDER_PER_DAY = 10;
 export const CHANGE_COOLDOWN_DAYS = 7;
 export const DAY_MS = 24 * 60 * 60 * 1000;
@@ -48,8 +49,9 @@ export interface StoredUpload extends UploadEntry {
   readStatus?: string;
 }
 
-// "duplicate": this exact file was already admitted to this order. "rate_limited": the order
-// already has MAX_DOCUMENTS_PER_ORDER_PER_DAY admitted uploads in the window; nothing is recorded.
+// "duplicate": this exact file was already admitted to this order. "rate_limited": this party
+// already has MAX_DOCUMENTS_PER_ORDER_PER_DAY admitted uploads to the order in the window;
+// nothing is recorded.
 export type UploadAdmission = "admitted" | "duplicate" | "rate_limited";
 
 export interface AcceptedDocument {
@@ -59,6 +61,12 @@ export interface AcceptedDocument {
   blHash?: Hex;
   extraction: object;
 }
+
+// How a reading ends when the model failed in a way that does not depend on the file (a provider
+// error, a timeout, a 429) and the retries ran out: the same file may be uploaded again.
+export const READ_EXTRACTOR_FAILED = "held:extractor_failed";
+
+export type StoredDocument = Pick<AcceptedDocument, "docType" | "blHash" | "extraction">;
 
 export interface IngestRepo {
   // Keel Personal ------------------------------------------------------------------------
@@ -81,18 +89,25 @@ export interface IngestRepo {
 
   // Keel Trade ---------------------------------------------------------------------------
 
-  // Atomic: the duplicate check, the per-order limit and the record happen together, so two
-  // concurrent uploads cannot both take the last slot of the day.
+  // Atomic: the duplicate check, the per-order-and-party limit and the record happen together,
+  // so two concurrent uploads cannot both take the last slot of the day.
   admitUpload(u: UploadEntry, max?: number): Promise<UploadAdmission>;
-  // Admitted uploads to this order in the current window
-  uploadsForOrder(orderId: Hex): Promise<number>;
+  // Admitted uploads to this order in the current window: of one party, or of both
+  uploadsForOrder(orderId: Hex, party?: Party): Promise<number>;
   upload(orderId: Hex, fileHash: Hex): Promise<StoredUpload | undefined>;
   // The asynchronous reader takes an admitted upload before reading it. false if it is unknown,
   // already read, or being read by someone else whose claim is younger than staleAfterMs.
   claimReading(orderId: Hex, fileHash: Hex, staleAfterMs: number): Promise<boolean>;
   finishReading(orderId: Hex, fileHash: Hex, status: string): Promise<void>;
+  // Gives the upload back to the reader: drops the claim of a reading that did not finish (a
+  // transient failure to retry) and reopens one that finished as READ_EXTRACTOR_FAILED, so the
+  // same file can be read again. false when nothing changed (unknown, or finished otherwise).
+  releaseReading(orderId: Hex, fileHash: Hex): Promise<boolean>;
   // The order a bill of lading was accepted for, if any
   orderForBl(blHash: Hex): Promise<Hex | undefined>;
+  // The record acceptDocument stored for this file of this order, if any. Lets a retried
+  // reading finish from what was already accepted instead of reading the file again.
+  acceptedDocument(orderId: Hex, fileHash: Hex): Promise<StoredDocument | undefined>;
   // true once this file is accepted for this order (also when it already was); false if the
   // bill of lading was accepted for another file in the meantime
   acceptDocument(d: AcceptedDocument): Promise<boolean>;

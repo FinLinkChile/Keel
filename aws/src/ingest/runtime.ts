@@ -6,7 +6,8 @@
 // (proforma), NOTICES_QUEUE_URL (extractor, inbound, digest); KEEL_CHAIN_ID or
 // KEEL_CONFIG_PREFIX/KEEL_SECRETS_PREFIX (config.ts, secrets.ts); the initial settings
 // LLM_PROVIDER, LLM_MODEL, INGEST_REQUIRE_DMARC; the base URLs ANTHROPIC_BASE_URL and
-// LLM_COMPAT_BASE_URL; LLM_TIMEOUT_MS (optional). Secret llm_keys (JSON
+// LLM_COMPAT_BASE_URL; LLM_TIMEOUT_MS (optional, a positive integer of milliseconds, default 60000;
+// anything else fails at startup). Secret llm_keys (JSON
 // {anthropic?, openai?, gemini?, compat?}) for the handlers that call the model.
 import {
   baseUrlsFromEnv,
@@ -67,7 +68,22 @@ export function llmKeys(json: string): ApiKeys {
 // Settings changes go to the logs too, next to the audit entries in the table
 const logAudit = (entry: SettingsAudit) => console.log(JSON.stringify({ event: "ingest_settings_changed", ...entry }));
 
+export const DEFAULT_LLM_TIMEOUT_MS = 60_000;
+
+// An unset variable is the default; a set one must be a positive integer. A bad value used to
+// become NaN, which silently turned the timeout off.
+export function llmTimeoutMs(env: Env = process.env): number {
+  const raw = env.LLM_TIMEOUT_MS;
+  if (raw === undefined || raw.trim() === "") return DEFAULT_LLM_TIMEOUT_MS;
+  if (!/^[1-9][0-9]*$/.test(raw.trim()) || !Number.isSafeInteger(Number(raw))) {
+    throw new Error(`LLM_TIMEOUT_MS must be a positive integer of milliseconds, got "${raw}"`);
+  }
+  return Number(raw);
+}
+
 export function settingsLoader(repo: DynamoIngestRepo, keys: () => Promise<ApiKeys>, env: Env = process.env) {
+  // Read once, when the runtime is built, so a bad value stops the container at startup
+  const timeoutMs = llmTimeoutMs(env);
   let store: Promise<SettingsStore> | undefined;
   return async (): Promise<SettingsStore> => {
     store ??= (async () =>
@@ -77,7 +93,7 @@ export function settingsLoader(repo: DynamoIngestRepo, keys: () => Promise<ApiKe
         urls: baseUrlsFromEnv(env),
         backend: dynamoSettingsBackend(repo.table, repo.db()),
         audit: logAudit,
-        ...(env.LLM_TIMEOUT_MS ? { timeoutMs: Number(env.LLM_TIMEOUT_MS) } : {}),
+        timeoutMs,
       }))();
     // A failed open (a missing key, a throttled read) is retried on the next invocation
     store.catch(() => (store = undefined));
