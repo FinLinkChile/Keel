@@ -1,4 +1,6 @@
-import type { Hex, OrderTerms, PurchaseOrder, RequiredDocType } from '@keel/schemas';
+import type { Currency, Hex, OrderTerms, PurchaseOrder, RequiredDocType } from '@keel/schemas';
+
+import type { ProformaLine } from '../ingest/proforma';
 
 // Same slugs as bot/examples/recipients.json
 export type PartyId = string;
@@ -40,7 +42,8 @@ export type OrderStage =
   | 'shipped' // step 4 done, dispute window running
   | 'settled' // step 5
   | 'refunded' // step 6
-  | 'cancelled'; // mutual cancellation
+  | 'cancelled' // mutual cancellation
+  | 'rejected'; // the exporter refused to sign the proposed order
 
 // A document already uploaded for an order, as the exporter sees it: only its outcome.
 export type OrderDocument = {
@@ -48,6 +51,20 @@ export type OrderDocument = {
   fileName: string;
   uploadedAt: number;
   status: 'accepted' | 'under_review';
+};
+
+// What the proforma asked for, kept with the order to compare with what was signed. Not part of
+// the signed terms.
+export type Quote = {
+  // Prices of quotes in different currencies are never compared
+  currency: Currency | null;
+  amountCents: number | null;
+  advanceBps: number | null;
+  // Unix seconds
+  issueDate: number | null;
+  latestShipmentDate: number | null;
+  // Quantity, unit and amount of each line, to compare prices per unit
+  lines?: ProformaLine[];
 };
 
 export type Order = {
@@ -59,7 +76,10 @@ export type Order = {
   stage: OrderStage;
   // Who has to act next, if anyone
   waitingOn?: Role;
-  // Unix seconds of each step that happened
+  // Unix seconds of each step that happened. sentAt and exporterSignedAt exist for orders
+  // proposed on this phone.
+  sentAt?: number;
+  exporterSignedAt?: number;
   signedAt?: number;
   advancePaidAt?: number;
   shippedAt?: number;
@@ -71,6 +91,13 @@ export type Order = {
   documents: OrderDocument[];
   po: PurchaseOrder;
   terms: OrderTerms;
+  quote?: Quote;
+  // Escrow state as the Keel API's indexer mirrors it ("NONE", "OPEN", "SHIPPED", "DISPUTED"…),
+  // only for orders read from the API. DISPUTED shows as stage 'shipped'; RESOLVED as 'settled'.
+  escrowState?: string;
+  // The carrier's attestation of the shipment as the API holds it (attestation fields as strings),
+  // only for orders read from the API once the shipment is attested
+  shipment?: { attestation: Record<string, unknown>; sigCarrier: string };
 };
 
 export type Wallet = {
@@ -84,7 +111,27 @@ export type Wallet = {
 export type NeedsYou =
   | { kind: 'sign_order'; orderId: Hex }
   | { kind: 'verify_supplier'; party: PartyId }
-  | { kind: 'upload_documents'; orderId: Hex };
+  | { kind: 'upload_documents'; orderId: Hex }
+  // From the Keel API (GET /needs-you): the shipment is attested, the importer may release the
+  // balance; and the other side signed a cancellation this side has not signed yet
+  | { kind: 'approve_balance'; orderId: Hex }
+  | { kind: 'sign_cancel'; orderId: Hex; cancelNonce?: string };
+
+// A supplier that went through the supplier check, with the payout account registered then. The
+// payout address is the only place an order takes its payee from.
+export type SupplierRecord = {
+  party: Party;
+  payoutAddress: Hex;
+};
+
+// The fixed third parties and the token of the corridor (carrier, arbiter and document verifier
+// are test keys in the prototype)
+export type TradeSetup = {
+  token: Hex;
+  carrier: Party;
+  arbiter: Party;
+  documentVerifier: Party;
+};
 
 // Read side of the app. The mock implementation lives in ./mock.ts; a real one reads the
 // contract events and the agent service.
@@ -97,4 +144,7 @@ export interface KeelData {
   orders(): Promise<Order[]>;
   order(orderId: Hex): Promise<Order | undefined>;
   needsYou(role: Role): Promise<NeedsYou[]>;
+  // Suppliers the importer can open an order with: only those that passed the supplier check
+  verifiedSuppliers(): Promise<SupplierRecord[]>;
+  tradeRegistry(): Promise<TradeSetup>;
 }

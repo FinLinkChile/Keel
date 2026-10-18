@@ -104,7 +104,9 @@ export interface TransportReadOptions {
   carrier: Hex;
   // Checked after the parser and before the model, so a reused bill of lading costs no LLM
   // call. Returns a hold reason, or undefined to go on.
-  beforeModel?: (blNumberHash: Hex) => "bl_used_by_other_order" | "duplicate_document_number" | undefined;
+  beforeModel?: (
+    blNumberHash: Hex,
+  ) => "bl_used_by_other_order" | "duplicate_document_number" | undefined | Promise<"bl_used_by_other_order" | "duplicate_document_number" | undefined>;
 }
 
 // Parser first, then the model: an unreadable document never reaches the LLM.
@@ -112,7 +114,7 @@ async function twoSources<P, L, R>(
   parse: () => Promise<P>,
   extract: () => Promise<L>,
   combine: (parsed: P, llm: L) => R,
-  beforeModel?: (parsed: P) => R | undefined,
+  beforeModel?: (parsed: P) => R | undefined | Promise<R | undefined>,
 ): Promise<R | Failed> {
   let parsed: P;
   try {
@@ -121,7 +123,7 @@ async function twoSources<P, L, R>(
     if (e instanceof TradeParseError) return { status: "held", reason: "parser_failed", failure: e.reason, field: e.field };
     throw e;
   }
-  const early = beforeModel?.(parsed);
+  const early = await beforeModel?.(parsed);
   if (early !== undefined) return early;
   let llm: L;
   try {
@@ -146,9 +148,9 @@ export async function readTransportDocument(
     () => parseTransportDocument(pdf),
     () => extractTransportDocument(pdf, extractor),
     (parsed, llm) => compareTransport(parsed, llm, options.carrier),
-    (parsed) => {
+    async (parsed) => {
       const key = blNumberHash(options.carrier, parsed.extraction.document_number);
-      const verdict = options.beforeModel?.(key);
+      const verdict = await options.beforeModel?.(key);
       if (verdict === "bl_used_by_other_order") return { status: "held", reason: verdict, blNumberHash: key };
       if (verdict === "duplicate_document_number") return { status: "duplicate", reason: verdict, blNumberHash: key };
       return undefined;

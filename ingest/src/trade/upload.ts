@@ -51,8 +51,9 @@ export interface TradeOrderEntry {
   knownDestinations?: PaymentDestination[];
 }
 
+// Synchronous for a file, asynchronous for a database (aws/src/ingest reads DynamoDB)
 export interface OrderRegistry {
-  get(orderId: Hex): TradeOrderEntry | undefined;
+  get(orderId: Hex): TradeOrderEntry | undefined | Promise<TradeOrderEntry | undefined>;
 }
 
 export const staticOrders = (orders: readonly TradeOrderEntry[]): OrderRegistry => {
@@ -73,6 +74,13 @@ export interface UploadRequest {
   file: Uint8Array;
 }
 
+// The same request before the file exists: the uploader declares the hash it signed. Used to
+// hand out a presigned upload URL (aws/src/handlers/upload.ts); the reader recomputes the hash
+// from the bytes that arrive and refuses a file whose hash is not the declared one.
+export interface DeclaredUpload extends Omit<UploadRequest, "file"> {
+  fileHash: Hex;
+}
+
 export type UploadAuth =
   | { status: "rejected"; reason: UploadRejection }
   | { status: "authorized"; order: TradeOrderEntry; docType: RequiredDocType; uploader: Hex; party: Party; fileHash: Hex };
@@ -85,14 +93,27 @@ export async function authorizeUpload(
   chainId: number,
   now: Date = new Date(),
 ): Promise<UploadAuth> {
-  const order = orders.get(req.orderId);
+  const { file, ...rest } = req;
+  return authorizeDeclaredUpload({ ...rest, fileHash: fileHash(file) }, orders, chainId, now);
+}
+
+// Authorization from a declared hash. Callers that hold the bytes use authorizeUpload, which
+// computes the hash itself; callers that do not must check the bytes against it later.
+export async function authorizeDeclaredUpload(
+  req: DeclaredUpload,
+  orders: OrderRegistry,
+  chainId: number,
+  now: Date = new Date(),
+): Promise<UploadAuth> {
+  const order = await orders.get(req.orderId);
   if (!order) return { status: "rejected", reason: "unknown_order" };
   if (!(REQUIRED_DOC_TYPES as readonly string[]).includes(req.docType)) return { status: "rejected", reason: "unknown_doc_type" };
   const docType = req.docType as RequiredDocType;
   if (Math.abs(now.getTime() / 1000 - req.issuedAt) > UPLOAD_MAX_SKEW_SECONDS) {
     return { status: "rejected", reason: "stale_signature" };
   }
-  const hash = fileHash(req.file);
+  if (!/^0x[0-9a-fA-F]{64}$/.test(req.fileHash)) return { status: "rejected", reason: "bad_signature" };
+  const hash = req.fileHash.toLowerCase() as Hex;
   let signer: Hex;
   try {
     signer = await recoverTypedDataAddress({

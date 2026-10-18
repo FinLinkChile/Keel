@@ -80,7 +80,7 @@ Sirve al acto 1 de la [demo](../entrega/demo.md): los documentos de PO-0142 que 
 * Atestación de embarque firmada con la llave de naviera de la demo, `testAccount("demo:carrier:harbor-line")`, que es la dirección de Harbor Line en `mock.ts`.
 * `npm run demo-docs -w ingest` escribe `documents.json` y `shipment.json` en la carpeta del agente. Implementada en `ingest/src/testing/demoOrder.ts` (PR #69).
 
-**T3.11 Registro de órdenes firmadas desde la app (agregada por Trade) [PROPUESTA].**
+**T3.11 Registro de órdenes firmadas desde la app (agregada por Trade).**
 Sirve a los pasos 4 y 5 del flujo para una orden creada en la app: hoy ni la carga de documentos de ingesta (T3.1) ni el agente la conocen, porque solo leen los archivos de la demo. Toca la [decisión abierta 15](../decisiones/abiertas.md) (Áreas 2, 3 y 4): se implementa solo si el Área 2 la confirma; propuesta en la revisión del PR #70.
 * Cuando ambas partes firman, la app envía la orden, sus términos y las dos firmas a ingesta (`POST /trade/orders`).
 * Ingesta no confía en la app: acepta la orden solo si las dos firmas EIP-712 recuperan al importador y al exportador con el dominio del escrow, si el hash de los términos es el `termsHash` de la orden y si el `orderId` corresponde a las partes y al nonce.

@@ -41,6 +41,10 @@ npm run demo-data -w app -- --exporter 0x… [--importer 0x…] [--out <dir>]
 
 Every order id is computed the way `TradeEscrow.open` checks it, `keccak256(abi.encode(importer, exporter, nonce))`, with the addresses of the wallets given to the script: the same order has another id with other wallets, while its label (PO-0142, the nonce in hex) stays. The generated files all use the same ids. `npm run bot-examples -w app` rewrites the ids of `bot/examples` with the mock's default addresses. The default `--out` is `app/demo-data/`, ignored by git. `scripts/demoData.test.ts` checks the files against the shapes ingest (`TradeOrderEntry`), the agent (`engine/src/agent/store.ts`) and the bot read, and the orders against the checks of `TradeEscrow.open` that can be made off chain.
 
+## Arbiter test key
+
+The on-chain gate only accepts a carrier, an arbiter and a document verifier that Area 1 registered in the Safe; any other address reverts with `UntrustedParty` when the order is funded. The carrier is the demo key of Area 3 (`testAccount("demo:carrier:harbor-line")`, `0xB4B5…7708`), whose `demo-docs` script signs the shipment attestation of PO-0142 (see `redteam/corpus/demo`). The verifier is the policy key of Area 2. The arbiter is a **test key** controlled by Area 4, with no value, declared as such. Its private key lives outside the repository (`~/keel-arbiter.env`, `DEMO_ARBITER_PRIVATE_KEY` and `DEMO_ARBITER_ADDRESS`) and is never committed, logged or sent to a chat: only the public address is shared. No engine or agent service holds it. To regenerate it, delete the env file, create a new key with viem (`generatePrivateKey`), save both lines in the same file, replace the address in `src/data/mock.ts` and ask Area 1 to register it again.
+
 ## Uploading a document from a phone to ingest
 
 This is the end to end test of the signed upload (step 4 of the flow): the exporter picks a PDF on the phone, the app signs a `DocumentUpload` over the exact bytes with the test wallet and sends them to ingest, and the screen shows only the outcome. You need a computer that runs ingest and the Expo dev server, and a phone with Expo Go on the same Wi-Fi network.
@@ -93,6 +97,23 @@ What each outcome means:
 | Uploads are not set up in this app | not sent | `EXPO_PUBLIC_INGEST_URL` or `EXPO_PUBLIC_CHAIN_ID` is missing; restart with `--clear` after editing `app/.env` |
 
 Nothing on this screen pays or changes the order: the upload only gives ingest the documents that the engine later compares with the signed order and the carrier's attestation. The screen never shows what ingest read in the file.
+
+## Sign-up
+
+The first time, the app asks for the country (only Chile is available), the company (RUT, legal name, email and a Chilean mobile), and the person who represents it (name, RUT, and whether they are a politically exposed person), the data a Chilean bank asks to open a company account. RUTs are checked with their check digit. The form comes filled with the demo company, Pacífico Foods SpA, because the documents of the test orders carry its RUT.
+
+**The identity validation is simulated.** The last step says how it works in production: TOC (Sovos) compares a live selfie with the photo on the ID card. Here the person ticks that it was done; nothing is captured or sent to TOC. KYC is future work (`docs/flujo/alcance.md`). The details stay on the phone (`onboarding.json`) and are never sent to ingest or to a model. The company the person signed up replaces the example importer on screen. Logging out from the profile goes back to Connect and keeps the test wallet.
+
+## The app on a phone with Xcode, without Expo Go
+
+Expo Go cannot run the document scanner of the proforma, so the app is built as a native app. `ios/` is generated and ignored by git, so nothing heavy is committed:
+
+1. `npm install` at the repository root, and copy `app/.env.example` to `app/.env` (set `EXPO_PUBLIC_INGEST_URL`, `EXPO_PUBLIC_CHAIN_ID` and, for a test build, `EXPO_PUBLIC_WALLET_CHECK=1`).
+2. In `app/`: `npx expo prebuild --platform ios` and `cd ios && pod install` (CocoaPods).
+3. Open `app/ios/Keel.xcworkspace`, choose your team in Signing & Capabilities (a free Apple ID works) and your iPhone.
+4. Edit Scheme, Run, Build Configuration: **Release**, so the app carries its JavaScript and needs no Metro. Press Run. If Xcode says the bundle identifier is taken, change it (`ios.bundleIdentifier` in `app.json`) to one of your own.
+
+The proforma is scanned with the iPhone's document scanner (the one in Notes); the pages are joined into one PDF before they go to ingest.
 
 ## Tasks
 

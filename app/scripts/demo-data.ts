@@ -1,5 +1,6 @@
 /// <reference types="node" />
-// npm run demo-data -w app -- --exporter 0x… [--importer 0x…] [--out <dir>]
+// npm run demo-data -w app -- --exporter 0x… [--importer 0x… --safe 0x…] [--out <dir>]
+// --importer is the key that owns the importer's Safe; --safe is the Safe, the importer of the orders
 //
 // Writes, from the app's mock and the given test wallets (public addresses from Wallet check):
 //   <out>/ingest-orders.json                    INGEST_ORDERS_FILE for ingest
@@ -10,12 +11,15 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { getAddress, isAddress } from 'viem';
+
 import { checkWallet, demoData, toFileText } from './demoData';
 
 const { values } = parseArgs({
   options: {
     exporter: { type: 'string' },
     importer: { type: 'string' },
+    safe: { type: 'string' },
     out: { type: 'string', default: 'demo-data' },
   },
 });
@@ -23,9 +27,15 @@ const { values } = parseArgs({
 const repo = resolve(__dirname, '../..');
 const botAccounts = Object.keys(JSON.parse(readFileSync(join(repo, 'bot/examples/recipients.json'), 'utf8')).accounts);
 
+function checkSafe(value: string) {
+  if (!isAddress(value, { strict: false })) throw new Error(`--safe is not an address: ${value}`);
+  return getAddress(value.toLowerCase());
+}
+
 async function main() {
   const wallets = { exporter: checkWallet('exporter', values.exporter), importer: checkWallet('importer', values.importer) };
-  const data = await demoData(wallets, botAccounts);
+  const importerSafe = values.safe ? checkSafe(values.safe) : undefined;
+  const data = await demoData(wallets, botAccounts, { importerSafe });
 
   const out = resolve(values.out!);
   const write = (path: string[], value: unknown) => {

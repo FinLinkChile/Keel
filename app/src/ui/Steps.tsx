@@ -5,7 +5,7 @@ import { Icon } from './Icon';
 import { Text } from './Text';
 import { colors } from './theme';
 
-export type StepState = 'done' | 'current' | 'todo';
+export type StepState = 'done' | 'current' | 'todo' | 'stopped';
 
 export type Step = {
   key: string;
@@ -125,6 +125,13 @@ function Dot({ state, s }: { state: StepState; s: (typeof SIZES)[keyof typeof SI
         <View style={[base, { backgroundColor: colors.accent }]}>
           <View style={{ width: s.inner, height: s.inner, borderRadius: s.inner / 2, backgroundColor: colors.onAccent }} />
         </View>
+      </View>
+    );
+  }
+  if (state === 'stopped') {
+    return (
+      <View style={[base, { backgroundColor: colors.dangerMuted }]}>
+        <Icon name="info" size={s.check + 2} strokeWidth={2.6} color="danger" />
       </View>
     );
   }

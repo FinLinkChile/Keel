@@ -2,6 +2,7 @@
 // T2.2, issue #10. Pure function: no network, no LLM, no implicit clock.
 import type { EscrowState, FundIntent, Hex, PurchaseOrder, Tier } from "@keel/schemas";
 import { structHash } from "@keel/schemas/hash";
+import { canonicalHash } from "./canonical";
 import type { RuleResult } from "./index";
 
 export type FundingRule =
@@ -86,6 +87,7 @@ export interface FundingContext {
 export interface FundingEvaluation {
   tier: Tier;
   rules: RuleResult<FundingRule, FundingReason>[];
+  inputsHash: Hex;
   // Absent when the deposit is blocked (tier 4)
   intent?: FundIntent;
 }
@@ -121,14 +123,15 @@ function knownSupplier(order: PurchaseOrder, ctx: FundingContext): RuleResult<Fu
 }
 
 // Whoever proves the shipment, verifies the documents or settles a dispute is never one of
-// the parties, and the carrier and the document verifier are different: releasing the
-// balance must always take two independent signatures. The escrow checks it again at open.
+// the parties nor the payout address, and the three of them are different: releasing the
+// balance must always take two independent signatures. Mirrors the role checks of
+// TradeEscrow.open, which rejects the same orders.
 function independentRoles(order: PurchaseOrder): RuleResult<FundingRule, FundingReason> {
   const rule = "independent-roles";
-  const parties = [order.importer, order.exporter];
+  const parties = [order.importer, order.exporter, order.payoutAddress];
   const thirds = [order.carrier, order.arbiter, order.documentVerifier];
   const clash =
-    thirds.some((t) => parties.some((p) => same(t, p))) || same(order.carrier, order.documentVerifier);
+    thirds.some((t) => parties.some((p) => same(t, p))) || thirds.some((t, i) => thirds.slice(i + 1).some((u) => same(t, u)));
   return clash ? { rule, tier: 4, reason: "ROLE_NOT_INDEPENDENT" } : { rule, tier: 1, reason: "ROLES_INDEPENDENT" };
 }
 
@@ -164,6 +167,12 @@ function shipmentDeadline(order: PurchaseOrder, ctx: FundingContext, policy: Fun
   return { rule, tier: 1, reason: "DEADLINE_OK" };
 }
 
+// What the decision was made on: the order and everything read around it (escrow state,
+// registry, allowance, history).
+export function fundingInputsHash(order: PurchaseOrder, context: FundingContext): Hex {
+  return canonicalHash({ order, context });
+}
+
 // Each rule returns the minimum tier it forces; the final tier is the maximum.
 export function evaluateFunding(
   order: PurchaseOrder,
@@ -180,7 +189,8 @@ export function evaluateFunding(
     shipmentDeadline(order, context, policy),
   ];
   const tier = Math.max(...rules.map((r) => r.tier)) as Tier;
-  if (tier === 4) return { tier, rules };
+  const inputsHash = fundingInputsHash(order, context);
+  if (tier === 4) return { tier, rules, inputsHash };
 
   const intent: FundIntent = {
     orderId: order.orderId,
@@ -191,5 +201,5 @@ export function evaluateFunding(
     deadline: BigInt(context.now + policy.intentTtlSeconds),
     nonce: context.nonce,
   };
-  return { tier, rules, intent };
+  return { tier, rules, inputsHash, intent };
 }

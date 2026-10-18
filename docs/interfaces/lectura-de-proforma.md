@@ -4,7 +4,7 @@ title: "Lectura de la proforma (Keel Trade)"
 description: "Cómo sube la app la proforma del exportador para prellenar la orden: mensaje EIP-712 que firma el importador, ruta HTTP, archivos aceptados, campos que devuelve y qué nunca devuelve."
 tags: [proforma, eip-712, ingesta, app, t3-9, paso-0]
 modo: trade
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T23:20:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T07:00:00Z }
 ---
 
 Diseño del Área 3 (T3.9) para la pantalla de nueva orden del Área 4 (T4.9), confirmado por el Área 4 al aprobar el PR #66. El código está en `ingest/src/trade/proforma.ts` y `ingest/src/extractor/proforma.ts`. El envío de fotos y escaneos al modelo sin redactar sigue **[PROPUESTA]** hasta que lo confirme el equipo.
@@ -75,6 +75,10 @@ Cuando el archivo va al modelo no hay texto que redactar: la transferencia queda
     "port_of_loading": "CNNGB",
     "port_of_discharge": null,
     "advance_bps": 3000,
+    "lines": [
+      { "hs_code": "846721", "quantity": 400, "unit": "PCE", "amount_minor": 1400000 },
+      { "hs_code": "820750", "quantity": 500, "unit": "SET", "amount_minor": 600000 }
+    ],
     "mentions_account_change": false,
     "hidden_text_detected": false
   },
@@ -84,6 +88,7 @@ Cuando el archivo va al modelo no hay texto que redactar: la transferencia queda
 
 - Un campo que la proforma no imprime llega como `null` y aparece en `missing`, para que el importador lo llene. Nunca se adivina ni se calcula.
 - Los valores pasan por las mismas normalizaciones que el BL y la factura: número compactado, monto en unidades menores sin decimales flotantes, fechas a medianoche UTC, códigos HS solo con dígitos (de 6 a 10), puertos en UN/LOCODE. Un valor que no se normaliza no se muestra como una suposición: ese campo llega como `null` y en `missing`, y los demás se conservan. Si falla un código HS, la lista queda vacía entera, para no mostrar una lista incompleta como si estuviera completa. Una respuesta que rompe el esquema (un campo de más, un tipo distinto) deja la lectura completa `unreadable`.
+- `lines` **[PROPUESTA]** trae cada línea de mercadería con su código HS, cantidad, unidad y monto, **sin descripción ni otro texto**, para comparar precios por unidad (nota del agente en la app). La unidad es un código de la Recomendación 20 de UN/ECE de una lista cerrada: `KGM` kilo, `TNE` tonelada, `GRM` gramo, `LBR` libra, `PCE` unidad, `SET` juego, `PR` par, `DZN` docena, `CT` caja, `BG` saco, `RO` rollo, `LTR` litro, `MTR` metro, `MTK` metro cuadrado, `MTQ` metro cúbico. La cantidad es positiva con hasta 3 decimales; el código HS y el monto de una línea pueden llegar en `null`. Igual que con los códigos HS, si una línea no se normaliza (unidad fuera de la lista, cantidad que no es un número) la lista llega vacía entera, para no mostrarla incompleta, y `lines` aparece en `missing`. Hasta 20 líneas. Una lectura guardada antes de este campo vuelve con `lines: []`.
 - `mentions_account_change` y `hidden_text_detected` son advertencias para la pantalla. No llenan nada.
 - `fileHash` es el `documentHash` de los `OrderTerms` de la orden que sale de esta proforma; así lo usa la app ([paso 1](../flujo/paso-1-firma-orden.md)).
 - La misma proforma subida otra vez devuelve la misma lectura sin llamar de nuevo al modelo. Ingesta guarda el hash y la lectura tipada, nunca el archivo.
