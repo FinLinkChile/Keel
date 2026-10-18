@@ -36,6 +36,7 @@ npm run demo-data -w app -- --exporter 0x… [--importer 0x…] [--out <dir>]
 |---|---|---|
 | `<out>/ingest-orders.json` | ingest, as `INGEST_ORDERS_FILE` | The open orders a test wallet can upload to: `orderId`, `payoutAddress` and `carrier` from the order, the wallets as `uploaders`, and the exporter's registered bank account as `knownDestinations`, so its own invoice raises no unknown account alert |
 | `<out>/agent/orders/<orderId>/order.json` | the agent (Area 2) | `{ order, terms, label }`: the `PurchaseOrder` with its real `termsHash` and `requiredDocsHash`, the `OrderTerms` and the label of the bot notices |
+| `<out>/agent/orders/<orderId>/order.json` (signed) | the agent (Area 2) | The same file plus `sigImporter` and `sigExporter`, which the agent needs to send `open` (decision 17). `demo-data` has no keys, so it cannot write them: the phones produce them when both sign. After the importer signs, the app posts the file to `{EXPO_PUBLIC_INGEST_URL}/trade/orders` ([signed order](../docs/interfaces/orden-firmada.md)); ingest checks both signatures, lets the parties upload documents and writes the file for the agent. The app records whether ingest took it and sends it again after signing and whenever it opens; a refusal shows as a notice with its reason. Signing never waits for it |
 | `<out>/agent/registry.json` | the agent | `parties` (address, bot account, the importer's RUT) and `history` (settled amounts by exporter) |
 | `<out>/bot-orders.json` | the bot, as `BOT_ORDERS_FILE` | The label and the bot accounts of each order, by order id |
 
@@ -102,7 +103,7 @@ Nothing on this screen pays or changes the order: the upload only gives ingest t
 
 The first time, the app asks for the country (only Chile is available), the company (RUT, legal name, email and a Chilean mobile), and the person who represents it (name, RUT, and whether they are a politically exposed person), the data a Chilean bank asks to open a company account. RUTs are checked with their check digit. The form comes filled with the demo company, Pacífico Foods SpA, because the documents of the test orders carry its RUT.
 
-**The identity validation is simulated.** The last step lists what a bank asks (the ID card, front and back, and a selfie) and the person ticks that it was done; nothing is captured or checked. KYC is future work (`docs/flujo/alcance.md`). The details stay on the phone (`onboarding.json`) and are never sent to ingest or to a model. The company the person signed up replaces the example importer on screen. Logging out from the profile goes back to Connect and keeps the test wallet.
+**The identity validation is simulated.** The last step says how it works in production: TOC (Sovos) compares a live selfie with the photo on the ID card. Here the person ticks that it was done; nothing is captured or sent to TOC. KYC is future work (`docs/flujo/alcance.md`). The details stay on the phone (`onboarding.json`) and are never sent to ingest or to a model. The company the person signed up replaces the example importer on screen. Logging out from the profile goes back to Connect and keeps the test wallet.
 
 ## The app on a phone with Xcode, without Expo Go
 

@@ -3,6 +3,8 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { config } from '@/config';
 import type { Signers } from '@/wallet/signer';
 
+import { syncSignedOrders } from '../ingest/signedOrder';
+
 import { apiClient, type ApiClient } from './api';
 import { withoutExamples } from './cleanStart';
 import { httpProposalStore } from './httpProposals';
@@ -40,6 +42,18 @@ const subscribe = (l: () => void) => {
   listeners.add(l);
   return () => void listeners.delete(l);
 };
+
+// Hands the orders signed on this phone to ingest (POST /trade/orders) until it takes them: after
+// a signature and whenever the app opens. With the Keel API the orders already live on the
+// server, so there is nothing to send. One run at a time.
+let syncing: Promise<unknown> | undefined;
+export function syncOrdersWithIngest(): Promise<unknown> {
+  if (api || !config.ingestUrl) return Promise.resolve();
+  syncing ??= syncSignedOrders({ store: proposals, ingestUrl: config.ingestUrl, now: Date.now() / 1000 }).finally(() => {
+    syncing = undefined;
+  });
+  return syncing;
+}
 
 // Screens call it after an API move that is not a proposal (a closing signature, an upload), so
 // what they show is read again

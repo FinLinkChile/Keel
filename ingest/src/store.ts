@@ -22,7 +22,7 @@ import {
   type UploadEntry,
 } from "./repo";
 import type { AccountAlert } from "./trade/accountAlert";
-import type { Party } from "./trade/upload";
+import type { Party, TradeOrderEntry } from "./trade/upload";
 
 export {
   CHANGE_COOLDOWN_DAYS,
@@ -120,6 +120,20 @@ export class IngestStore implements IngestRepo {
         received_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS proforma_uploads_by_importer ON proforma_uploads (importer, received_at);
+      -- Orders signed by both parties and sent from the app (T3.11): who may upload documents to
+      -- them, and the agent's order.json exactly as accepted
+      CREATE TABLE IF NOT EXISTS signed_orders (
+        order_id    TEXT PRIMARY KEY,
+        entry       TEXT NOT NULL,
+        body        TEXT NOT NULL,
+        received_at INTEGER NOT NULL
+      );
+      -- Every authorized request for the agent's analysis, for the daily limit. Nothing else is kept.
+      CREATE TABLE IF NOT EXISTS insights_requests (
+        importer    TEXT NOT NULL,
+        received_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS insights_by_importer ON insights_requests (importer, received_at);
     `);
   }
 
@@ -268,6 +282,33 @@ export class IngestStore implements IngestRepo {
       .prepare("DELETE FROM trade_reads WHERE order_id = ? AND file_hash = ? AND (status IS NULL OR status = ?)")
       .run(orderId.toLowerCase(), fileHash, READ_EXTRACTOR_FAILED);
     return r.changes === 1;
+  }
+
+  async recordInsights(importer: Hex): Promise<void> {
+    this.db.prepare("INSERT INTO insights_requests (importer, received_at) VALUES (?, ?)").run(importer.toLowerCase(), this.now().getTime());
+  }
+
+  // Authorized analysis requests of this importer in the last 24 hours
+  async insightsToday(importer: Hex): Promise<number> {
+    const row = this.db
+      .prepare("SELECT count(*) AS n FROM insights_requests WHERE importer = ? AND received_at > ?")
+      .get(importer.toLowerCase(), this.now().getTime() - DAY_MS) as { n: number };
+    return row.n;
+  }
+
+  // Orders signed by both from the app (T3.11). false if an order with this id was already saved
+  async saveSignedOrder(orderId: Hex, entry: TradeOrderEntry, body: string): Promise<boolean> {
+    const r = this.db
+      .prepare("INSERT OR IGNORE INTO signed_orders (order_id, entry, body, received_at) VALUES (?, ?, ?, ?)")
+      .run(orderId.toLowerCase(), JSON.stringify(entry), body, this.now().getTime());
+    return r.changes === 1;
+  }
+
+  async signedOrder(orderId: Hex): Promise<{ entry: TradeOrderEntry; body: string } | undefined> {
+    const row = this.db.prepare("SELECT entry, body FROM signed_orders WHERE order_id = ?").get(orderId.toLowerCase()) as
+      | { entry: string; body: string }
+      | undefined;
+    return row ? { entry: JSON.parse(row.entry) as TradeOrderEntry, body: row.body } : undefined;
   }
 
   async orderForBl(blHash: Hex): Promise<Hex | undefined> {

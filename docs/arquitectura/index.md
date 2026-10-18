@@ -1,5 +1,6 @@
 # Arquitectura
 
+* [El analista: análisis de compras con un modelo, fuera del flujo de pago](analista.md) - Qué recibe el modelo que analiza las compras de la empresa, qué devuelve, cómo se valida, por qué no puede ser manipulado por un documento y qué no puede hacer.
 * [Despliegue en AWS](despliegue-aws.md) - Cómo se propone correr Keel en AWS sin servidores propios: principios, mapa de los conceptos de la arquitectura y por dónde entran las peticiones a la API (HTTP API con throttling ahora, REST API con WAF en producción).
 * [Componentes de la arquitectura en AWS](aws-componentes.md) - Qué servicio de AWS cumple cada función de Keel Trade, qué hace, qué es hoy en el repo y si existe, es nuevo, cambia o falta decidirlo.
 * [API y datos en AWS](aws-api-y-datos.md) - Las rutas de la API con quién las llama y cómo se autentica cada una, y las tablas y buckets que reemplazan a los archivos y al SQLite de hoy.

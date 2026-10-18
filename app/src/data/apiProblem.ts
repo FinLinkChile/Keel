@@ -1,3 +1,4 @@
+import { t } from '../i18n/translate';
 import { isApiError } from './api';
 
 // What a screen says when the Keel API refuses a request. Only the error code is read; the
@@ -30,5 +31,5 @@ const WORDS: Record<string, string> = {
 
 export function apiProblem(e: unknown): string | undefined {
   if (!isApiError(e)) return undefined;
-  return WORDS[e.code] ?? 'Something went wrong on our side, try again';
+  return t(WORDS[e.code] ?? 'Something went wrong on our side, try again');
 }

@@ -8,6 +8,7 @@ import { isApiError, type OrderView } from '@/data/api';
 import { apiProblem } from '@/data/apiProblem';
 import { approveBalance, balanceApprovalDetails, canApproveBalance, canCancel, canDispute, signCancellation } from '@/data/closing';
 import { SIGNING_NOT_SET_UP, signingSetup } from '@/data/signOrder';
+import { useT } from '@/i18n';
 import { useSession } from '@/session';
 import { BottomSheet } from '@/ui/BottomSheet';
 import { Button } from '@/ui/Button';
@@ -32,6 +33,7 @@ function DetailRow({ label, value, mono }: { label: string; value: string; mono?
 }
 
 export function ClosingActions({ orderId, role }: { orderId: Hex; role: Role }) {
+  const t = useT();
   const { signer, address } = useSession();
   const [busy, setBusy] = useState<'approve' | 'cancel'>();
   const [problem, setProblem] = useState<string>();
@@ -45,7 +47,7 @@ export function ClosingActions({ orderId, role }: { orderId: Hex; role: Role }) 
       return await api.getOrder(signer, orderId);
     } catch (e) {
       if (isApiError(e, 'not_found')) return null;
-      return { error: apiProblem(e) ?? 'Something went wrong on our side, try again' };
+      return { error: apiProblem(e) ?? t('Something went wrong on our side, try again') };
     }
   }, [orderId, address]);
 
@@ -68,7 +70,7 @@ export function ClosingActions({ orderId, role }: { orderId: Hex; role: Role }) 
       await act();
       refreshData();
     } catch (e) {
-      setProblem(apiProblem(e) ?? 'The wallet could not sign. Try again.');
+      setProblem(apiProblem(e) ?? t('The wallet could not sign. Try again.'));
     }
     setBusy(undefined);
   }
@@ -76,7 +78,7 @@ export function ClosingActions({ orderId, role }: { orderId: Hex; role: Role }) 
   const cancel = order.closing?.cancel;
   const mine = role === 'importer' ? cancel?.sigImporter : cancel?.sigExporter;
   const theirs = role === 'importer' ? cancel?.sigExporter : cancel?.sigImporter;
-  const other = role === 'importer' ? 'The supplier' : 'The buyer';
+  const other = role === 'importer' ? t('The supplier') : t('The buyer');
   const showApprove = role === 'importer' && canApproveBalance(order);
   const showCancel = canCancel(order.state);
   const showDispute = canDispute(order.state);
@@ -88,30 +90,28 @@ export function ClosingActions({ orderId, role }: { orderId: Hex; role: Role }) 
   return (
     <View style={{ backgroundColor: colors.surface, borderRadius: radius.sheet, padding: 20, gap: 12 }}>
       <Text size={18} weight={800} accessibilityRole="header">
-        Close the order
+        {t('Close the order')}
       </Text>
 
       {order.state === 'DISPUTED' ? (
         <Text size={14} leading={1.45} color="textMuted">
-          In dispute. The balance stays in escrow until the arbiter splits it between you and the supplier&apos;s signed account, or
-          both of you sign a cancellation.
+          {t('In dispute. The balance stays in escrow until the arbiter splits it between you and the supplier\'s signed account, or both of you sign a cancellation.')}
         </Text>
       ) : null}
 
       {approved && order.state === 'SHIPPED' ? (
         <Text size={14} leading={1.45} color="textMuted">
-          Balance approved. The agent releases it to the signed account on its next pass.
+          {t('Balance approved. The agent releases it to the signed account on its next pass.')}
         </Text>
       ) : null}
 
       {showApprove ? (
         <View style={{ gap: 8 }}>
           <Text size={14} leading={1.45} color="textMuted">
-            The carrier attested the shipment. Approving pays the balance to the supplier&apos;s signed account now, without waiting
-            for the document check or the dispute window.
+            {t('The carrier attested the shipment. Approving pays the balance to the supplier\'s signed account now, without waiting for the document check or the dispute window.')}
           </Text>
           <Button
-            label={busy === 'approve' ? 'Signing' : 'Approve balance'}
+            label={busy === 'approve' ? t('Signing') : t('Approve balance')}
             disabled={!!busy || !signer || !setup}
             onPress={() => setConfirmApprove(true)}
           />
@@ -122,14 +122,14 @@ export function ClosingActions({ orderId, role }: { orderId: Hex; role: Role }) 
         <View style={{ gap: 8 }}>
           <Text size={14} leading={1.45} color="textMuted">
             {mine && !theirs
-              ? `You signed the cancellation. ${other} has to sign it too.`
+              ? t('You signed the cancellation. {other} has to sign it too.', { other })
               : theirs && !mine
-                ? `${other} signed a cancellation. With your signature, what is left in escrow goes back to the buyer.`
-                : 'A cancellation needs both signatures. What is left in escrow goes back to the buyer.'}
+                ? t('{other} signed a cancellation. With your signature, what is left in escrow goes back to the buyer.', { other })
+                : t('A cancellation needs both signatures. What is left in escrow goes back to the buyer.')}
           </Text>
           {!mine ? (
             <Button
-              label={busy === 'cancel' ? 'Signing' : 'Sign cancellation'}
+              label={busy === 'cancel' ? t('Signing') : t('Sign cancellation')}
               variant="secondary"
               disabled={!!busy || !signer || !setup}
               onPress={() => setConfirmCancel(true)}
@@ -139,12 +139,12 @@ export function ClosingActions({ orderId, role }: { orderId: Hex; role: Role }) 
       ) : null}
 
       {showDispute ? (
-        <Button label="Raise dispute" variant="secondary" onPress={() => setDisputeHelp(true)} />
+        <Button label={t('Raise dispute')} variant="secondary" onPress={() => setDisputeHelp(true)} />
       ) : null}
 
       {!setup ? (
         <Text size={13} color="textMuted">
-          {SIGNING_NOT_SET_UP}
+          {t(SIGNING_NOT_SET_UP)}
         </Text>
       ) : null}
       {problem ? (
@@ -153,59 +153,55 @@ export function ClosingActions({ orderId, role }: { orderId: Hex; role: Role }) 
         </Text>
       ) : null}
 
-      <BottomSheet visible={confirmApprove && !!details} title="Approve the balance?" onClose={() => setConfirmApprove(false)}>
+      <BottomSheet visible={confirmApprove && !!details} title={t('Approve the balance?')} onClose={() => setConfirmApprove(false)}>
         <View style={{ gap: 14, paddingTop: 6 }}>
           <Text size={14} leading={1.45} color="textMuted">
-            Your signature pays the balance to the supplier&apos;s signed account now, without waiting for the document check or the
-            dispute window. It names this shipment attestation:
+            {t('Your signature pays the balance to the supplier\'s signed account now, without waiting for the document check or the dispute window. It names this shipment attestation:')}
           </Text>
           {details ? (
             <View style={{ gap: 6 }}>
-              <DetailRow label="Balance" value={`${details.balance} USDC`} />
-              <DetailRow label="On board" value={details.onBoardDate} />
-              <DetailRow label="Port of loading" value={details.portOfLoading} />
-              <DetailRow label="B/L number hash" value={details.blNumberHash} mono />
+              <DetailRow label={t('Balance')} value={`${details.balance} USDC`} />
+              <DetailRow label={t('On board')} value={details.onBoardDate} />
+              <DetailRow label={t('Port of loading')} value={details.portOfLoading} />
+              <DetailRow label={t('B/L number hash')} value={details.blNumberHash} mono />
             </View>
           ) : null}
           <Button
-            label="Approve balance"
+            label={t('Approve balance')}
             onPress={() => {
               setConfirmApprove(false);
               void run('approve', () => approveBalance(api!, signer!, setup!, order));
             }}
           />
-          <Button label="Not now" variant="secondary" onPress={() => setConfirmApprove(false)} />
+          <Button label={t('Not now')} variant="secondary" onPress={() => setConfirmApprove(false)} />
         </View>
       </BottomSheet>
 
-      <BottomSheet visible={confirmCancel} title="Sign the cancellation?" onClose={() => setConfirmCancel(false)}>
+      <BottomSheet visible={confirmCancel} title={t('Sign the cancellation?')} onClose={() => setConfirmCancel(false)}>
         <View style={{ gap: 14, paddingTop: 6 }}>
           <Text size={14} leading={1.45} color="textMuted">
-            Your signature is valid only in the order&apos;s current state. Once both of you sign, the agent cancels the order and
-            what is left in escrow goes back to the buyer.
+            {t('Your signature is valid only in the order\'s current state. Once both of you sign, the agent cancels the order and what is left in escrow goes back to the buyer.')}
           </Text>
           <Button
-            label="Sign cancellation"
+            label={t('Sign cancellation')}
             onPress={() => {
               setConfirmCancel(false);
               void run('cancel', () => signCancellation(api!, signer!, setup!, order, role));
             }}
           />
-          <Button label="Keep the order" variant="secondary" onPress={() => setConfirmCancel(false)} />
+          <Button label={t('Keep the order')} variant="secondary" onPress={() => setConfirmCancel(false)} />
         </View>
       </BottomSheet>
 
-      <BottomSheet visible={disputeHelp} title="Raise a dispute" onClose={() => setDisputeHelp(false)}>
+      <BottomSheet visible={disputeHelp} title={t('Raise a dispute')} onClose={() => setDisputeHelp(false)}>
         <View style={{ gap: 12, paddingTop: 6 }}>
           <Text size={14} leading={1.45} color="textMuted">
-            A dispute freezes the balance until the arbiter decides how to split it between the buyer and the supplier&apos;s signed
-            account. It is a transaction on the escrow, raiseDispute(orderId), sent by the buyer&apos;s Safe or the supplier&apos;s
-            wallet. This app does not send transactions yet: send it from that wallet with this order id.
+            {t('A dispute freezes the balance until the arbiter decides how to split it between the buyer and the supplier\'s signed account. It is a transaction on the escrow, raiseDispute(orderId), sent by the buyer\'s Safe or the supplier\'s wallet. This app does not send transactions yet: send it from that wallet with this order id.')}
           </Text>
           <Text mono size={12} selectable>
             {order.orderId}
           </Text>
-          <Button label="Close" variant="secondary" onPress={() => setDisputeHelp(false)} />
+          <Button label={t('Close')} variant="secondary" onPress={() => setDisputeHelp(false)} />
         </View>
       </BottomSheet>
     </View>

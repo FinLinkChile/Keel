@@ -1,4 +1,5 @@
 import { formatDay, formatMinor } from '../ui/format';
+import { t } from '../i18n/translate';
 
 import { tokenToCents } from './amounts';
 import type { Order, OrderStage, Party, Role } from './types';
@@ -25,7 +26,7 @@ const DAY = 24 * 3600;
 // Unix seconds -> "today", "in 1 day", "in 2 days"
 function inDays(seconds: number): string {
   const days = Math.max(0, Math.ceil(seconds / DAY));
-  return days === 0 ? 'today' : days === 1 ? 'in 1 day' : `in ${days} days`;
+  return days === 0 ? t('today') : days === 1 ? t('in 1 day') : t('in {n} days', { n: days });
 }
 
 export function orderLine(order: Order, role: Role, counterparty: Party, now: number): OrderLine {
@@ -38,40 +39,40 @@ export function orderLine(order: Order, role: Role, counterparty: Party, now: nu
   switch (order.stage) {
     // The importer sends the order, the exporter signs first and the importer signs last (03c).
     case 'awaiting_signature':
-      if (mine) return { status: 'Review', yourTurn: true, detail: [{ text: `${who}, ${total}` }] };
+      if (mine) return { status: t('Review'), yourTurn: true, detail: [{ text: `${who}, ${total}` }] };
       return {
-        status: role === 'exporter' ? 'Signed' : 'Sent',
+        status: role === 'exporter' ? t('Signed') : t('Sent'),
         yourTurn: false,
-        detail: [{ text: `${who} has to sign, ${total}` }],
+        detail: [{ text: t('{name} has to sign, {total}', { name: who, total }) }],
       };
     case 'signed':
       if (order.blockedBy === 'supplier_check')
-        return { status: 'Signed', yourTurn: false, detail: [{ text: `${who}, waits for the supplier check` }] };
-      return { status: 'Signed', yourTurn: false, detail: [{ text: `${who}, signed by both, waiting to open` }] };
+        return { status: t('Signed'), yourTurn: false, detail: [{ text: t('{name}, waits for the supplier check', { name: who }) }] };
+      return { status: t('Signed'), yourTurn: false, detail: [{ text: t('{name}, signed by both, waiting to open', { name: who }) }] };
     case 'advance_paid':
       if (role === 'exporter')
-        return { status: 'Ship', yourTurn: mine, detail: [{ text: `${who}, ship by ${deadline}` }] };
-      return { status: 'Advance paid', yourTurn: false, detail: [{ text: `${who}, ships by ${deadline}` }] };
+        return { status: t('Ship'), yourTurn: mine, detail: [{ text: t('{name}, ship by {date}', { name: who, date: deadline }) }] };
+      return { status: t('Advance paid'), yourTurn: false, detail: [{ text: t('{name}, ships by {date}', { name: who, date: deadline }) }] };
     case 'shipped': {
       const releaseAt = Number((order.shippedAt ?? 0) + Number(order.po.disputeWindow));
-      return { status: 'Shipped', yourTurn: false, detail: [{ text: `${who}, balance ${inDays(releaseAt - now)}` }] };
+      return { status: t('Shipped'), yourTurn: false, detail: [{ text: t('{name}, balance {when}', { name: who, when: inDays(releaseAt - now) }) }] };
     }
     case 'settled':
-      return { status: 'Settled', yourTurn: false, detail: [{ text: `${who}, ${formatDay(order.closedAt ?? 0)}` }] };
+      return { status: t('Settled'), yourTurn: false, detail: [{ text: `${who}, ${formatDay(order.closedAt ?? 0)}` }] };
     case 'refunded':
       // The balance goes back to the importer; the advance stays with the exporter.
       return role === 'importer'
         ? {
-            status: 'Refunded',
+            status: t('Refunded'),
             yourTurn: false,
-            detail: [{ text: 'No proof of shipment, ' }, { text: `${formatMinor(balance)} back to you`, money: true }],
+            detail: [{ text: t('No proof of shipment, ') }, { text: t('{amount} back to you', { amount: formatMinor(balance) }), money: true }],
           }
-        : { status: 'Refunded', yourTurn: false, detail: [{ text: `No proof of shipment, balance back to ${who}` }] };
+        : { status: t('Refunded'), yourTurn: false, detail: [{ text: t('No proof of shipment, balance back to {name}', { name: who }) }] };
     case 'rejected':
       return role === 'importer'
-        ? { status: 'Rejected', yourTurn: false, detail: [{ text: `${who} did not sign, ${total}` }] }
-        : { status: 'Rejected', yourTurn: false, detail: [{ text: `You did not sign, ${total}` }] };
+        ? { status: t('Rejected'), yourTurn: false, detail: [{ text: t('{name} did not sign, {total}', { name: who, total }) }] }
+        : { status: t('Rejected'), yourTurn: false, detail: [{ text: t('You did not sign, {total}', { total }) }] };
     case 'cancelled':
-      return { status: 'Cancelled', yourTurn: false, detail: [{ text: `${who}, both agreed to cancel` }] };
+      return { status: t('Cancelled'), yourTurn: false, detail: [{ text: t('{name}, both agreed to cancel', { name: who }) }] };
   }
 }
