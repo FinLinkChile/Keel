@@ -90,6 +90,47 @@ export function initialSettings(env: Record<string, string | undefined>): Ingest
   });
 }
 
+// Where the settings live. A file for the local server; a table shared by every Lambda
+// instance on AWS (aws/src/ingest/settings.ts), so a change made through one instance is the
+// one every other instance reads.
+export interface SettingsBackend {
+  // undefined when nothing was saved yet. Not validated here: SettingsStore validates.
+  load(): Promise<StoredSettings | undefined>;
+  // Saves `next` together with its audit entry. `previous` is what the change was computed
+  // from: false if someone else saved in between, and nothing is written.
+  save(next: StoredSettings, audit: SettingsAudit, previous: StoredSettings): Promise<boolean>;
+}
+
+// One process owns the file, so a save never loses a race
+export function fileSettingsBackend(file: string): SettingsBackend {
+  return {
+    async load() {
+      try {
+        return JSON.parse(await readFile(file, "utf8")) as StoredSettings;
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+        throw new SettingsError("settings file is invalid");
+      }
+    },
+    async save(next) {
+      const tmp = `${file}.${randomBytes(4).toString("hex")}.tmp`;
+      await writeFile(tmp, JSON.stringify(next, null, 2), { mode: 0o600 });
+      await rename(tmp, file);
+      return true;
+    },
+  };
+}
+
+// Stored settings written before base URLs left the settings may still carry one: it is dropped
+function validStored(raw: StoredSettings): StoredSettings {
+  try {
+    const { baseURL: _legacy, ...settings } = raw.settings as IngestSettings & { baseURL?: string };
+    return { settings: IngestSettings.parse(settings), updatedAt: String(raw.updatedAt), updatedBy: String(raw.updatedBy) };
+  } catch {
+    throw new SettingsError("stored settings are invalid");
+  }
+}
+
 export class SettingsStore {
   private current: StoredSettings;
   private extractor?: { key: string; instance: Promise<ExtractorProvider> };
@@ -98,34 +139,39 @@ export class SettingsStore {
     initial: StoredSettings,
     private readonly keys: ApiKeys,
     private readonly urls: BaseUrls,
-    private readonly file: string | undefined,
+    private readonly backend: SettingsBackend | undefined,
     private readonly audit: (entry: SettingsAudit) => void,
+    private readonly timeoutMs: number | undefined,
   ) {
     this.current = initial;
   }
 
-  // Loads the file if it exists and is valid, otherwise starts from `fallback`.
+  // Loads the stored settings if they exist and are valid, otherwise starts from `fallback`.
+  // `file` is a shorthand for fileSettingsBackend(file).
   static async open(options: {
     fallback: IngestSettings;
     keys: ApiKeys;
     urls?: BaseUrls;
     file?: string;
+    backend?: SettingsBackend;
     audit?: (entry: SettingsAudit) => void;
+    // Per-request timeout of the LLM call, passed to the extractor
+    timeoutMs?: number;
   }): Promise<SettingsStore> {
-    let stored: StoredSettings = { settings: options.fallback, updatedAt: new Date().toISOString(), updatedBy: "env" };
-    if (options.file) {
-      try {
-        const raw = JSON.parse(await readFile(options.file, "utf8")) as StoredSettings;
-        // Files written before base URLs left the settings may still carry one: it is dropped
-        const { baseURL: _legacy, ...settings } = raw.settings as IngestSettings & { baseURL?: string };
-        stored = { ...raw, settings: IngestSettings.parse(settings) };
-      } catch (e) {
-        if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw new SettingsError("settings file is invalid");
-      }
-    }
-    const store = new SettingsStore(stored, options.keys, options.urls ?? {}, options.file, options.audit ?? (() => {}));
-    await store.extractorConfig(stored.settings); // fail at startup, not on the first email
+    const backend = options.backend ?? (options.file ? fileSettingsBackend(options.file) : undefined);
+    const initial: StoredSettings = { settings: options.fallback, updatedAt: new Date().toISOString(), updatedBy: "env" };
+    const store = new SettingsStore(initial, options.keys, options.urls ?? {}, backend, options.audit ?? (() => {}), options.timeoutMs);
+    await store.refresh();
+    await store.extractorConfig(store.current.settings); // fail at startup, not on the first email
     return store;
+  }
+
+  // Reads the backend again. A Lambda calls it once per invocation, so a change saved by
+  // another instance applies from the next document on.
+  async refresh(): Promise<void> {
+    if (!this.backend) return;
+    const stored = await this.backend.load();
+    if (stored) this.current = validStored(stored);
   }
 
   get(): StoredSettings {
@@ -145,7 +191,13 @@ export class SettingsStore {
   private async extractorConfig(s: IngestSettings): Promise<ExtractorConfig> {
     const apiKey = this.keys[s.provider];
     if (!apiKey) throw new SettingsError(`no API key configured for ${s.provider} (${KEY_ENV[s.provider]})`);
-    const config: ExtractorConfig = { provider: s.provider, apiKey, model: s.model, baseURL: this.urls[s.provider] };
+    const config: ExtractorConfig = {
+      provider: s.provider,
+      apiKey,
+      model: s.model,
+      baseURL: this.urls[s.provider],
+      ...(this.timeoutMs !== undefined ? { timeoutMs: this.timeoutMs } : {}),
+    };
     // createExtractor validates the provider/baseURL combination and the TLS rule
     await createExtractor(config).catch((e: unknown) => {
       throw new SettingsError(e instanceof Error ? e.message : "invalid extractor settings");
@@ -156,23 +208,25 @@ export class SettingsStore {
   async update(change: unknown, actor: string): Promise<StoredSettings> {
     const parsed = SettingsChange.safeParse(change);
     if (!parsed.success) throw new SettingsError("invalid settings change");
-    const next: IngestSettings = { ...this.current.settings, ...parsed.data };
+    const previous = this.current;
+    const next: IngestSettings = { ...previous.settings, ...parsed.data };
     await this.extractorConfig(next);
 
     const changes: SettingsAudit["changes"] = {};
     for (const k of Object.keys(IngestSettings.shape) as (keyof IngestSettings)[]) {
-      if (this.current.settings[k] !== next[k]) changes[k] = { from: this.current.settings[k], to: next[k] };
+      if (previous.settings[k] !== next[k]) changes[k] = { from: previous.settings[k], to: next[k] };
     }
     if (Object.keys(changes).length === 0) return this.get();
 
     const stored: StoredSettings = { settings: next, updatedAt: new Date().toISOString(), updatedBy: actor };
-    if (this.file) {
-      const tmp = `${this.file}.${randomBytes(4).toString("hex")}.tmp`;
-      await writeFile(tmp, JSON.stringify(stored, null, 2), { mode: 0o600 });
-      await rename(tmp, this.file);
+    const entry: SettingsAudit = { type: "settings_changed", at: stored.updatedAt, actor, changes };
+    if (this.backend && !(await this.backend.save(stored, entry, previous))) {
+      // Someone else changed them since this instance read them: their change stands
+      await this.refresh();
+      throw new SettingsError("settings changed concurrently, read them again and retry");
     }
     this.current = stored;
-    this.audit({ type: "settings_changed", at: stored.updatedAt, actor, changes });
+    this.audit(entry);
     return this.get();
   }
 

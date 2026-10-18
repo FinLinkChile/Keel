@@ -1,7 +1,7 @@
 ---
 type: Área de trabajo
 title: "Área 5: red team, evidencia, documentación y coordinación"
-description: "Objetivo, entregables y tareas T5.1 a T5.7: coordinación, verificación de afirmaciones, informe de seguridad, batería de red team, script de evidencia, documento técnico, deck y video."
+description: "Objetivo, entregables y tareas T5.1 a T5.9: coordinación, verificación de afirmaciones, informe de seguridad, batería de red team, script de evidencia, documento técnico, deck y video, repositorio abierto al jurado y rama de entrega."
 tags: [area-5, red-team, evidencia, entrega, t5]
 modo: ambos
 status: draft
@@ -133,11 +133,25 @@ Parte del Área 1 (17 de octubre): `redteam/src/evidence/area1/` (TypeScript con
 * Los cuatro actos de Personal (base): pago normal, factura fraudulenta, cambio legítimo de beneficiario y llave robada. Los cuatro de Trade (agregado): orden completa, fraude documental (cambio de cuenta y BL falso), proveedor que no embarca y llave robada. Trade es la demo principal; **abierto:** qué actos de Personal entran en el deck y en el video.
 * Ensayo general el domingo 18.
 
+**T5.8 Repositorio abierto al jurado y licencias (agregada por las bases de entrega).** **[PROPUESTA]**
+Las bases piden el enlace al repositorio de GitHub, y `FinLinkChile/Keel` es privado.
+* Decidir con el equipo cómo accede el jurado: repositorio público (lo más simple) o acceso invitado, si la organización lo acepta. Hacerlo público es irreversible en la práctica (puede quedar copiado o indexado): lo decide el equipo, no una sola persona.
+* Antes de abrirlo, revisar el historial completo: que no haya llaves, `.env`, tokens del bot ni del LLM, ni datos reales del importador entrevistado (T5.2 confirma si se puede citar).
+* Agregar `LICENSE` y un aviso de terceros con sus licencias (Safe y Zodiac en LGPL-3.0, OpenZeppelin en MIT, forge-std y las dependencias de npm). Las bases exigen que el código de terceros esté bien licenciado.
+
+**T5.9 Rama de entrega e instrucciones reproducibles (agregada por las bases de entrega).** **[PROPUESTA]**
+Hoy `main` solo tiene el andamiaje; el trabajo está en `dev` y en PRs abiertas. El jurado verá la rama por defecto.
+* Revisar y mergear las PRs abiertas a `dev` antes del congelamiento del domingo 18 a las 20:00, y después `dev` a `main`.
+* Que `npm install`, `npm test` y `forge test` pasen desde un clon limpio en Linux, macOS y Windows. Hoy fallan 3 pruebas de `ingest/` en Windows (permisos de archivo en `settings.test.ts` y dos timeouts); se coordina con el Área 3.
+* Alinear con la red decidida (Base Sepolia, [decisión abierta 1](../decisiones/abiertas.md)) lo que todavía dice que no está elegida: `contracts/README.md` y los README de cada carpeta.
+* Instrucciones de despliegue en inglés que cualquiera pueda seguir: requisitos, variables de `.env.example`, comando de despliegue de T1.8 y dónde quedan las direcciones (`contracts/deployments/84532.json`).
+
 # Listo cuando
 
 * El script de evidencia corre de punta a punta sobre el despliegue final.
 * La batería de red team y sus métricas están en el repositorio.
 * Los seis elementos de la entrega están subidos el lunes 19 a las 22:00.
+* El jurado puede abrir el repositorio, y `main` tiene el código final con pruebas que pasan e instrucciones de despliegue.
 
 # Dependencias
 

@@ -9,6 +9,7 @@ export const KEY_ENV = {
   relayer: "RELAYER_PRIVATE_KEY",
   policySigner: "POLICY_SIGNER_PRIVATE_KEY",
   cosigner: "COSIGNER_PRIVATE_KEY",
+  pauser: "MONITOR_PAUSER_PRIVATE_KEY",
 } as const;
 export type KeyRole = keyof typeof KEY_ENV;
 
@@ -56,4 +57,19 @@ export function loadPolicySigner(env: KeyEnv, registeredAddress?: Hex): PolicySi
     return account.signTypedData(params as never);
   }) as PolicySigner["signTypedData"];
   return { address: account.address, signTypedData };
+}
+
+// The relayer only pays gas and sends: without a valid PDR or signature the gate and the
+// escrow revert, so this key moves no funds by itself.
+export function loadRelayer(env: KeyEnv) {
+  assertSeparateKeys(env);
+  return accountFor("relayer", env);
+}
+
+// The monitor's pause key (T2.8): it may only pause the Trade gate, through a pause-only role
+// Area 1 adds to the gate. Optional: without it the monitor only alerts. Never the cosigner key,
+// which also cosigns tier 3.
+export function loadPauser(env: KeyEnv) {
+  assertSeparateKeys(env);
+  return env[KEY_ENV.pauser] ? accountFor("pauser", env) : undefined;
 }

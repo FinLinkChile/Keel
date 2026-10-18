@@ -6,7 +6,7 @@ In Keel Personal the documents are utility bills that arrive by email. In Keel T
 
 The extractor reads data. It does not validate signatures: the proof of shipment is the attestation signed by the carrier, not a scanned signature in a PDF.
 
-Bills of lading have no standard format across carriers. The parser covers the formats in the corpus, and that limit is declared.
+Bills of lading have no standard format across carriers. The parser covers the formats in the corpus and the carrier forms of CSAV and Hapag-Lloyd, and that limit is declared.
 
 ## Current state
 
@@ -57,7 +57,7 @@ A document that passes is `ready` and enters the order's package. If it announce
 
 ### Parser limits (T3.3)
 
-Bills of lading have no standard format across carriers. The parser reads documents that print each field after its label (`B/L No.:`, `Port of Loading:`, `Shipped on Board Date:`), which covers the three layouts of the corpus (two ocean carriers and an airline), not any carrier. It also declares:
+Bills of lading have no standard format across carriers. The parser reads documents that print each field next to its label (`B/L No.:`, `Port of Loading:`, `Shipped on Board Date:`) or under it inside the same box, as the forms of CSAV and Hapag-Lloyd do (`B/L-No.:`, hyphen included). A label counts where it opens a run or is followed by a colon, not inside a sentence of the form. This covers the three layouts of the corpus (two ocean carriers and an airline) and those carrier forms (`src/trade/carrierForm.test.ts` builds one, and `redteam/corpus/carrier-forms` holds the carriers' own specimens, blank and filled; `npm run carrier-forms:run -w ingest` measures the model on them), not any carrier. A document number without digits is held: it is a label read as a value. It also declares:
 
 * Dates are read only in unambiguous forms (`12-OCT-2026`, `OCT 12, 2026`, `2026-10-12`). `10/12/2026` is held: it is a different day in Chile and in a US template.
 * Amounts use the dot as decimal mark (`25,000.00`); `25.000,00` is held rather than guessed.
@@ -80,6 +80,10 @@ Measured on 2026-10-14 with `claude-opus-5-5` through the team's LiteLLM proxy: 
 `POST /trade/proforma` reads the exporter's proforma so the app can prefill the purchase order on the importer's review screen (step 0 of the flow). The importer signs `ProformaUpload(bytes32 fileHash,uint64 issuedAt)` in the same domain as the document upload; the importer uploaders of `INGEST_ORDERS_FILE` and the addresses of `INGEST_IMPORTERS_FILE` may upload. The body is `{ issuedAt, signature, file }`, the file a PDF, a JPEG, PNG or WebP photo, or a scan; its type is read from the bytes.
 
 A PDF with text is read like the other documents, from redacted text, and the parser's hidden text check is added to the model's. A photo or a scanned PDF has no text to redact, so the file goes to the model and the transfer is logged as unredacted (`extraccion_proforma`). The answer is typed fields only (number, date, currency, amount, incoterm, HS codes, latest shipment date, ports, advance in basis points, and two warnings), with the fields the proforma does not print listed in `missing`. It never returns the payout address, names or free text. One reader is enough because the reading decides nothing: the people review every field before both sign the order. 20 proformas per importer and day; the same file returns the same reading without a second call to the model. Contract: [docs/interfaces/lectura-de-proforma.md](../docs/interfaces/lectura-de-proforma.md).
+
+## Signed orders from the app (T3.11)
+
+`POST /trade/orders` takes an order signed by both parties: the agent's `order.json` (`order`, `terms`, `label`, `sigImporter`, `sigExporter`) in canonical JSON. It exists with `INGEST_ESCROW_ADDRESS`. Ingest accepts it only if the terms hash to `termsHash`, the `orderId` is the one of the parties and nonce, the importer is registered and both EIP-712 signatures are valid. The importer is a Safe, so its signature is an owner's over the `SafeMessage`: with `INGEST_RPC_URL` the Safe checks it (ERC-1271); without it, the owner key must be in `INGEST_IMPORTERS_FILE`. Then the exporter and that owner key may upload the order's documents, and with `INGEST_AGENT_DIR` the agent's `orders/<orderId>/order.json` is written. Contract in [docs/interfaces/orden-firmada.md](../docs/interfaces/orden-firmada.md).
 
 ## Demo documents of PO-0142
 
@@ -179,7 +183,7 @@ The registered issuer RUTs are never given to the model, so it cannot "correct" 
 
 ## Hidden text detection
 
-Text a person would not see never feeds the payment fields and raises `hidden_text_detected`: invisible rendering modes, layers that are off by default, annotation appearances, glyphs under 4 pt or squeezed horizontally, text outside the page, transparent text (`ca`/`CA` below 0.1), and text whose painted color (fill or stroke, by rendering mode) is white. Look-alike characters (Cyrillic, full-width, mathematical or superscript digits, zero-width) raise the same flag. Input over 10 MB or 20 pages, encrypted or malformed PDFs, and text over 20,000 characters are held with a typed reason.
+Text a person would not see never feeds the payment fields and raises `hidden_text_detected`: invisible rendering modes, layers that are off by default, annotation appearances, glyphs under 4 pt or squeezed horizontally, text outside the page, transparent text (`ca`/`CA` below 0.1), and text whose painted color (fill or stroke, by rendering mode) is white. Look-alike characters (Cyrillic, full-width, mathematical or superscript digits, zero-width) raise the same flag. Input over 10 MB or 20 pages, encrypted or malformed PDFs, and text over 20,000 characters are held with a typed reason. Hidden runs with no letter or digit (box guides) are dropped instead of flagged. Pages of terms and conditions (over 4,000 characters, at least 80% in lines of 100 or more) are read by neither the parser nor the extractor, and the 20,000 limit is counted without them; the hidden text and account change checks still read every page.
 
 Known gaps, declared rather than hidden: text covered by a white shape drawn on top of it, text cut away by a clipping path, soft masks, and text the same color as a non-white background are not detected yet.
 

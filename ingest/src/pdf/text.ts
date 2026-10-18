@@ -40,6 +40,8 @@ export interface TextRun {
   // Effective glyph height and width scale in points, after every matrix and Tz
   size: number;
   width: number;
+  // Length of the run along the baseline in points, from the glyph advances
+  length: number;
   fill: RGB;
   stroke: RGB;
   fillAlpha: number;
@@ -160,6 +162,7 @@ function walkPage(
         y: m[5],
         size: fontSize * Math.hypot(m[2], m[3]),
         width: fontSize * Math.hypot(m[0], m[1]) * Math.abs(gs.hScale),
+        length: Math.abs(advance) * Math.hypot(m[0], m[1]),
         fill: gs.fill,
         stroke: gs.stroke,
         fillAlpha: gs.fillAlpha,
@@ -290,8 +293,23 @@ export async function readTextRuns(pdf: Uint8Array): Promise<TextRun[]> {
   return runs;
 }
 
-// Groups runs into reading-order lines: top to bottom, then left to right.
-export function toLines(runs: TextRun[]): string[] {
+// One run of a line with where it starts and ends, so a reader can tell the boxes of a form apart
+export interface LayoutCell {
+  x: number;
+  x1: number;
+  text: string;
+}
+
+export interface LayoutLine {
+  page: number;
+  y: number;
+  // Largest glyph height on the line
+  size: number;
+  cells: LayoutCell[];
+}
+
+// Groups runs into reading-order lines: top to bottom, then left to right. Blank runs are dropped.
+export function toLayoutLines(runs: TextRun[]): LayoutLine[] {
   const sorted = [...runs].sort((a, b) => a.page - b.page || b.y - a.y || a.x - b.x);
   const lines: { page: number; y: number; runs: TextRun[] }[] = [];
   for (const run of sorted) {
@@ -303,13 +321,20 @@ export function toLines(runs: TextRun[]): string[] {
     }
   }
   return lines
-    .map((line) =>
-      line.runs
+    .map((line) => ({
+      page: line.page,
+      y: line.y,
+      size: Math.max(...line.runs.map((r) => r.size)),
+      cells: line.runs
         .sort((a, b) => a.x - b.x)
-        .map((r) => r.text)
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim(),
-    )
-    .filter((l) => l.length > 0);
+        .map((r) => ({ x: r.x, x1: r.x + r.length, text: r.text.replace(/\s+/g, " ").trim() }))
+        .filter((c) => c.text.length > 0),
+    }))
+    .filter((l) => l.cells.length > 0);
+}
+
+export const lineText = (line: LayoutLine): string => line.cells.map((c) => c.text).join(" ");
+
+export function toLines(runs: TextRun[]): string[] {
+  return toLayoutLines(runs).map(lineText);
 }

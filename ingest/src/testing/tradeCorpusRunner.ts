@@ -3,6 +3,7 @@
 // (trade/corpus.test.ts), the configured LLM in scripts/corpus-run.ts.
 import type { CommercialInvoiceExtraction, Hex, RequiredDocType, TransportDocumentExtraction } from "@keel/schemas";
 import type { ExtractorProvider } from "../extractor";
+import type { IngestRepo } from "../repo";
 import { IngestStore } from "../store";
 import { receiveTradeDocument, type TradeOutcome } from "../trade/receive";
 import { staticOrders, uploadDomain, UPLOAD_TYPES, fileHash } from "../trade/upload";
@@ -44,7 +45,7 @@ export interface UploadOptions {
 }
 
 export async function upload(
-  store: IngestStore,
+  store: IngestRepo,
   extractor: ExtractorProvider,
   set: LegitSet,
   docType: RequiredDocType,
@@ -134,7 +135,7 @@ export async function runCorpus(
       }
       legit.push({ id: `${set.id}-${which}`, title: `${set.id} ${doc.docType}`, outcome, expected: LEGIT_EXPECTED, mismatches });
     }
-    const pkg = store.tradePackage(set.order.orderId, set.order.requiredDocs);
+    const pkg = await store.tradePackage(set.order.orderId, set.order.requiredDocs);
     packages.push({ id: set.id, ok: pkg.status === "complete", docsHash: pkg.status === "complete" ? pkg.docsHash : undefined });
     store.close();
   }

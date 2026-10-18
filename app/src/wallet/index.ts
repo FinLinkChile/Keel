@@ -1,26 +1,29 @@
 import type { Hex } from '@keel/schemas';
 
+import type { Role } from '../data/types';
+
 import { keyStore } from './keyStore';
-import { localSigner, newPrivateKey } from './localSigner';
-import type { WalletProvider } from './signer';
+import { ensureKeys, importKey, loadKeys, removeKeys, type Keys } from './keys';
+import { localSigner } from './localSigner';
+import type { Signers, WalletProvider } from './signer';
 
 export * from './signer';
 
-// Test wallet of this device. The key is generated here and stored by keyStore (SecureStore on
-// the phone); it is never sent anywhere and never enters the repository.
-export const wallet: WalletProvider = {
-  load: async () => {
-    const key = await keyStore.read();
-    return key ? localSigner(key as Hex) : null;
+const signersOf = (keys: Keys): Signers =>
+  Object.fromEntries(Object.entries(keys).map(([role, key]) => [role, localSigner(key as Hex)])) as Signers;
+
+// Test wallets of this device, one per role. The keys are generated here and stored by keyStore
+// (SecureStore on the phone); they are never sent anywhere and never enter the repository.
+export const wallets: WalletProvider = {
+  load: async () => signersOf(await loadKeys(keyStore)),
+  create: async () => signersOf(await ensureKeys(keyStore)) as Required<Signers>,
+  reset: () => removeKeys(keyStore),
+  importKey: async (role, privateKey) => {
+    await importKey(keyStore, role, privateKey);
+    return signersOf(await loadKeys(keyStore));
   },
-  create: async () => {
-    const existing = await keyStore.read();
-    if (existing) return localSigner(existing as Hex);
-    const key = newPrivateKey();
-    await keyStore.write(key);
-    return localSigner(key);
-  },
-  reset: () => keyStore.remove(),
 };
+
+export const ROLES_WITH_KEY: readonly Role[] = ['importer', 'exporter'];
 
 export const keyStorage = keyStore.where;

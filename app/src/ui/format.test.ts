@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { addressGroups, formatAddress, formatCompact, formatDay, formatMinor, initials } from './format';
+import { addressGroups, formatAddress, formatCompact, formatDay, formatLocalDayTime, formatMinor, formatRut, initials } from './format';
 
 describe('formatMinor', () => {
   it('groups thousands and keeps the minor digits', () => {
@@ -53,5 +53,21 @@ describe('formatDay and formatCompact', () => {
     expect(formatCompact(8_000_000n)).toBe('80k');
     expect(formatCompact(1_250_000_000n)).toBe('12.5M');
     expect(formatCompact(95_000n)).toBe('950');
+  });
+});
+
+describe('formatLocalDayTime', () => {
+  it('writes the day and the time in the phone zone', () => {
+    const d = new Date(2026, 9, 14, 9, 5);
+    expect(formatLocalDayTime(d.getTime() / 1000)).toBe('Oct 14, 09:05');
+  });
+});
+
+describe('formatRut', () => {
+  it('puts the dots and the dash back in a stored RUT', () => {
+    expect(formatRut('765432103')).toBe('76.543.210-3');
+    expect(formatRut('12000008K')).toBe('12.000.008-K');
+    expect(formatRut('76.543.210-3')).toBe('76.543.210-3');
+    expect(formatRut('123456785')).toBe('12.345.678-5');
   });
 });

@@ -17,5 +17,6 @@ describe.skipIf(!existsSync(INGEST))('upload types match ingest', () => {
     const ingest = await import(/* @vite-ignore */ INGEST);
     expect(UPLOAD_TYPES).toEqual(ingest.UPLOAD_TYPES);
     expect(uploadDomain(31337)).toEqual(ingest.uploadDomain(31337));
-  });
+    // Importing ingest is slow on a cold cache
+  }, 30_000);
 });
