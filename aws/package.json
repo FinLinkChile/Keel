@@ -1,0 +1,29 @@
+{
+  "name": "@keel/aws",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1152.0",
+    "@aws-sdk/client-kms": "^3.1152.0",
+    "@aws-sdk/client-s3": "^3.1152.0",
+    "@aws-sdk/client-sqs": "^3.1152.0",
+    "@aws-sdk/client-ssm": "^3.1152.0",
+    "@aws-sdk/lib-dynamodb": "^3.1152.0",
+    "@aws-sdk/s3-request-presigner": "^3.1152.0",
+    "@keel/engine": "*",
+    "@keel/schemas": "*",
+    "viem": "^2.57.5",
+    "zod": "^4.6.6"
+  },
+  "devDependencies": {
+    "@noble/curves": "^1.9.1",
+    "@types/aws-lambda": "^8.10.164",
+    "esbuild": "^0.28.2"
+  }
+}

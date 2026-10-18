@@ -5,6 +5,7 @@
 import { z } from "zod";
 
 export * from "./personal";
+export * from "./api";
 
 // ---------------------------------------------------------------------------
 // 2.1 Document extraction (output of the quarantined extractor)
