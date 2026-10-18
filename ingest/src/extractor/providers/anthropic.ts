@@ -25,8 +25,9 @@ export class AnthropicProvider implements ExtractorProvider {
     apiKey: string,
     readonly model: string,
     baseURL?: string,
+    timeoutMs?: number,
   ) {
-    this.client = new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) });
+    this.client = new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}), ...(timeoutMs ? { timeout: timeoutMs } : {}) });
     this.proxied = baseURL !== undefined;
     this.provider = this.proxied ? "anthropic-proxy" : "anthropic";
   }

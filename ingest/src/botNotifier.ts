@@ -3,7 +3,7 @@
 // (docs/interfaces/avisos-al-bot.md). Optional and never in the payment path: without
 // BOT_URL nothing is sent, and a slow or failing bot never delays or changes an outcome.
 import type { EmailOutcome } from "./email/receive";
-import type { StoredChangeRequest } from "./store";
+import type { StoredChangeRequest } from "./repo";
 import type { TradeOutcome } from "./trade/receive";
 
 export type BotPayload =
@@ -100,22 +100,34 @@ export function botNotifierFromEnv(
 
 export const DIGEST_INTERVAL_HOURS = 24;
 
-// Sends IngestStore.changeDigest once per interval, only when there is something new (T3.2:
+// The change digest payload since `since`, or undefined when there is nothing new. Shared by the
+// local timer below and the daily Lambda (aws/src/handlers/digest.ts).
+export async function changeDigestPayload(
+  digest: (since: Date) => StoredChangeRequest[] | Promise<StoredChangeRequest[]>,
+  since: Date,
+): Promise<BotPayload | undefined> {
+  const requests = await digest(since);
+  return requests.length > 0 ? { source: "change_digest", since: since.toISOString(), requests } : undefined;
+}
+
+// Sends IngestRepo.changeDigest once per interval, only when there is something new (T3.2:
 // one summary instead of a notification each). The timer does not keep the process alive.
 export function scheduleChangeDigest(
   notifier: BotNotifier,
-  digest: (since: Date) => StoredChangeRequest[],
+  digest: (since: Date) => StoredChangeRequest[] | Promise<StoredChangeRequest[]>,
   hours = DIGEST_INTERVAL_HOURS,
   now: () => Date = () => new Date(),
-): { stop(): void; tick(): void } {
+): { stop(): void; tick(): Promise<void> } {
   let since = now();
-  const tick = () => {
+  const tick = async () => {
     const until = now();
-    const requests = digest(since);
-    if (requests.length > 0) notifier.send({ source: "change_digest", since: since.toISOString(), requests });
+    const payload = await changeDigestPayload(digest, since);
+    if (payload) notifier.send(payload);
     since = until;
   };
-  const timer = setInterval(tick, hours * 60 * 60 * 1000);
+  const timer = setInterval(() => {
+    tick().catch((e: unknown) => console.error("change digest failed", e instanceof Error ? e.name : "unknown"));
+  }, hours * 60 * 60 * 1000);
   timer.unref();
   return { stop: () => clearInterval(timer), tick };
 }

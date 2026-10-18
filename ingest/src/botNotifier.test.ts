@@ -58,17 +58,17 @@ describe("botNotifierFromEnv", () => {
 });
 
 describe("scheduleChangeDigest", () => {
-  it("sends one summary per interval, only when there are new requests", () => {
+  it("sends one summary per interval, only when there are new requests", async () => {
     const sent: BotPayload[] = [];
     const bot = { send: (p: BotPayload) => sent.push(p), idle: async () => {} };
     let clock = Date.parse("2026-10-15T00:00:00Z");
     const pending: StoredChangeRequest[] = [];
     const schedule = scheduleChangeDigest(bot, () => pending.splice(0), 24, () => new Date(clock));
-    schedule.tick();
+    await schedule.tick();
     expect(sent).toEqual([]);
     pending.push({ id: 1, aliasId: "LUZ", status: "pending" } as StoredChangeRequest);
     clock += 24 * 3600 * 1000;
-    schedule.tick();
+    await schedule.tick();
     schedule.stop();
     expect(sent).toMatchObject([{ source: "change_digest", requests: [{ id: 1 }] }]);
   });
