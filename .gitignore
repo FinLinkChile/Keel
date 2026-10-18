@@ -22,3 +22,5 @@ contracts/out-vectors/
 Thumbs.db
 .vscode/
 .idea/
+# Deployment files written by tests (the real ones are contracts/deployments/<chainId>.json)
+contracts/deployments/test-*.json

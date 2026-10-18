@@ -10,78 +10,26 @@ import {TradeEscrow} from "../../src/TradeEscrow.sol";
 import {KeelHash} from "../../src/KeelHash.sol";
 import {PurchaseOrder, FundIntent, PolicyDecision} from "../../src/KeelTypes.sol";
 import {IZodiacRolesV2, TradeRolesConfig} from "../../script/TradeRolesConfig.sol";
-
-/// @dev Safe 1.4.1, safe-global/safe-smart-account tag v1.4.1 (commit bf943f80):
-/// contracts/Safe.sol (setup, execTransaction, nonce, domainSeparator),
-/// contracts/base/ModuleManager.sol (enableModule, isModuleEnabled).
-interface ISafe141 {
-    function setup(
-        address[] calldata owners,
-        uint256 threshold,
-        address to,
-        bytes calldata data,
-        address fallbackHandler,
-        address paymentToken,
-        uint256 payment,
-        address payable paymentReceiver
-    ) external;
-    function execTransaction(
-        address to,
-        uint256 value,
-        bytes calldata data,
-        uint8 operation,
-        uint256 safeTxGas,
-        uint256 baseGas,
-        uint256 gasPrice,
-        address gasToken,
-        address payable refundReceiver,
-        bytes memory signatures
-    ) external payable returns (bool success);
-    function enableModule(address module) external;
-    function isModuleEnabled(address module) external view returns (bool);
-    function domainSeparator() external view returns (bytes32);
-}
-
-/// @dev contracts/proxies/SafeProxyFactory.sol at v1.4.1.
-interface ISafeProxyFactory141 {
-    function createProxyWithNonce(address singleton, bytes memory initializer, uint256 saltNonce)
-        external
-        returns (address proxy);
-}
-
-/// @dev gnosisguild/zodiac v3.4.1, contracts/factory/ModuleProxyFactory.sol.
-interface IModuleProxyFactory {
-    function deployModule(address masterCopy, bytes memory initializer, uint256 saltNonce)
-        external
-        returns (address proxy);
-}
-
-/// @dev Circle FiatToken admin functions (USDC proxy on Base Sepolia, version() = "2"), used to
-/// make a call fail inside the Safe through the real token and to record the issuer risk.
-interface IFiatTokenAdmin {
-    function blacklister() external view returns (address);
-    function blacklist(address account) external;
-    function isBlacklisted(address account) external view returns (bool);
-    function pauser() external view returns (address);
-    function pause() external;
-}
+import {
+    BaseSepolia,
+    IFiatTokenAdmin,
+    IModuleProxyFactory,
+    ISafe141,
+    ISafeProxyFactory141
+} from "../../script/KeelExternal.sol";
 
 /// @notice Base Sepolia fork with a real Safe 1.4.1, a real Zodiac Roles v2 instance, real USDC and
 /// the Keel Trade contracts, wired as in production (T1.7). Skips every test when
 /// BASE_SEPOLIA_RPC_URL is not set, so CI without secrets stays green.
 abstract contract ForkBase is Test {
-    // contracts/CLAUDE.md, section 14 (checked with cast code on Base Sepolia, chainId 84532)
-    address constant ROLES_MASTER = 0xF2964CE6161ce0e75964Fe7927cE114cb0B283D5;
-    address constant MODULE_FACTORY = 0x000000000000aDdB49795b0f9bA5BC298cDda236;
-    address constant SAFE_FACTORY = 0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67;
-    address constant SAFE_L2 = 0x29fcB43b46531BcA003ddC8FCB67FFE91900C762;
-    address constant USDC = 0x036CbD53842c5426634e7929541eC2318f3dCF7e;
-    // Safe 1.4.1 CompatibilityFallbackHandler, canonical address in safe-global/safe-deployments
-    // (commit 382117f5, src/assets/v1.4.1/compatibility_fallback_handler.json, 84532: canonical).
-    // Lets the Safe validate ERC-1271 signatures (it signs purchase orders as the importer).
-    address constant FALLBACK_HANDLER = 0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99;
-    // safe-smart-account v1.4.1, contracts/handler/CompatibilityFallbackHandler.sol
-    bytes32 constant SAFE_MSG_TYPEHASH = 0x60b3cbf8b4a223d68d641b3b6ddf9a298e7f33710cf3d3a9d1146b5a6150fbca;
+    // Addresses and their sources: script/KeelExternal.sol (shared with the deployment scripts)
+    address constant ROLES_MASTER = BaseSepolia.ROLES_MASTER;
+    address constant MODULE_FACTORY = BaseSepolia.MODULE_FACTORY;
+    address constant SAFE_FACTORY = BaseSepolia.SAFE_FACTORY;
+    address constant SAFE_L2 = BaseSepolia.SAFE_L2;
+    address constant USDC = BaseSepolia.USDC;
+    address constant FALLBACK_HANDLER = BaseSepolia.FALLBACK_HANDLER;
+    bytes32 constant SAFE_MSG_TYPEHASH = BaseSepolia.SAFE_MSG_TYPEHASH;
 
     /// Fixed block, so every run reads the same chain state.
     uint256 constant FORK_BLOCK = 48_173_000;
