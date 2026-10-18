@@ -15,12 +15,46 @@ export interface Renderer {
 }
 
 export interface MessageSender {
+  // Throws RetryableSendError when the same send may work later (rate limit, outage)
   send(chatId: ChatId, message: Message): Promise<void>;
 }
 
+// A send that failed for a reason that may pass: Telegram's 429 or 5xx, or the network. Any other
+// error is final (a blocked bot, a chat that no longer exists) and is never retried.
+export class RetryableSendError extends Error {
+  override name = "RetryableSendError";
+}
+
+// Loaded once at startup (the recipients file)
 export interface RecipientDirectory {
   name(accountId: AccountId): string | undefined;
   chats(accountId: AccountId, role: Role): readonly ChatId[];
+}
+
+// The same questions against a store (DynamoDB in the cloud), where chats are linked at run time
+export interface RecipientLookup {
+  name(accountId: AccountId): Promise<string | undefined>;
+  chats(accountId: AccountId, role: Role): Promise<readonly ChatId[]>;
+}
+
+// Result of counting one capped message for a chat: within the cap, the first one over it (the
+// fixed overflow message goes out once) or any later one.
+export type Admission = "admitted" | "over_cap_first" | "over_cap";
+
+// What NotifyService remembers between notices. In memory for the local bot; in a store for the
+// cloud, where each invocation starts empty and the same notice may arrive twice.
+export interface NotifyState {
+  // Records a notice id. True the first time it is seen.
+  firstSeen(noticeId: string): Promise<boolean>;
+  // Claims the delivery of a notice to one chat: true the first time only, so a notice that
+  // arrives twice (a producer retry, a queue redelivery) reaches each chat once.
+  claim(noticeId: string, chatId: ChatId): Promise<boolean>;
+  // Gives a claim back after a send that failed and will be retried.
+  release(noticeId: string, chatId: ChatId): Promise<void>;
+  // Records a document hold on one side of an order. True if that side already had one.
+  documentHold(orderRef: string, side: string): Promise<boolean>;
+  // Counts one capped message for a chat at `now` (Unix ms) against `max` per hour.
+  admit(chatId: ChatId, now: number, max: number): Promise<Admission>;
 }
 
 export interface Clock {
@@ -36,7 +70,7 @@ export type LogEntry =
   | { event: "diff_withheld"; noticeId: string; kind: string; fields: string[] }
   | { event: "no_chats"; noticeId: string; kind: string; recipient: Recipient }
   | { event: "sent"; noticeId: string; kind: string; chatId: ChatId; recipient: Recipient }
-  | { event: "send_failed"; noticeId: string; kind: string; chatId: ChatId; error: string }
+  | { event: "send_failed"; noticeId: string; kind: string; chatId: ChatId; error: string; retry?: boolean }
   | { event: "rate_limited"; noticeId: string; kind: string; chatId: ChatId }
   | { event: "overflow_sent"; chatId: ChatId };
 

@@ -112,6 +112,33 @@ export interface AgentStateItem {
   pausedHere?: boolean;
 }
 
+// ---------------------------------------------------------------- bot
+//
+// Written and read through the bot's KeyValueStore (bot/src/adapters/kv/store.ts, keys there),
+// implemented on DynamoDB by ./bot/dynamo-kv.ts. `ttl` is Unix seconds; an item past it is
+// treated as absent on every read, since DynamoDB deletes it late.
+//
+//   pk                    sk                         attributes                         writer
+//   account#<accountId>   meta                       name, kind                         botAdmin
+//   account#<accountId>   chat#<role>#<chatId>       chatId                             botAdmin
+//   order#<orderId>       meta                       label, importer, exporter,         botAdmin
+//                                                    arbiter?, shipmentDeadline
+//   order#<orderRef>      hold#<side>                ttl (365 days)                     botNotify
+//   index                 account#<id> | order#<id>  (none)                             botAdmin
+//   audit#recipients      <ISO time>#<nonce>         type, at, actor, changes           botAdmin
+//   notice#<noticeId>     seen                       ttl (30 days)                      botNotify
+//   notice#<noticeId>     chat#<chatId>              ttl (30 days), delivery claim      botNotify
+//   chat#<chatId>         hour#<hourStartMs>         count, overflowSent?, ttl          botNotify
+//
+// Account ids are the bot's registry ids (PartyItem.account), never addresses. orderId is the
+// bytes32 id in lowercase. Withheld diff values are never stored.
+export interface BotItem {
+  pk: string;
+  sk: string;
+  ttl?: number;
+  [attribute: string]: unknown;
+}
+
 export const stateId = {
   lock: (relayer: string) => `lock#${relayer.toLowerCase()}`,
   notice: (key: string) => `notice#${key}`,
