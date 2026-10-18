@@ -19,6 +19,7 @@
 //   counter                             alert | change          sequence numbers
 //   proforma#<importer>                 read#<fileHash>         a proforma reading, returned again
 //   proforma#<importer>#<day>           count                   proforma uploads that day (ttl)
+//   insights#<importer>#<day>           count                   purchase analyses that day (ttl)
 //   settings                            current                 LLM and DMARC settings (./settings.ts)
 //   audit#<day>                         <at>#<rand>             who changed which setting
 //   transfers#<day>                     <at>#<rand>             transfers to LLM vendors (Ley 21.719)
@@ -78,6 +79,7 @@ export const ingestKey = {
   counter: (name: "alert" | "change") => ({ pk: "counter", sk: name }),
   proformaRead: (importer: string, fileHash: string) => ({ pk: `proforma#${lower(importer)}`, sk: `read#${lower(fileHash)}` }),
   proformaCount: (importer: string, day: string) => ({ pk: `proforma#${lower(importer)}#${day}`, sk: "count" }),
+  insightsCount: (importer: string, day: string) => ({ pk: `insights#${lower(importer)}#${day}`, sk: "count" }),
   settings: () => ({ pk: "settings", sk: "current" }),
   audit: (iso: string) => ({ pk: `audit#${iso.slice(0, 10)}`, sk: `${iso}#${randomBytes(4).toString("hex")}` }),
   transfer: (iso: string, seq: number) => ({ pk: `transfers#${iso.slice(0, 10)}`, sk: `${iso}#${pad(seq, 4)}#${randomBytes(4).toString("hex")}` }),
@@ -496,6 +498,16 @@ export class DynamoIngestRepo implements IngestRepo {
         Item: { ...ingestKey.proformaRead(importer, fileHash), reading, readAt: this.now().getTime() },
       }),
     );
+  }
+
+  // Keel Trade, purchase analysis --------------------------------------------------------
+
+  async recordInsights(importer: Hex): Promise<void> {
+    await this.send(new UpdateCommand(this.increment(ingestKey.insightsCount(importer, utcDay(this.now()))) as never));
+  }
+
+  async insightsToday(importer: Hex): Promise<number> {
+    return this.count(ingestKey.insightsCount(importer, utcDay(this.now())));
   }
 
   // Beyond IngestRepo: what the Lambdas need from the same table ------------------------

@@ -86,7 +86,7 @@ Names live in the directory, never in a notice, so `POST /notices` has no free t
 ```json
 {
   "accounts": {
-    "acme-imports": { "kind": "company", "name": "Acme Imports", "roles": { "owner": [1001], "operator": [1002], "cosigner": [1003] } },
+    "acme-imports": { "kind": "company", "name": "Pacífico Foods SpA", "roles": { "owner": [1001], "operator": [1002], "cosigner": [1003] } },
     "ana": { "kind": "personal", "name": "Ana", "roles": { "owner": [4001], "cosigner": [4002] } }
   }
 }

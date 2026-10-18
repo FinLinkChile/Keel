@@ -44,6 +44,7 @@ describe('sign-up', () => {
       country: 'CL',
       company: { rut: '765432103', legalName: 'Pacífico Foods SpA', email: 'compras@pacificofoods.example', phone: '+56912345678' },
       representative: { name: 'Camila Rojas Soto', rut: '123456785', pep: true },
+      profile: { industry: 'food', salesBracket: 'small' },
       identityValidated: true,
       completedAt: 1000,
     });
@@ -58,5 +59,12 @@ describe('sign-up', () => {
     expect(await store.get()).toEqual(saved);
     await store.clear();
     expect(await store.get()).toBeNull();
+  });
+
+  it('asks what the company does and its size', () => {
+    expect(checkStep('company', { ...DEMO_DRAFT, industry: null, salesBracket: null })).toMatchObject({
+      industry: 'Choose what your company does.',
+      salesBracket: 'Choose the size of your company.',
+    });
   });
 });
