@@ -284,8 +284,15 @@ export class IngestStore implements IngestRepo {
     return r.changes === 1;
   }
 
-  async recordInsights(importer: Hex): Promise<void> {
-    this.db.prepare("INSERT INTO insights_requests (importer, received_at) VALUES (?, ?)").run(importer.toLowerCase(), this.now().getTime());
+  async recordInsights(importer: Hex, limit: number): Promise<boolean> {
+    const now = this.now().getTime();
+    const r = this.db
+      .prepare(
+        `INSERT INTO insights_requests (importer, received_at)
+         SELECT ?, ? WHERE (SELECT count(*) FROM insights_requests WHERE importer = ? AND received_at > ?) < ?`,
+      )
+      .run(importer.toLowerCase(), now, importer.toLowerCase(), now - DAY_MS, limit);
+    return r.changes === 1;
   }
 
   // Authorized analysis requests of this importer in the last 24 hours

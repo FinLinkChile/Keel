@@ -128,7 +128,9 @@ export interface IngestRepo {
 
   // Keel Trade, purchase analysis ---------------------------------------------------------
 
-  recordInsights(importer: Hex): Promise<void>;
+  // Records a request only while the importer is under `limit` in the current window, checked
+  // and written in one step so concurrent requests cannot pass it. false when the limit is reached
+  recordInsights(importer: Hex, limit: number): Promise<boolean>;
   // Authorized analysis requests of this importer in the current window
   insightsToday(importer: Hex): Promise<number>;
 }

@@ -338,12 +338,14 @@ export function describeIngestRepo(name: string, make: RepoFactory): void {
       it("counts an importer's analyses of the day", async () => {
         const { repo, advance } = await setup();
         const importer = `0x${"Ef".repeat(20)}` as Hex;
-        await repo.recordInsights(importer);
-        await repo.recordInsights(importer.toLowerCase() as Hex);
+        expect(await repo.recordInsights(importer, 2)).toBe(true);
+        expect(await repo.recordInsights(importer.toLowerCase() as Hex, 2)).toBe(true);
+        expect(await repo.recordInsights(importer, 2)).toBe(false);
         expect(await repo.insightsToday(importer)).toBe(2);
         expect(await repo.insightsToday(addr(1))).toBe(0);
         advance(DAY_MS + 1);
         expect(await repo.insightsToday(importer)).toBe(0);
+        expect(await repo.recordInsights(importer, 2)).toBe(true);
       });
     });
   });
