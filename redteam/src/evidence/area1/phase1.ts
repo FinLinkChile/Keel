@@ -1,10 +1,10 @@
 // Phase 1: registries and the gate's rejections, in order. Each step checks the state it needs
 // and writes one evidence file.
 import type { Hex } from "@keel/schemas";
-import { encodeFunctionData, erc20Abi } from "viem";
-import { type Ctx, gateCall, gateEvents, gateRead, safeExec, sendExpectRevert, simulateFrom, waitUntil } from "./chain";
+import { encodeFunctionData, erc20Abi, zeroAddress } from "viem";
+import { type Ctx, gateCall, gateEvents, gateRead, latestBlock, safeExec, sendExpectRevert, simulateFrom, waitUntil } from "./chain";
 import { checkNotPaused, preflight, ROLE, readRegistry } from "./checks";
-import { PreconditionError } from "./config";
+import { envAddress, PreconditionError } from "./config";
 import { decisionFor, executeCall, intentFor, type OpenedOrder, openOrder, otherCalldataHash, signDecision, trustedParties } from "./orders";
 import type { CaseRecord, ExpectedError, Sink, TxRef } from "./record";
 
@@ -43,6 +43,107 @@ async function gateRejection(
     details: { order: o.po, orderHash: o.orderHash, ...details },
     notes,
   });
+}
+
+// ------------------------------------------------------------------ 1.1 registrations
+
+export const SUPPLIER = 1;
+export const THIRD_PARTY = 2;
+
+export interface Wanted {
+  label: string;
+  kind: typeof SUPPLIER | typeof THIRD_PARTY;
+  subject: Hex;
+  payout: Hex;
+  roles: number;
+}
+
+interface Earlier {
+  changeId: bigint;
+  activatesAt: bigint;
+  tx: TxRef;
+}
+
+export const callFor = (ctx: Ctx, w: Wanted) =>
+  w.kind === SUPPLIER ? gateCall(ctx, "queueSupplier", [w.subject, w.payout]) : gateCall(ctx, "queueThirdParty", [w.subject, w.roles]);
+
+// The newest change for the same subject that is not vetoed: for a supplier the same pair, for a
+// third party any change that includes this role.
+async function latestChange(ctx: Ctx, w: Wanted) {
+  const count = await gateRead<bigint>(ctx, "changeCount");
+  for (let id = count; id >= 1n; id--) {
+    const [kind, subject, payout, roles, activatesAt, vetoed] = await gateRead<readonly [number, Hex, Hex, number, bigint, boolean]>(ctx, "changes", [id]);
+    if (vetoed || kind !== w.kind || subject !== w.subject) continue;
+    if (w.kind === SUPPLIER ? payout === w.payout : (roles & w.roles) !== 0) return { changeId: id, roles, activatesAt };
+  }
+  return undefined;
+}
+
+// The transaction that emitted ChangeQueued(changeId). Its block is the first one whose timestamp
+// is the queue time (activatesAt - configDelay, which the gate took from block.timestamp): found
+// by binary search over block timestamps, then the logs of that block and the next 9 (some RPC
+// plans, like Alchemy's free tier, only serve eth_getLogs over 10 blocks).
+async function queuedTx(ctx: Ctx, changeId: bigint, queuedAt: bigint, label: string): Promise<TxRef> {
+  const head = await latestBlock(ctx);
+  const ts = async (n: bigint) => (await ctx.pub.getBlock({ blockNumber: n })).timestamp;
+  // Blocks are at least one second apart, so the queue block is no older than this
+  let lo = head.number > head.timestamp - queuedAt ? head.number - (head.timestamp - queuedAt) : 0n;
+  let hi = head.number;
+  while (lo < hi) {
+    const mid = (lo + hi) / 2n;
+    if ((await ts(mid)) < queuedAt) lo = mid + 1n;
+    else hi = mid;
+  }
+  const event = ctx.abis.gate.find((x) => x.type === "event" && x.name === "ChangeQueued");
+  const logs: { transactionHash: Hex | null }[] = await ctx.pub.getLogs({
+    address: ctx.d.fundingGate,
+    event: event as never,
+    args: { changeId } as never,
+    fromBlock: lo,
+    toBlock: lo + 9n > head.number ? head.number : lo + 9n,
+  });
+  const hash = logs[0]?.transactionHash;
+  if (!hash) throw new PreconditionError(`change ${changeId} (${label}) is queued but its ChangeQueued log is not in blocks ${lo}..${lo + 9n}`);
+  const [receipt, tx] = await Promise.all([ctx.pub.getTransactionReceipt({ hash }), ctx.pub.getTransaction({ hash })]);
+  return {
+    label: `Safe: ${label} (earlier run)`,
+    hash: receipt.transactionHash,
+    blockNumber: receipt.blockNumber,
+    from: receipt.from,
+    to: receipt.to ?? zeroAddress,
+    status: receipt.status,
+    gasUsed: receipt.gasUsed,
+    gasLimit: tx.gas,
+  };
+}
+
+export async function planRegistrations(ctx: Ctx, wanted: Wanted[]) {
+  const configDelay = await gateRead<bigint>(ctx, "configDelay");
+  const plan: { w: Wanted; earlier?: Earlier }[] = [];
+  for (const w of wanted) {
+    const failure = await simulateFrom(ctx, ctx.d.safe, ctx.d.fundingGate, callFor(ctx, w));
+    if (!failure) {
+      plan.push({ w });
+      continue;
+    }
+    if (failure.name !== "AlreadyRegistered") throw new PreconditionError(`${w.label} would revert with ${failure.name}; nothing sent`);
+    const c = await latestChange(ctx, w);
+    if (!c || (w.kind === THIRD_PARTY && c.roles !== w.roles)) {
+      throw new PreconditionError(
+        `${w.label}: already registered with other data (${c ? `change ${c.changeId} has roles ${c.roles}` : "no matching change"}); the Safe must sort it out; nothing sent`,
+      );
+    }
+    plan.push({ w, earlier: { changeId: c.changeId, activatesAt: c.activatesAt, tx: await queuedTx(ctx, c.changeId, c.activatesAt - configDelay, w.label) } });
+  }
+  return plan;
+}
+
+// Both or neither: a half-set pair is a configuration mistake, not a reason to skip it silently.
+function appSupplier(): { exporter: Hex; payout: Hex } | undefined {
+  const set = ["APP_EXPORTER_ADDRESS", "APP_PAYOUT_ADDRESS"].filter((k) => process.env[k]);
+  if (set.length === 0) return undefined;
+  if (set.length === 1) throw new PreconditionError("set both APP_EXPORTER_ADDRESS and APP_PAYOUT_ADDRESS, or neither");
+  return { exporter: envAddress("APP_EXPORTER_ADDRESS"), payout: envAddress("APP_PAYOUT_ADDRESS") };
 }
 
 // Dry-runs each Safe -> gate call before sending any, so a pending entry from an earlier partial
@@ -87,36 +188,57 @@ export const PHASE1: Step[] = [
     id: "1.1",
     title: "Safe registers the supplier, carrier, arbiter and document verifier",
     async run(ctx, sink) {
-      const { registry: r } = await preflight(ctx, { senders: ["owner"] });
-      if (r.supplier || r.carrier || r.arbiter || r.verifier) {
-        throw new PreconditionError(`some registrations are already active (${JSON.stringify(r)}): 1.1 already ran; run the later steps with --steps`);
-      }
+      await preflight(ctx, { senders: ["owner"] });
       const { exporter, payout, carrier, arbiter } = ctx.addr;
-      const calls: [string, Hex][] = [
-        ["queueSupplier(DEMO_EXPORTER, DEMO_PAYOUT)", gateCall(ctx, "queueSupplier", [exporter, payout])],
-        ["queueThirdParty(DEMO_CARRIER, CARRIER)", gateCall(ctx, "queueThirdParty", [carrier, ROLE.CARRIER])],
-        ["queueThirdParty(DEMO_ARBITER, ARBITER)", gateCall(ctx, "queueThirdParty", [arbiter, ROLE.ARBITER])],
-        ["queueThirdParty(POLICY_SIGNER_ADDRESS, VERIFIER)", gateCall(ctx, "queueThirdParty", [ctx.verifier, ROLE.VERIFIER])],
+      const wanted: Wanted[] = [
+        { label: "queueSupplier(DEMO_EXPORTER, DEMO_PAYOUT)", kind: SUPPLIER, subject: exporter, payout, roles: 0 },
+        { label: "queueThirdParty(DEMO_CARRIER, CARRIER)", kind: THIRD_PARTY, subject: carrier, payout: zeroAddress, roles: ROLE.CARRIER },
+        { label: "queueThirdParty(DEMO_ARBITER, ARBITER)", kind: THIRD_PARTY, subject: arbiter, payout: zeroAddress, roles: ROLE.ARBITER },
+        { label: "queueThirdParty(POLICY_SIGNER_ADDRESS, VERIFIER)", kind: THIRD_PARTY, subject: ctx.verifier, payout: zeroAddress, roles: ROLE.VERIFIER },
       ];
-      await dryRunFromSafe(ctx, calls);
-      const queued = [];
-      for (const [label, data] of calls) queued.push(await safeExec(ctx, ctx.d.fundingGate, data, label));
-      const events = queued.flatMap((q) => gateEvents(ctx, q.receipt.logs)).filter((e) => e.eventName === "ChangeQueued");
-      if (events.length !== 4) throw new Error(`expected 4 ChangeQueued events, got ${events.length}`);
-      const activatesAt = events.reduce((m, e) => ((e.args.activatesAt as bigint) > m ? (e.args.activatesAt as bigint) : m), 0n);
+      // Optional: the supplier the app uses (APP_EXPORTER_ADDRESS, APP_PAYOUT_ADDRESS)
+      const app = appSupplier();
+      if (app) wanted.push({ label: "queueSupplier(APP_EXPORTER, APP_PAYOUT)", kind: SUPPLIER, subject: app.exporter, payout: app.payout, roles: 0 });
+
+      // Idempotent: whatever is already pending or active with the same data is skipped (and its
+      // ChangeQueued log goes into the evidence); anything registered differently stops the step.
+      // Every decision is taken before the first send.
+      const plan = await planRegistrations(ctx, wanted);
+      const setup: TxRef[] = [];
+      const changes: Record<string, unknown>[] = [];
+      for (const p of plan.filter((x) => x.earlier)) {
+        const e = p.earlier!;
+        console.log(`  skip ${p.w.label}: change ${e.changeId} already queued in ${e.tx.hash}`);
+        setup.push(e.tx);
+        changes.push({ label: p.w.label, changeId: e.changeId, activatesAt: e.activatesAt, queuedEarlier: true });
+      }
+      for (const p of plan.filter((x) => !x.earlier)) {
+        const q = await safeExec(ctx, ctx.d.fundingGate, callFor(ctx, p.w), p.w.label);
+        const ev = gateEvents(ctx, q.receipt.logs).find((e) => e.eventName === "ChangeQueued");
+        if (!ev) throw new Error(`${p.w.label}: no ChangeQueued event`);
+        setup.push(q.tx);
+        changes.push({ label: p.w.label, changeId: ev.args.changeId, activatesAt: ev.args.activatesAt, queuedEarlier: false });
+      }
+      const activatesAt = changes.reduce((m, c) => ((c.activatesAt as bigint) > m ? (c.activatesAt as bigint) : m), 0n);
       const configDelay = await gateRead<bigint>(ctx, "configDelay");
       await waitUntil(ctx, activatesAt, `configDelay (${configDelay} s)`);
       const after = await readRegistry(ctx);
-      if (!(after.supplier && after.carrier && after.arbiter && after.verifier)) throw new Error(`registrations not active after the wait: ${JSON.stringify(after)}`);
+      const appActive = app ? await gateRead<boolean>(ctx, "isKnownSupplier", [app.exporter, app.payout]) : undefined;
+      if (!(after.supplier && after.carrier && after.arbiter && after.verifier) || appActive === false) {
+        throw new Error(`registrations not active after the wait: ${JSON.stringify({ ...after, appSupplier: appActive })}`);
+      }
       sink.write({
         caseId: "1.1",
         phase: 1,
         title: this.title,
         kind: "state-change",
-        setup: queued.map((q) => q.tx),
+        setup,
         passed: true,
-        details: { configDelay, changes: events.map((e) => e.args), activatesAt, registryAfter: after },
-        notes: ["Each change counted only from activatesAt = queue time + configDelay, enforced by FundingGate."],
+        details: { configDelay, changes, activatesAt, registryAfter: { ...after, appSupplier: appActive }, appSupplier: app },
+        notes: [
+          "Each change counted only from activatesAt = queue time + configDelay, enforced by FundingGate.",
+          ...(plan.some((x) => x.earlier) ? ["Changes marked queuedEarlier were sent by an earlier run of this step; their transaction is the one that emitted ChangeQueued."] : []),
+        ],
       });
     },
   },

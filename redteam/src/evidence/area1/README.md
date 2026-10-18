@@ -18,7 +18,7 @@ The Safe may have several owners (ours and Area 4's): the script signs with `OWN
 
 | Case | What | Expected |
 |---|---|---|
-| 1.1 | Safe queues the supplier (DEMO_EXPORTER, DEMO_PAYOUT), carrier, arbiter and verifier (POLICY_SIGNER_ADDRESS), and waits `configDelay` | active |
+| 1.1 | Safe queues the supplier (DEMO_EXPORTER, DEMO_PAYOUT), carrier, arbiter and verifier (POLICY_SIGNER_ADDRESS), plus the app's supplier (APP_EXPORTER_ADDRESS, APP_PAYOUT_ADDRESS) when both are set, and waits `configDelay` | active |
 | 1.2 | Safe queues (DEMO_EXPORTER, DEMO_ATTACKER) and vetoes it | vetoed |
 | 1.3 | Deposit for an order paying the vetoed DEMO_ATTACKER | `UnknownSupplier` |
 | 1.4 | Deposit for an order with an unregistered carrier | `UntrustedParty` |
@@ -32,6 +32,8 @@ The Safe may have several owners (ours and Area 4's): the script signs with `OWN
 | 3.3 | Carrier attestation after `shipmentDeadline + refundGrace` | `DeadlinePassed` |
 | 3.4 | The same bill of lading on a second order | `BillOfLadingAlreadyUsed` |
 
+Step 1.1 is idempotent: it reads the registry first, skips every entry already pending or active with the same data (its file lists the earlier `ChangeQueued` transaction, found by block timestamp so that a 10-block `eth_getLogs` limit is enough) and stops if an entry is registered with other data. Account nonces come from viem's `nonceManager` and the Safe nonce is kept by the script; reads, simulations and gas estimates run at the block of the last receipt or later, because a load-balanced RPC can still answer from an older block right after a receipt.
+
 Orders 1.3 to 1.7 and 1.9 are opened for real in the escrow (the Safe signs through ERC-1271 with the owner key, DEMO_EXPORTER signs too) and stay OPEN. The PDRs of phase 1 are signed by DEMO_ATTACKER: the real policy key is never used.
 
 ## Usage
@@ -41,6 +43,8 @@ Run from the repo root after `forge build` in `contracts/`. Each order totals `-
 ```sh
 TSX=node_modules/.bin/tsx; CLI=redteam/src/evidence/area1/cli.ts
 $TSX $CLI phase1 [--steps 1.3,1.4] [--out DIR]     # default: every step, in order
+$TSX $CLI app-setup --policy-hash <hash>           # Delay policy + app carrier and arbiter (below)
+$TSX $CLI rotate-guardian [--tx <hash>]           # Safe sets GUARDIAN_ADDRESS as the gate guardian (below)
 $TSX $CLI open-order [--deadline-seconds 600]       # an order for a real deposit of phase 3
 $TSX $CLI phase3 repeat-deposit   --tx <deposit tx hash>
 $TSX $CLI phase3 exporter-dispute --order <orderId>
@@ -48,6 +52,10 @@ $TSX $CLI phase3 duplicate-bl     --order <orderId A> --order-b <orderId B> [--b
 $TSX $CLI phase3 late-attestation --order <orderId>  # waits deadline + grace, showing the time left
 $TSX $CLI summary --out DIR                          # table of every file in DIR
 ```
+
+`app-setup` runs in one process, so the owner's nonces never collide: it checks that the Delay has nothing pending, queues `FundingGate.setPolicyHash` on it (as `SetTradePolicy.s.sol`), queues `APP_CARRIER_ADDRESS` and `APP_ARBITER_ADDRESS` with the idempotent 1.1 (after checking that neither is the Safe, a Safe owner, the cosigner, the guardian, the policy signer or `RELAYER_ADDRESS`, nor has code), waits for the cooldown, runs `executeNextTx`, waits for `configDelay` and reads back the policy hash and both roles. It writes `1.0-…` (policy) and `1.1-…app carrier and arbiter`.
+
+`rotate-guardian` checks that the gate's guardian is `GUARDIAN_OLD_ADDRESS` and that `GUARDIAN_ADDRESS` is a plain account (same checks as `app-setup`), sends `setGuardian(GUARDIAN_ADDRESS)` from the Safe, then checks the `GuardianSet` event, `guardian()`, and with `eth_call` only (never sent) that `emergencyPause()` succeeds from the new address and reverts with `OnlyPauser` from the old one. With `--tx <setGuardian hash>` nothing is sent: the same checks run on that mined transaction. It writes `1.10-…`.
 
 Common options: `--rpc-url` (default `$BASE_SEPOLIA_RPC_URL`), `--deployments` (default `contracts/deployments/<chainId>.json`), `--out` (default a new temporary directory), `--live` (required for a real chain).
 

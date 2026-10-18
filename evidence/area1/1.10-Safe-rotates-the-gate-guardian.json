@@ -1,0 +1,52 @@
+{
+  "schema": "keel.area1.evidence/v1",
+  "chainId": 84532,
+  "contracts": {
+    "safe": "0x366E72921895dBFD7688822418BE43E02551Ee82",
+    "roles": "0xD60f4297ed883D9b567A5A511F0735b2A7b19592",
+    "tradeEscrow": "0x8346c6F1AfbaFF8140D35116fAF5ec07e4232970",
+    "fundingGate": "0x2bc56bbB5B47B493009531e751C8Bd90513e927f",
+    "token": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+  },
+  "caseId": "1.10",
+  "phase": 1,
+  "title": "Safe rotates the gate guardian",
+  "kind": "state-change",
+  "setup": [
+    {
+      "label": "Safe: setGuardian(GUARDIAN_ADDRESS)",
+      "hash": "0x4c0c82742e25941eeb10b7933fb4950c325fdda593183ba8ec436f17ff906d61",
+      "blockNumber": "48297931",
+      "from": "0x998207c916dcf1a0f14a24ddbf46332eedce6fd6",
+      "to": "0x366e72921895dbfd7688822418be43e02551ee82",
+      "status": "success",
+      "gasUsed": "72155",
+      "gasLimit": "107628"
+    }
+  ],
+  "passed": true,
+  "details": {
+    "previousGuardian": "0x796086b060f69D0C72F85Ed994Ccccbf16F2E61e",
+    "guardian": "0xB34f41d7C3eA3deD9e6477794cDEc31C214c22E6",
+    "guardianSetEvent": {
+      "previousGuardian": "0x796086b060f69D0C72F85Ed994Ccccbf16F2E61e",
+      "guardian": "0xB34f41d7C3eA3deD9e6477794cDEc31C214c22E6"
+    },
+    "guardianAfter": "0xB34f41d7C3eA3deD9e6477794cDEc31C214c22E6",
+    "emergencyPauseEthCall": {
+      "fromNewGuardian": "succeeds",
+      "fromOldGuardian": {
+        "name": "OnlyPauser",
+        "args": [],
+        "data": "0x75df51dc"
+      }
+    },
+    "pausedAfter": false
+  },
+  "notes": [
+    "The previous guardian key was lost; the Safe replaced it with setGuardian, Safe only.",
+    "emergencyPause was only simulated with eth_call from both addresses, never sent: the gate stays unpaused.",
+    "Checked first: the new address is not the Safe, a Safe owner, the cosigner, the policy signer or the relayer, and has no code."
+  ],
+  "writtenAt": "2026-10-18T23:00:23.864Z"
+}

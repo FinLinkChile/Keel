@@ -36,6 +36,11 @@ export interface Ctx {
   d: Deployment & { token: Hex };
   // POLICY_SIGNER_ADDRESS: the document verifier of the evidence orders
   verifier: Hex;
+  // Highest block this run knows about (its receipts, the end of a wait). Every read, simulation
+  // and gas estimate runs at this block or later, never on a node that is still behind it.
+  minBlock: bigint;
+  // Next Safe nonce, kept by the script after each Safe transaction it sends
+  safeNonce?: bigint;
 }
 
 export class CaseFailure extends Error {
@@ -60,7 +65,7 @@ export async function connect(opts: Options, d: Deployment, verifier: Hex): Prom
   const pub = createPublicClient({ chain, transport: http(opts.rpcUrl) }) as PublicClient;
   const abis = loadAbis(opts.artifactsDir);
   const token = (await pub.readContract({ address: d.fundingGate, abi: abis.gate, functionName: "token" })) as Hex;
-  return { chainId, chain, pub, isAnvil, opts, abis, addr: loadAddresses(), signer: signerLoader(), d: { ...d, token }, verifier };
+  return { chainId, chain, pub, isAnvil, opts, abis, addr: loadAddresses(), signer: signerLoader(), d: { ...d, token }, verifier, minBlock: 0n };
 }
 
 export function wallet(ctx: Ctx, actor: Signer | PrivateKeyAccount) {
@@ -68,18 +73,56 @@ export function wallet(ctx: Ctx, actor: Signer | PrivateKeyAccount) {
   return createWalletClient({ account, chain: ctx.chain, transport: http(ctx.opts.rpcUrl) });
 }
 
-export const read = <T>(ctx: Ctx, address: Hex, abi: Abis[keyof Abis] | typeof safeAbi, functionName: string, args: unknown[] = []) =>
-  ctx.pub.readContract({ address, abi, functionName, args } as never) as Promise<T>;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// A block number at or after ctx.minBlock, as the RPC reports it (waits up to 60 s for it).
+export async function syncedBlock(ctx: Ctx): Promise<bigint> {
+  for (let i = 0; i < 60; i++) {
+    const n = await ctx.pub.getBlockNumber({ cacheTime: 0 });
+    if (n >= ctx.minBlock) return n;
+    await sleep(1_000);
+  }
+  throw new Error(`the RPC stayed behind block ${ctx.minBlock} for 60 s`);
+}
+
+export function seeBlock(ctx: Ctx, n: bigint) {
+  if (n > ctx.minBlock) ctx.minBlock = n;
+}
+
+// A load-balanced RPC may route a call at an explicit block to a node that does not have it yet.
+const BEHIND = /header not found|block not found|unknown block|missing trie node|block.*not.*available/i;
+async function atBlock<T>(fn: () => Promise<T>): Promise<T> {
+  for (let i = 0; ; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (i >= 10 || !BEHIND.test(String((err as Error)?.message))) throw err;
+      await sleep(1_000);
+    }
+  }
+}
+
+export const read = async <T>(ctx: Ctx, address: Hex, abi: Abis[keyof Abis] | typeof safeAbi, functionName: string, args: unknown[] = []) => {
+  const blockNumber = await syncedBlock(ctx);
+  return atBlock(() => ctx.pub.readContract({ address, abi, functionName, args, blockNumber } as never) as Promise<T>);
+};
 
 export const gateRead = <T>(ctx: Ctx, fn: string, args: unknown[] = []) => read<T>(ctx, ctx.d.fundingGate, ctx.abis.gate, fn, args);
 export const escrowRead = <T>(ctx: Ctx, fn: string, args: unknown[] = []) => read<T>(ctx, ctx.d.tradeEscrow, ctx.abis.escrow, fn, args);
 
+export async function latestBlock(ctx: Ctx): Promise<{ number: bigint; timestamp: bigint }> {
+  const blockNumber = await syncedBlock(ctx);
+  const b = await atBlock(() => ctx.pub.getBlock({ blockNumber }));
+  return { number: b.number, timestamp: b.timestamp };
+}
+
 export async function latestTimestamp(ctx: Ctx): Promise<bigint> {
-  return (await ctx.pub.getBlock({ blockTag: "latest" })).timestamp;
+  return (await latestBlock(ctx)).timestamp;
 }
 
 export async function usdcBalance(ctx: Ctx, who: Hex): Promise<bigint> {
-  return ctx.pub.readContract({ address: ctx.d.token, abi: erc20Abi, functionName: "balanceOf", args: [who] });
+  const blockNumber = await syncedBlock(ctx);
+  return atBlock(() => ctx.pub.readContract({ address: ctx.d.token, abi: erc20Abi, functionName: "balanceOf", args: [who], blockNumber }));
 }
 
 // Revert data of a failed eth_call, wherever viem nests it. Any other failure is rethrown.
@@ -95,12 +138,16 @@ function revertData(err: unknown): Hex | undefined {
 }
 
 // eth_call with the exact sender, calldata and gas. Returns the decoded revert, or null if it succeeds.
+// "latest" means: the newest block at or after ctx.minBlock.
 async function simulate(ctx: Ctx, from: Hex, to: Hex, data: Hex, gas: bigint | undefined, block: Hex | "latest"): Promise<DecodedError | null> {
+  const tag = block === "latest" ? toHex(await syncedBlock(ctx)) : block;
   try {
-    await ctx.pub.request({
-      method: "eth_call",
-      params: [{ from, to, data, ...(gas ? { gas: toHex(gas) } : {}) }, block],
-    } as never);
+    await atBlock(() =>
+      ctx.pub.request({
+        method: "eth_call",
+        params: [{ from, to, data, ...(gas ? { gas: toHex(gas) } : {}) }, tag],
+      } as never),
+    );
     return null;
   } catch (err) {
     const data = revertData(err);
@@ -109,7 +156,7 @@ async function simulate(ctx: Ctx, from: Hex, to: Hex, data: Hex, gas: bigint | u
   }
 }
 
-// eth_call at latest from any address (for example the Safe, to dry-run a Safe call's inner call).
+// eth_call at the newest synced block from any address (for example the Safe, to dry-run a Safe call's inner call).
 export const simulateFrom = (ctx: Ctx, from: Hex, to: Hex, data: Hex) => simulate(ctx, from, to, data, undefined, "latest");
 
 function txRef(label: string, receipt: TransactionReceipt, gasLimit: bigint): TxRef {
@@ -134,8 +181,13 @@ export async function sendOk(ctx: Ctx, sender: Signer | PrivateKeyAccount, to: H
   const w = wallet(ctx, sender);
   const failure = await simulate(ctx, w.account.address, to, data, undefined, "latest");
   if (failure) throw new CaseFailure(`${label}: simulation reverts with ${failure.name}(${failure.args.join(", ")}), not sending`);
-  const hash = await w.sendTransaction({ to, data, chain: ctx.chain, account: w.account });
+  // Gas estimated at a synced block: on a node behind our last receipt the estimate could fail
+  // (for example a Safe transaction signed for the next Safe nonce).
+  const blockNumber = await syncedBlock(ctx);
+  const estimate = await atBlock(() => ctx.pub.estimateGas({ account: w.account, to, data, blockNumber }));
+  const hash = await w.sendTransaction({ to, data, gas: (estimate * 12n) / 10n + 20_000n, chain: ctx.chain, account: w.account });
   const receipt = await ctx.pub.waitForTransactionReceipt({ hash });
+  seeBlock(ctx, receipt.blockNumber);
   const tx = await ctx.pub.getTransaction({ hash });
   if (receipt.status !== "success") throw new CaseFailure(`${label}: transaction ${hash} reverted`);
   console.log(`  ok   ${label}  ${hash}`);
@@ -189,6 +241,7 @@ export async function sendExpectRevert(
   // 2. Send anyway, with a fixed gas so no node refuses it at estimation.
   const hash = await w.sendTransaction({ to, data, gas, chain: ctx.chain, account: w.account });
   const receipt = await ctx.pub.waitForTransactionReceipt({ hash });
+  seeBlock(ctx, receipt.blockNumber);
   if (receipt.status !== "reverted") throw new CaseFailure(`${label}: ${hash} did NOT revert on chain`);
   if (receipt.gasUsed >= gas) throw new CaseFailure(`${label}: ${hash} used all its gas; the revert may be out of gas`);
 
@@ -223,7 +276,9 @@ export async function checkSafeOwner(ctx: Ctx): Promise<{ owners: Hex[]; thresho
 // One Safe transaction signed by the owner over the safeTxHash (ECDSA, v = 27/28). safeTxGas =
 // gasPrice = 0, so a failing inner call reverts the whole transaction (GS013).
 export async function safeExec(ctx: Ctx, to: Hex, data: Hex, label: string): Promise<Sent> {
-  const nonce = await read<bigint>(ctx, ctx.d.safe, safeAbi, "nonce");
+  // Read at a block at or after our last receipt, and never below the nonce this run already used
+  const onChain = await read<bigint>(ctx, ctx.d.safe, safeAbi, "nonce");
+  const nonce = ctx.safeNonce !== undefined && ctx.safeNonce > onChain ? ctx.safeNonce : onChain;
   const safeTxHash = await read<Hex>(ctx, ctx.d.safe, safeAbi, "getTransactionHash", [to, 0n, data, 0, 0n, 0n, 0n, zeroAddress, zeroAddress, nonce]);
   const signature = await ctx.signer("owner").sign({ hash: safeTxHash });
   const execData = encodeFunctionData({
@@ -231,7 +286,9 @@ export async function safeExec(ctx: Ctx, to: Hex, data: Hex, label: string): Pro
     functionName: "execTransaction",
     args: [to, 0n, data, 0, 0n, 0n, 0n, zeroAddress, zeroAddress, signature],
   });
-  return sendOk(ctx, "owner", ctx.d.safe, execData, `Safe: ${label}`);
+  const sent = await sendOk(ctx, "owner", ctx.d.safe, execData, `Safe: ${label}`);
+  ctx.safeNonce = nonce + 1n;
+  return sent;
 }
 
 export const gateCall = (ctx: Ctx, functionName: string, args: unknown[]) => encodeFunctionData({ abi: ctx.abis.gate, functionName, args } as never);
@@ -258,7 +315,7 @@ export async function waitUntil(ctx: Ctx, target: bigint, what: string): Promise
   let seenTs = 0n;
   let seenAt = Date.now();
   for (;;) {
-    const now = await latestTimestamp(ctx);
+    const { number, timestamp: now } = await latestBlock(ctx);
     if (now !== seenTs) {
       seenTs = now;
       seenAt = Date.now();
@@ -267,6 +324,8 @@ export async function waitUntil(ctx: Ctx, target: bigint, what: string): Promise
     }
     if (now >= target) {
       if (last) process.stdout.write("\n");
+      // Later reads must see this block (its timestamp is what activated the change)
+      seeBlock(ctx, number);
       return;
     }
     const left = Number(target - now);
@@ -274,6 +333,6 @@ export async function waitUntil(ctx: Ctx, target: bigint, what: string): Promise
       process.stdout.write(`\r  waiting for ${what}: ${Math.floor(left / 60)}m ${String(left % 60).padStart(2, "0")}s left   `);
       last = Date.now();
     }
-    await new Promise((r) => setTimeout(r, 2_000));
+    await sleep(2_000);
   }
 }

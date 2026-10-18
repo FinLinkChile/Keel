@@ -1,0 +1,98 @@
+{
+  "schema": "keel.area1.evidence/v1",
+  "chainId": 84532,
+  "contracts": {
+    "safe": "0x366E72921895dBFD7688822418BE43E02551Ee82",
+    "roles": "0xD60f4297ed883D9b567A5A511F0735b2A7b19592",
+    "tradeEscrow": "0x8346c6F1AfbaFF8140D35116fAF5ec07e4232970",
+    "fundingGate": "0x2bc56bbB5B47B493009531e751C8Bd90513e927f",
+    "token": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+  },
+  "caseId": "1.7",
+  "phase": 1,
+  "title": "Deposit with a PDR signed by a key that is not the policy signer",
+  "kind": "revert",
+  "setup": [
+    {
+      "label": "open order 1.7",
+      "hash": "0x0ab28ce4ca5b5737048aedbde5a6a8b4ab3af135d2ee134b998b6a849c7df4cc",
+      "blockNumber": "48236379",
+      "from": "0x1dca5bc3e7a06eca0e50775dcb410a650148f14b",
+      "to": "0x8346c6f1afbaff8140d35116faf5ec07e4232970",
+      "status": "success",
+      "gasUsed": "433727",
+      "gasLimit": "546004"
+    }
+  ],
+  "revert": {
+    "tx": {
+      "label": "1.7 execute",
+      "hash": "0x45bde941ef1e2862ced4b7865bee30df1e2147e046dbbeaca38bef00bc1a874d",
+      "blockNumber": "48236381",
+      "from": "0x2fdd1c7b6dd0fd3a41b2ec43631d3dbcbd504c63",
+      "to": "0x2bc56bbb5b47b493009531e751c8bd90513e927f",
+      "status": "reverted",
+      "gasUsed": "109653",
+      "gasLimit": "1000000"
+    },
+    "expected": {
+      "name": "BadPolicySignature"
+    },
+    "simulated": {
+      "name": "BadPolicySignature",
+      "args": [],
+      "data": "0x87fd6e54"
+    },
+    "actual": {
+      "name": "BadPolicySignature",
+      "args": [],
+      "data": "0x87fd6e54",
+      "source": "replay"
+    },
+    "reproduce": "cast run 0x45bde941ef1e2862ced4b7865bee30df1e2147e046dbbeaca38bef00bc1a874d --rpc-url \"$BASE_SEPOLIA_RPC_URL\""
+  },
+  "passed": true,
+  "details": {
+    "order": {
+      "orderId": "0x940e7f7bf50df7ecce379d755b1d80981196578d84a9d35d67d61f81fb486488",
+      "importer": "0x366E72921895dBFD7688822418BE43E02551Ee82",
+      "exporter": "0x1dca5bC3e7A06eCa0E50775dcB410a650148f14b",
+      "payoutAddress": "0x43Ac05c12E9e0A4E537b2566786Fa68773feda62",
+      "token": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      "totalAmount": "1000000",
+      "advanceBps": 1000,
+      "shipmentDeadline": "1792845842",
+      "disputeWindow": "3600",
+      "carrier": "0xe5ea4525B51db068907D34998aFF9236Cef3cc76",
+      "arbiter": "0xF53ACde9Dd56abca283785124fA06F5366c06519",
+      "documentVerifier": "0xc7F2300AD6203D629d71aCe901e1B4e1b923A01C",
+      "incoterm": "0x464f420000000000000000000000000000000000000000000000000000000000",
+      "termsHash": "0x941c0b511640989aa1bcbd8a8d527c50f84f3781e2972216029cba1736881a10",
+      "requiredDocsHash": "0x3928a70aa851d3336ff18e657064310718b9c894358f8a7b05750d61f22ee77c",
+      "nonce": "5710867671812934930"
+    },
+    "orderHash": "0xb2e1b51e80f977d923a7e0ac11b1b635fa5f744d98cd6ae5eea0aa9b1df64c25",
+    "intent": {
+      "orderId": "0x940e7f7bf50df7ecce379d755b1d80981196578d84a9d35d67d61f81fb486488",
+      "orderHash": "0xb2e1b51e80f977d923a7e0ac11b1b635fa5f744d98cd6ae5eea0aa9b1df64c25",
+      "escrow": "0x8346c6F1AfbaFF8140D35116fAF5ec07e4232970",
+      "token": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      "amount": "1000000",
+      "deadline": "1792241946",
+      "nonce": "606131760705264616"
+    },
+    "decision": {
+      "intentHash": "0x289cf1e28ed53d7d18671b077ba145f43ceba410dab3f22b171e595a44350295",
+      "calldataHash": "0x91ee5abef55c31c5ae4baafb51a611da904dcfa32ed6e7cc98e57b7f60c99df5",
+      "policyHash": "0x90e5e81523331cb4fe1695c8fdb7234776e15c1c31ba6f1df6807809fe4a160e",
+      "inputsHash": "0x183af7d930b6d0b11b0c58e27b82e351c00f935ab8021ba9cc6143bbb391ee89",
+      "tier": 1,
+      "expiresAt": "1792241646"
+    },
+    "pdrSignedBy": "0x2fdD1c7B6dD0fd3a41b2Ec43631D3dBcbd504c63"
+  },
+  "notes": [
+    "Order, registries and calldata are all valid; only the signature of the decision is wrong."
+  ],
+  "writtenAt": "2026-10-17T12:44:08.566Z"
+}
