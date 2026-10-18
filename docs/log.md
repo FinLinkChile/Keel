@@ -1,5 +1,9 @@
 # Historial de la documentación
 
+## 2026-10-18
+
+* **Decisión (negocio)**: Keel es **rentista, asociado a un banco**: gana con la utilidad de la plata depositada y bloqueada en las órdenes, que el banco socio custodia e invierte en instrumentos seguros bajo su licencia, y el cliente no paga comisión. Dos casos de crédito: (A) el banco presta al importador, que deposita en Keel con el flujo actual, o (B) el banco deposita el crédito directamente en Keel, que gestiona el bloqueo. Reemplaza la recomendación anterior de cobrar comisión. Quedan abiertos el banco, el reparto, la opinión legal sobre captación y cómo se une el rendimiento con el token del escrow. El documento también registra que el agente quedó como analista en su pestaña. Lo decidió el equipo; lo registró el Área 3 (Daniela). Documento: [opciones de negocio](negocio/Keel%20opciones%20de%20negocio%20y%20an%C3%A1lisis%20de%20datos.md).
+
 ## 2026-10-17
 
 * **Actualización (app) [PROPUESTA]**: análisis de negociación y puntaje enriquecido. Al enviar una orden, la app guarda con ella lo que pidió la proforma (monto, anticipo, fechas), sin firmarlo, y compara con lo firmado: puntos de anticipo y porcentaje de total negociados, por proveedor y en el panel. El puntaje del proveedor suma los días promedio entre el embarque y la fecha límite, los documentos aceptados y cuánto tarda en firmar. Todo sale de datos que ya existen (la orden, sus marcas de tiempo y la lectura de la proforma, que se puede unir a la orden porque `documentHash` es el hash de la proforma). Área 3 (Daniela), como aporte al Área 4.

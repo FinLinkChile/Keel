@@ -1,6 +1,31 @@
 # Keel: opciones de negocio y análisis de datos
 
-Oct 16, 2026 · @Daniela Ávila
+Oct 16, 2026 · @Daniela Ávila · actualizado el 18 de octubre de 2026
+
+## Decisión: Keel es rentista, asociado a un banco
+
+**Modelo elegido (18 de octubre de 2026):** Keel gana con la plata que queda depositada y bloqueada en las órdenes. Esa plata se trabaja en instrumentos de inversión seguros y Keel se queda con la utilidad. **El cliente no paga comisión**: ese es el beneficio que lo atrae.
+
+**Siempre a través de un banco socio.** El banco recibe y mantiene los fondos bajo su licencia (cuenta segregada o depósito tokenizado), los invierte y comparte la utilidad con Keel. Keel no capta dinero del público ni invierte por su cuenta: aporta la orden firmada, el control del bloqueo y los datos verificados.
+
+**Dos formas de usar el crédito del banco:**
+
+| Caso | Cómo funciona | Quién pone la plata bloqueada |
+| --- | --- | --- |
+| A. Crédito al importador | El banco presta el total al importador, y el importador lo deposita en Keel con el flujo de hoy: la orden firmada, el depósito y el bloqueo hasta el embarque | El importador, con el crédito del banco |
+| B. Crédito directo a Keel | El banco deposita el crédito directamente en Keel, que gestiona el bloqueo de la orden; el importador le paga al banco después | El banco |
+
+En los dos casos la plata solo puede ir al exportador (anticipo al firmar, saldo al probarse el embarque) o volver a quien la puso si vence el plazo, como en el [flujo](../flujo/flujo-clave.md). El banco además puede usar el historial de cumplimiento de Keel para decidir a quién prestar (análisis 8).
+
+**Lo que hay que resolver antes del piloto [ABIERTO]:**
+
+* **Qué banco**, cómo se reparte la utilidad y en qué instrumentos se invierte. Tienen que ser de bajo riesgo y líquidos: la plata es del importador (o del banco en el caso B) y la promesa de Keel es que está visible, bloqueada y disponible cuando la orden la libera.
+* **Opinión legal:** sin el banco, invertir la plata del cliente podría ser captación de dinero del público, reservada a los bancos (art. 39 de la Ley General de Bancos). Con el banco es él quien custodia e invierte bajo su licencia, pero hay que confirmarlo.
+* **Cómo se une con la cadena:** hoy el depósito es un token en el contrato de escrow. Si el token es un depósito tokenizado del banco, el rendimiento lo genera el banco con las reservas que lo respaldan y el contrato no cambia; un token que no rinde no genera utilidad. En Hong Kong, las stablecoins reguladas no pueden pagar interés al tenedor.
+* **Volumen:** el rendimiento por orden es bajo (unos 82 USD en una orden de 50.000 USD con la mitad retenida 30 días a 4%, ver la opción 2), así que el modelo depende del volumen de plata bloqueada.
+* **En la demo** el modelo se muestra como narrativa: la integración con un banco sigue fuera del alcance de la competencia ([alcance](../flujo/alcance.md)).
+
+Las secciones 1 a 3 comparan las opciones que se evaluaron antes de decidir.
 
 ## 1. Cobrar comisión por orden
 
@@ -57,11 +82,9 @@ Es lo que gana el banco con la carta de crédito: prestar, no invertir la plata 
 - Si el banco ve que Keel solo lo conecta con clientes, podría hacerlo solo. Por eso importa que los datos y la verificación sean nuestros.
 - Necesita volumen y un historial de órdenes para que el financista confíe.
 
-## Recomendación
+## Recomendación anterior (reemplazada)
 
-1. **Demo:** mostrar la comisión como modelo, y el financiamiento y el float como pantallas de fase 2.
-2. **Piloto:** comisión por orden, sin tocar el float.
-3. **Con bancos:** agregar financiamiento. El rendimiento del saldo, solo si el banco lo hace y lo comparte.
+Antes de decidir, la recomendación era partir cobrando comisión en la demo y el piloto, y dejar el float y el financiamiento para la fase con bancos. **La reemplaza la decisión de arriba:** sin comisión, con la utilidad de los fondos bloqueados a través de un banco socio y con el crédito del banco en los casos A y B.
 
 ## 4. Datos que tendremos
 
@@ -82,36 +105,40 @@ No se guardan las llaves privadas: el usuario las conserva. Como propuesta de di
 
 ## 5. Análisis posibles con esos datos
 
-Son ocho análisis, y el que más valor puede tener es el puntaje de crédito para financiar. En todos, la IA recomienda, las reglas deciden y la persona autoriza.
+Son ocho análisis, y el que más valor puede tener, con el banco socio, es el puntaje de crédito para financiar. En todos, la IA recomienda, las reglas deciden y la persona autoriza.
+
+### Cómo quedó el agente (18 de octubre de 2026)
+
+El agente es un **analista de las compras** en la pestaña Agent de la app, no un aviso al firmar: las notas antes de firmar se probaron y se quitaron. Hoy tiene:
+
+* **"What the agent sees" [PROPUESTA]:** un modelo lee métricas calculadas en el teléfono (tendencias de gasto, dependencia de proveedores, caja y anticipos comprometidos, ritmo de compra, precios por unidad, negociación) y el rubro y tamaño de la empresa, y escribe hasta 5 hallazgos con recomendaciones. No ve documentos ni nombres y no puede firmar ni mover dinero. Amplía D2, así que lo tiene que confirmar el equipo ([analista](../arquitectura/analista.md)).
+* **Los números detrás:** lo comprado o vendido, lo bloqueado en el escrow, el anticipo antes del embarque, embarques a tiempo, reembolsos, gasto por proveedor y producto, y lo negociado frente a cada proforma.
+* **Puntaje del proveedor** en su perfil: estrellas por embarques a tiempo, días de margen, documentos aceptados y cuánto tarda en firmar.
+
+Para el modelo rentista, lo que más vale es lo que el banco no tiene de las pymes: el historial verificado de órdenes, pagos y cumplimiento, que sale de documentos y de la cadena. Los modelos predictivos entrenados con esos datos quedan como trabajo futuro.
 
 | Análisis | Qué hace | Datos que usa | Quién lo valora | Cuándo |
 | --- | --- | --- | --- | --- |
-| Notas del agente antes de firmar | Compara precio, anticipo y condiciones con tus órdenes anteriores y sugiere cambios | Orden de compra, historial de órdenes | Importador | Demo y piloto |
+| Analista de compras (pestaña Agent) | Lee tendencias, dependencia, caja y ritmo de la empresa y aconseja | Métricas de las órdenes, perfil de la empresa | Importador | Demo y piloto |
 | Alerta de fraude | Detecta cambio de cuenta o documentos con datos que no calzan | Proveedores, documentos, eventos de riesgo | Importador | Demo (ya está en el mockup) |
 | Puntaje del proveedor | Mide plazos cumplidos, documentos correctos y disputas | Proveedores, documentos de embarque, eventos de riesgo | Importador y banco | Piloto |
 | Plan de caja | Muestra cuándo hay que pagar anticipo, saldo (30 días desde el on board), flete e impuestos | Orden de compra, fecha on board, incoterm | Importador | Piloto |
 | Plazos de entrega | Predice cuándo llega la carga según naviera y ruta | Fecha on board, naviera, puerto, historial | Importador | Piloto y fase 2 |
 | Costo real de importar | Suma flete, arancel, IVA y cambio por proveedor | Orden, documentos, certificado de origen | Importador | Fase 2, porque aduanas está fuera de alcance |
 | Comparación con empresas parecidas | Muestra cuánto pagas tú frente a tu rubro, con datos anónimos | Todos los grupos, de muchos usuarios | Importador | Fase 2 |
-| Puntaje de crédito para financiar | Evalúa a quién prestar según cumplimiento e historial de pagos | Pagos y escrow, proveedores, eventos de riesgo | Banco o financista | Fase 2 |
+| Puntaje de crédito para financiar | Evalúa a quién prestar según cumplimiento e historial de pagos | Pagos y escrow, proveedores, eventos de riesgo | Banco socio | Piloto con el banco |
 
 ### Cada análisis, con un ejemplo
 
 Los ejemplos usan nombres y montos del mockup, y son ilustrativos.
 
-#### 1. Notas del agente antes de firmar
+#### 1. Analista de compras
 
-Hoy el agente lee la proforma y copia los 9 términos (pantalla 03b). Podría sumar notas antes de firmar, comparando con tus órdenes anteriores y con las reglas de tu empresa. No decide nada: propone y tú firmas. Es el uso más natural de la IA como protagonista sin romper la separación de poderes, porque la IA lee y sugiere, el motor de reglas decide, la persona autoriza y el contrato ejecuta.
+Lee cómo cambian tus compras y qué viene, y te aconseja según el tamaño de tu empresa. Reemplaza a las notas antes de firmar, que se probaron y se quitaron.
 
-**Ejemplo:** llega la proforma LH-2026-311 de Lingnan Hydrocolloids: 6.000 kg de agar a 8,00 USD por kilo, 48.000 USD en total, 50% de anticipo, CIF San Antonio. El agente muestra tres notas:
+**Ejemplo:** Pacífico Foods, pequeña empresa de alimentos, abre la pestaña Agent. El agente muestra: "Lingnan concentra el 71% de tu gasto: valida un segundo proveedor para que un atraso no te deje sin stock", "Tu gasto en agar subió 40% en 90 días: con ese volumen puedes negociar precio o un anticipo menor", "Tu próxima compra de agar sería en unos 37 días: reserva para el anticipo".
 
-- "Este precio por kilo es 12% más alto que el promedio de tus últimas 3 órdenes (7,14 USD)."
-- "Tus órdenes anteriores de agar pedían certificado de Sernapesca y de salud, y esta no. ¿Los agrego?"
-- Si el proveedor fuera Kowloon Food Ingredients, que aún no tiene órdenes: "Con un proveedor nuevo, un anticipo de 50% (24.000 USD) es arriesgado. Sugiero 30% (14.400 USD)."
-
-**Dónde va en la app:** una tarjeta "Notas del agente" en las pantallas donde se revisan los términos antes de firmar (03 y 04). Cada nota se puede aceptar, y cambia el término, o ignorar.
-
-**Qué necesita:** la orden de compra y el historial de órdenes de la empresa. Al inicio compara solo contra tus propias órdenes; compararse con el mercado exigiría otra fuente de datos.
+**Qué necesita:** las órdenes de la empresa y su rubro y tamaño. Al inicio compara solo contra tus propias órdenes; compararse con el mercado exigiría datos de otras empresas.
 
 #### 2. Alerta de fraude
 
