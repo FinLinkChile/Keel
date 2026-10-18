@@ -16,11 +16,14 @@ export function proposalToOrder(p: Proposal, carrier: string): Order {
     carrier,
     stage: p.status === 'signed' ? 'signed' : p.status === 'rejected' ? 'rejected' : 'awaiting_signature',
     waitingOn: WAITING_ON[p.status],
+    sentAt: p.sentAt,
+    exporterSignedAt: p.exporterSignedAt,
     signedAt: p.status === 'signed' ? p.signedAt : undefined,
     transportDoc: 'BILL_OF_LADING',
     documents: [],
     po: p.po,
     terms: p.terms,
+    quote: p.quote,
   };
 }
 

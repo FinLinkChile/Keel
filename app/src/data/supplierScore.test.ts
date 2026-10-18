@@ -9,7 +9,7 @@ const OTHER = '0x00000000000000000000000000000000000000b2' as Hex;
 const DEADLINE = 1_000_000;
 
 const order = (stage: Order['stage'], extra: Partial<Order> = {}, exporter = LINGNAN): Order =>
-  ({ stage, ...extra, po: { exporter, shipmentDeadline: BigInt(DEADLINE) } }) as unknown as Order;
+  ({ stage, documents: [], ...extra, po: { exporter, shipmentDeadline: BigInt(DEADLINE) } }) as unknown as Order;
 
 describe('supplierScore', () => {
   it('has no score until an order ships or is refunded', () => {
@@ -47,5 +47,22 @@ describe('supplierScore', () => {
     const s = supplierScore([on, on, on, order('refunded')], LINGNAN);
     // 3 of 4 is 3.75, shown as 4
     expect(s.stars).toBe(4);
+  });
+
+  it('measures how early it ships, its documents and how fast it signs', () => {
+    const DAY = 86_400;
+    const s = supplierScore(
+      [
+        order('settled', { shippedAt: DEADLINE - 4 * DAY, documents: [{ status: 'accepted' }] as Order['documents'], sentAt: 0, exporterSignedAt: DAY }),
+        order('shipped', { shippedAt: DEADLINE + DAY, documents: [{ status: 'under_review' }] as Order['documents'], sentAt: 0, exporterSignedAt: 2 * DAY }),
+        order('advance_paid'),
+      ],
+      LINGNAN,
+    );
+    // (4 days early + 1 day late) / 2
+    expect(s.marginDays).toBe(1.5);
+    expect(s.documents).toEqual({ uploaded: 2, accepted: 1 });
+    expect(s.signDays).toBe(1.5);
+    expect(supplierScore([order('signed')], LINGNAN)).toMatchObject({ marginDays: null, signDays: null, documents: { uploaded: 0, accepted: 0 } });
   });
 });
