@@ -67,6 +67,10 @@ export interface OrderItem {
   // Mirror of the escrow, written by the indexer only
   chain?: { state: string; updatedBlock: string; lastTx?: Hex; lastEvent?: string };
   createdAt: number;
+  // Revision of `shipment` and `closing`, written by the orders API only (aws/src/orders/closing.ts):
+  // each write of those two is conditional on the revision it read, so two signatures sent at the
+  // same time cannot overwrite each other. The indexer's `chain` writes do not touch it.
+  rev?: number;
 }
 
 // Orders the agent still has to act on. The fan-out only lists Safes with at least one.
@@ -87,6 +91,10 @@ export interface PartyItem {
   history?: string[];
   // Known supplier of an importer Safe: exporter -> payout addresses
   knownPayouts?: string[];
+  // On an exporter: the importer Safes (lowercase) that registered it as a known supplier through
+  // POST /suppliers (aws/src/orders/directory.ts). An off-chain directory for the app; the
+  // FundingGate's own registry is what `fund` enforces.
+  knownBy?: string[];
 }
 
 // ---------------------------------------------------------------- agent_state
