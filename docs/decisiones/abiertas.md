@@ -1,7 +1,7 @@
 ---
 type: Decisiones
 title: "Decisiones abiertas"
-description: "Las 16 preguntas que el equipo todavía no cierra. Si un componente toca alguna, se decide con el equipo antes de escribir código."
+description: "Las 17 preguntas que el equipo todavía no cierra. Si un componente toca alguna, se decide con el equipo antes de escribir código."
 tags: [decisiones-abiertas, pendiente]
 modo: ambos
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T16:00:00Z }
@@ -35,3 +35,4 @@ Una celda vacía en "quién decide" significa que las fuentes no lo asignan toda
 - Qué actos de Keel Personal entran en el deck y en el video: [demo](../entrega/demo.md). Depende de la decisión 14.
 - Quién mantiene el registro de órdenes de ingesta (quién puede subir documentos a cada orden y cuáles son las cuentas registradas del exportador) y si debería leerse de los eventos `OrderOpened` del escrow. Supuesto actual del Área 3: un archivo que entrega el Área 4. Ver [carga de documentos](../interfaces/carga-de-documentos.md).
 - Dónde entra Keel Personal en el orden de recorte: [recortes](../trabajo/recortes.md). Depende de la decisión 14.
+| 17 | **Decidida el 18 de octubre (Área 2, Darienn).** `TradeEscrow.open` la envía el relayer del Servicio del agente (Área 2), que paga el gas. `open` no pide permiso y no da autoridad a quien la envía, porque la autoridad son las firmas del importador y del exportador. El Área 4 produce esas firmas y las entrega junto a la orden (`order.json`); el agente solo abre órdenes de su Safe. Es la misma separación de poderes de los demás pasos: la interfaz firma, el motor y el relayer ejecutan. | Área 2 | [Servicio del agente](../arquitectura/servicio-del-agente.md), [Área 2](../trabajo/area-2-motor.md), [Paso 1](../flujo/paso-1-firma-orden.md) |

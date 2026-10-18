@@ -16,6 +16,7 @@ export const ESCROW_ABI = parseAbi([
   "struct DocumentDecision { bytes32 orderId; bytes32 attestationHash; bytes32 docsHash; bytes32 policyHash; bytes32 inputsHash; uint64 expiresAt; }",
   "struct OrderRecord { PurchaseOrder po; uint8 state; uint64 stateVersion; bytes32 orderHash; uint256 paidOut; bytes32 attestationHash; bytes32 docsHash; uint64 shippedAt; bool funded; }",
   "function orderOf(bytes32 orderId) view returns (OrderRecord)",
+  "function open(PurchaseOrder po, bytes sigImporter, bytes sigExporter) returns (bytes32 orderHash)",
   "function refundGrace() view returns (uint64)",
   "function fund(bytes32 orderId)",
   "function submitShipment(bytes32 orderId, ShipmentAttestation att, bytes sigCarrier)",
@@ -23,7 +24,6 @@ export const ESCROW_ABI = parseAbi([
   "function refundAfterDeadline(bytes32 orderId)",
   // Permissionless calls the agent relays with signatures people gave (open, BalanceApproval,
   // CancelOrder, DisputeResolution): the relayer adds no authority, the escrow checks each one
-  "function open(PurchaseOrder po, bytes sigImporter, bytes sigExporter) returns (bytes32)",
   "function approveBalance(bytes32 orderId, bytes sigImporter)",
   "function cancel(bytes32 orderId, bytes sigImporter, bytes sigExporter)",
   "function resolve(bytes32 orderId, uint256 toImporter, uint256 toExporter, bytes sigArbiter)",
@@ -83,6 +83,11 @@ export function decodeOrderOf(data: Hex): OrderRecord {
   return { po: r.po, state: ESCROW_STATES[r.state] ?? "NONE", orderHash: r.orderHash, attestationHash: r.attestationHash, shippedAt: r.shippedAt };
 }
 
+export const openCall = (escrow: Hex, po: PurchaseOrder, sigImporter: Hex, sigExporter: Hex): Call => ({
+  to: escrow,
+  data: encodeFunctionData({ abi: ESCROW_ABI, functionName: "open", args: [po, sigImporter, sigExporter] }),
+});
+
 export const refundGraceCall = (escrow: Hex): Call => ({
   to: escrow,
   data: encodeFunctionData({ abi: ESCROW_ABI, functionName: "refundGrace" }),
@@ -103,12 +108,6 @@ export const releaseBalanceCall = (escrow: Hex, decision: DocumentDecision, sigV
 export const refundCall = (escrow: Hex, orderId: Hex): Call => ({
   to: escrow,
   data: encodeFunctionData({ abi: ESCROW_ABI, functionName: "refundAfterDeadline", args: [orderId] }),
-});
-
-// Step 1: anyone may open an order both parties signed; the escrow checks both signatures
-export const openCall = (escrow: Hex, po: PurchaseOrder, sigImporter: Hex, sigExporter: Hex): Call => ({
-  to: escrow,
-  data: encodeFunctionData({ abi: ESCROW_ABI, functionName: "open", args: [po, sigImporter, sigExporter] }),
 });
 
 // The importer's BalanceApproval: the escrow rebuilds it from the attestation it accepted

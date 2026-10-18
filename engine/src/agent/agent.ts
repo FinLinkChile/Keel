@@ -22,8 +22,8 @@ import {
   decodeCancelNonce,
   decodeOrderOf,
   decodeRefundGrace,
-  type OrderRecord,
   openCall,
+  type OrderRecord,
   orderOfCall,
   refundCall,
   refundGraceCall,
@@ -181,11 +181,10 @@ export class Agent {
       try {
         record = decodeOrderOf(await this.deps.chain.call(orderOfCall(this.config.escrow, orderId)));
         if (record.state === "NONE") {
-          // Not on chain yet: the escrow holds no importer, so the stored order says whose it is.
-          // Without both signatures someone else opens it (the app, a party): nothing to report.
-          const stored = this.openable(orderId);
-          if (!stored) continue;
-          event = await this.open(orderId, stored);
+          // Not in the escrow yet: open it if the app delivered the order with both signatures
+          const opened = await this.open(orderId);
+          if (!opened) continue;
+          event = opened;
         } else {
           if (!same(record.po.importer, this.config.safe)) continue;
           event = await this.step(orderId, record, now, before);
@@ -265,17 +264,17 @@ export class Agent {
     }
   }
 
-  // A stored order the agent may open: both signatures, and this Safe as the importer
-  private openable(orderId: Hex): StoredOrder | null {
+  // Step 1: submit the order both parties signed. `open` takes no permission (the signatures are
+  // the authority) and the relayer only pays the gas (decision 17). Only orders of this Safe are
+  // opened, so the agent never pays gas to register someone else's order.
+  private async open(orderId: Hex): Promise<AgentEvent | undefined> {
     const stored = this.deps.store.order(orderId);
-    if (!stored?.sigImporter || !stored.sigExporter) return null;
-    if (!same(stored.order.orderId, orderId) || !same(stored.order.importer, this.config.safe)) return null;
-    return stored;
-  }
-
-  // Step 1: open the order both parties signed. The escrow checks the signatures and the order id.
-  private open(orderId: Hex, stored: StoredOrder): Promise<AgentEvent> {
-    return this.execute(orderId, "NONE", "open", openCall(this.config.escrow, stored.order, stored.sigImporter!, stored.sigExporter!));
+    if (!stored?.signatures || !same(stored.order.importer, this.config.safe)) return undefined;
+    const state: EscrowState = "NONE";
+    if (!same(stored.order.orderId, orderId)) return { orderId, state, outcome: "failed", reason: "AGENT_ERROR", detail: "order.json does not belong to this folder" };
+    const { sigImporter, sigExporter } = stored.signatures;
+    // A revert (bad signature, role separation, wrong token) is held with its name and no gas is spent
+    return this.execute(orderId, state, "open", openCall(this.config.escrow, stored.order, sigImporter, sigExporter));
   }
 
   // The cancel is sent only for the cancelNonceOf the escrow holds now: a cancel signed in an

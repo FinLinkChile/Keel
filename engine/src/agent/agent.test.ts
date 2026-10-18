@@ -166,34 +166,8 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
     return encodeAbiParameters([{ type: "bytes32" }, { type: "bytes32" }, { type: "uint8" }], [r, s, Number(v)]);
   }
 
-  // Both parties sign the order, nobody opens it yet
-  async function signOrder(over: Partial<PurchaseOrder> = {}) {
-    const nonce = 7n;
-    const order: PurchaseOrder = {
-      orderId: keccak256(encodeAbiParameters([{ type: "address" }, { type: "address" }, { type: "uint256" }], [safe, exporter.address, nonce])),
-      importer: safe,
-      exporter: exporter.address,
-      payoutAddress: PAYOUT,
-      token: usdc,
-      totalAmount: TOTAL,
-      advanceBps: 5000,
-      shipmentDeadline: DEADLINE,
-      disputeWindow: 0n,
-      carrier: carrier.address,
-      arbiter: ARBITER,
-      documentVerifier: policySigner.address,
-      incoterm: bytes32Text("CIF"),
-      termsHash: termsHash(terms),
-      requiredDocsHash: requiredDocsHash(["BILL_OF_LADING", "COMMERCIAL_INVOICE"]),
-      nonce,
-      ...over,
-    };
-    const typed = { domain: domain(), types: { PurchaseOrder: EIP712_TYPES.PurchaseOrder }, primaryType: "PurchaseOrder" as const, message: order };
-    return { order, sigImporter: await safeSign(typed), sigExporter: await exporter.signTypedData(typed) };
-  }
-
-  // Both parties sign and open the order; the Safe signs with ERC-1271
-  async function openOrder(over: Partial<PurchaseOrder> = {}): Promise<PurchaseOrder> {
+  // Both parties sign the order; the Safe signs with ERC-1271
+  async function signOrder(over: Partial<PurchaseOrder> = {}, exporterSigner = exporter) {
     const nonce = 7n;
     const order: PurchaseOrder = {
       orderId: keccak256(encodeAbiParameters([{ type: "address" }, { type: "address" }, { type: "uint256" }], [safe, exporter.address, nonce])),
@@ -217,7 +191,13 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
     const typed = { domain: domain(), types: { PurchaseOrder: EIP712_TYPES.PurchaseOrder }, primaryType: "PurchaseOrder" as const, message: order };
     const { r, s, v } = parseSignature(await importerOwner.signTypedData(typed));
     const sigImporter = encodeAbiParameters([{ type: "bytes32" }, { type: "bytes32" }, { type: "uint8" }], [r, s, Number(v)]);
-    await chain.send("TradeEscrow", escrow, "open", [order, sigImporter, await exporter.signTypedData(typed)], RELAYER);
+    return { order, sigImporter, sigExporter: await exporterSigner.signTypedData(typed) };
+  }
+
+  // The order opened in the escrow by someone else, stored without signatures
+  async function openOrder(over: Partial<PurchaseOrder> = {}): Promise<PurchaseOrder> {
+    const { order, sigImporter, sigExporter } = await signOrder(over);
+    await chain.send("TradeEscrow", escrow, "open", [order, sigImporter, sigExporter], RELAYER);
     writeStoreFile(dir, ["orders", order.orderId, "order.json"], { order, terms });
     return order;
   }
@@ -250,6 +230,48 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
   const storeDocuments = (order: PurchaseOrder, docs = extractions()) =>
     writeStoreFile(dir, ["orders", order.orderId, "documents.json"], { extractions: docs, fileHashes: FILES });
 
+  describe("opening the order (decision 17)", () => {
+    it("opens a signed order of its Safe with the relayer, once, and the next step is the deposit", async () => {
+      const { order, sigImporter, sigExporter } = await signOrder();
+      writeStoreFile(dir, ["orders", order.orderId, "order.json"], { order, terms, sigImporter, sigExporter });
+      const keel = agent();
+
+      expect((await keel.tick())[0]).toMatchObject({ outcome: "sent", action: "open", status: "success" });
+      expect(await stateOf(order.orderId)).toBe("OPEN");
+      // One step per tick: the next one is the deposit (no gate in this test, so it waits)
+      expect((await keel.tick())[0]).toMatchObject({ state: "OPEN", outcome: "waiting", reason: "GATE_NOT_DEPLOYED" });
+      expect(sent).toHaveLength(1);
+    });
+
+    it("does not open an order of another importer, or one stored without signatures", async () => {
+      const other = await signOrder({ nonce: 9n, orderId: keccak256(encodeAbiParameters([{ type: "address" }, { type: "address" }, { type: "uint256" }], [safe, exporter.address, 9n])) });
+      writeStoreFile(dir, ["orders", other.order.orderId, "order.json"], { order: other.order, terms });
+      const foreign = await signOrder({ importer: address(0xf0), nonce: 10n });
+      writeStoreFile(dir, ["orders", foreign.order.orderId, "order.json"], { order: foreign.order, terms, sigImporter: foreign.sigImporter, sigExporter: foreign.sigExporter });
+
+      expect(await agent().tick()).toEqual([]);
+      expect(sent).toHaveLength(0);
+    });
+
+    it("holds an order whose signature does not verify, with the revert name and no gas", async () => {
+      const { order, sigImporter, sigExporter } = await signOrder({}, forger);
+      writeStoreFile(dir, ["orders", order.orderId, "order.json"], { order, terms, sigImporter, sigExporter });
+
+      expect((await agent().tick())[0]).toMatchObject({ outcome: "held", reason: "SIMULATION_REVERTED", action: "open", revert: "BadExporterSignature" });
+      expect(sent).toHaveLength(0);
+      expect(await stateOf(order.orderId)).toBe("NONE");
+    });
+
+    it("does nothing when someone else already opened it", async () => {
+      const { order, sigImporter, sigExporter } = await signOrder();
+      await chain.send("TradeEscrow", escrow, "open", [order, sigImporter, sigExporter], RELAYER);
+      writeStoreFile(dir, ["orders", order.orderId, "order.json"], { order, terms, sigImporter, sigExporter });
+
+      expect((await agent().tick())[0]).toMatchObject({ state: "OPEN", reason: "GATE_NOT_DEPLOYED" });
+      expect(sent).toHaveLength(0);
+    });
+  });
+
   it("takes an order from the shipment to the balance and its PDR verifies against the transaction", async () => {
     const order = await openOrder();
     await fundOrder(order);
@@ -278,6 +300,66 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
     // A repeated tick sends nothing: the order is final
     expect((await keel.tick())[0]).toMatchObject({ outcome: "waiting", reason: "NOTHING_TO_DO" });
     expect(sent).toHaveLength(2);
+  });
+
+  // Step 1 (decision 17): the app stores the order with both signatures and the relayer opens it
+  async function storeSignedOrder(over: Partial<PurchaseOrder> = {}, signer = exporter) {
+    const nonce = 8n;
+    const importer = over.importer ?? safe;
+    const order: PurchaseOrder = {
+      orderId: keccak256(encodeAbiParameters([{ type: "address" }, { type: "address" }, { type: "uint256" }], [importer, exporter.address, nonce])),
+      importer,
+      exporter: exporter.address,
+      payoutAddress: PAYOUT,
+      token: usdc,
+      totalAmount: TOTAL,
+      advanceBps: 5000,
+      shipmentDeadline: DEADLINE,
+      disputeWindow: 0n,
+      carrier: carrier.address,
+      arbiter: ARBITER,
+      documentVerifier: policySigner.address,
+      incoterm: bytes32Text("CIF"),
+      termsHash: termsHash(terms),
+      requiredDocsHash: requiredDocsHash(["BILL_OF_LADING", "COMMERCIAL_INVOICE"]),
+      nonce,
+      ...over,
+    };
+    const typed = { domain: domain(), types: { PurchaseOrder: EIP712_TYPES.PurchaseOrder }, primaryType: "PurchaseOrder" as const, message: order };
+    const { r, s, v } = parseSignature(await importerOwner.signTypedData(typed));
+    const sigImporter = encodeAbiParameters([{ type: "bytes32" }, { type: "bytes32" }, { type: "uint8" }], [r, s, Number(v)]);
+    writeStoreFile(dir, ["orders", order.orderId, "order.json"], { order, terms, sigImporter, sigExporter: await signer.signTypedData(typed) });
+    return order;
+  }
+
+  it("opens a signed order with the relayer, once, and the next tick moves on to the deposit", async () => {
+    const order = await storeSignedOrder();
+    const keel = agent();
+    expect(await stateOf(order.orderId)).toBe("NONE");
+
+    const [opened] = await keel.tick();
+    expect(opened).toMatchObject({ orderId: order.orderId, state: "NONE", outcome: "sent", action: "open", status: "success" });
+    expect(await stateOf(order.orderId)).toBe("OPEN");
+
+    // Repeating the tick sends nothing more: the order is OPEN and, with no gate, it waits
+    expect((await keel.tick())[0]).toMatchObject({ state: "OPEN", outcome: "waiting", reason: "GATE_NOT_DEPLOYED" });
+    expect(sent).toHaveLength(1);
+  });
+
+  it("holds an order whose signature does not verify, with the revert name and no gas spent", async () => {
+    const order = await storeSignedOrder({}, forger);
+    const [held] = await agent().tick();
+    expect(held).toMatchObject({ orderId: order.orderId, outcome: "held", action: "open", reason: "SIMULATION_REVERTED", revert: "BadExporterSignature" });
+    expect(sent).toHaveLength(0);
+    expect(await stateOf(order.orderId)).toBe("NONE");
+  });
+
+  it("does not open an order of another importer, nor one stored without signatures", async () => {
+    const other = await storeSignedOrder({ importer: address(0x0bad) });
+    const unsigned = await openOrder();
+    expect(await agent().tick()).toEqual([expect.objectContaining({ orderId: unsigned.orderId })]);
+    expect(await stateOf(other.orderId)).toBe("NONE");
+    expect(sent).toHaveLength(0);
   });
 
   it("documents that do not match the order hold the balance, notify once and send nothing", async () => {

@@ -39,8 +39,8 @@ describe("orders API -> agent", () => {
     const stored = store.order(po.orderId)!;
     expect(stored.order).toEqual(po);
     expect(stored.terms).toEqual(terms);
-    expect(stored.sigImporter).toMatch(/^0x[0-9a-f]+$/i);
-    expect(stored.sigExporter).toMatch(/^0x[0-9a-f]+$/i);
+    expect(stored.signatures?.sigImporter).toMatch(/^0x[0-9a-f]+$/i);
+    expect(stored.signatures?.sigExporter).toMatch(/^0x[0-9a-f]+$/i);
     // The importer's tax id and bot account come from the parties table
     expect(store.registry().parties.some((p) => p.address.toLowerCase() === SAFE.toLowerCase() && p.account === "importer-co")).toBe(true);
   });

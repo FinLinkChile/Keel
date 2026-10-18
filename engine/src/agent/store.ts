@@ -3,7 +3,7 @@
 // who delivers them is open decision 15; until it closes they are JSON files of the demo:
 //
 //   <dir>/registry.json                     parties, amount history
-//   <dir>/orders/<orderId>/order.json       { order, terms, label, sigImporter?, sigExporter?, closing? } (app, Area 4)
+//   <dir>/orders/<orderId>/order.json       { order, terms, label, sigImporter, sigExporter, closing? } (app, Area 4)
 //   <dir>/orders/<orderId>/shipment.json    { attestation, sigCarrier } (carrier)
 //   <dir>/orders/<orderId>/documents.json   { extractions, fileHashes } (ingest, Area 3)
 //
@@ -34,10 +34,9 @@ export interface StoredOrder {
   terms: OrderTerms;
   // What people call the order in the bot notices, such as PO-0131 (the bot's OrderLabel)
   label?: string;
-  // EIP-712 signatures of both parties over `order`. With both, the agent opens an order the
-  // escrow does not hold yet (state NONE); without them it waits for someone else to open it.
-  sigImporter?: Hex;
-  sigExporter?: Hex;
+  // The two EIP-712 signatures over the order. With them the agent opens the order in the escrow
+  // (decision 17); an order stored without them is opened by someone else.
+  signatures?: { sigImporter: Hex; sigExporter: Hex };
   closing?: StoredClosing;
 }
 
@@ -113,8 +112,7 @@ export function reviveOrder(raw: Raw): StoredOrder {
     order: reviveStruct(EIP712_TYPES.PurchaseOrder, raw.order),
     terms: OrderTerms.parse({ ...raw.terms, invoiceAmountMinor: BigInt(raw.terms.invoiceAmountMinor) }),
     ...(typeof raw.label === "string" && { label: raw.label }),
-    ...(isHex(raw.sigImporter) && { sigImporter: raw.sigImporter }),
-    ...(isHex(raw.sigExporter) && { sigExporter: raw.sigExporter }),
+    ...(isHex(raw.sigImporter) && isHex(raw.sigExporter) && { signatures: { sigImporter: raw.sigImporter, sigExporter: raw.sigExporter } }),
     ...(closing && { closing }),
   };
 }

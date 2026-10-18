@@ -12,10 +12,11 @@ El servicio del agente (T2.11, `engine/src/agent/`) une la ingesta, el motor, el
 
 # Qué hace en cada vuelta
 
-Lee de TradeEscrow el estado de cada orden guardada cuyo importador es su Safe y da como máximo un paso por orden:
+Lee de TradeEscrow el estado de cada orden guardada cuyo importador es su Safe y da como máximo un paso por orden. Una orden que todavía no existe en el escrow (NONE) la abre si trae las dos firmas:
 
 | Estado | Paso |
 | --- | --- |
+| NONE, con la orden y sus dos firmas guardadas | Si el `importer` de la orden es su Safe, envía `open` ([paso 1](../flujo/paso-1-firma-orden.md), [decisión 17](../decisiones/abiertas.md)). Una orden de otra Safe, o guardada sin firmas, se ignora: la abre otra persona y el agente no paga ese gas. Si la simulación revierte (por ejemplo `BadExporterSignature`), queda retenida con ese nombre |
 | OPEN | Evalúa el depósito, firma el PDR y lo envía por el FundingGate ([paso 2](../flujo/paso-2-deposito.md)). Proveedor nuevo o todavía en su plazo: `cambio_en_cola`. Nivel 3: `en_aprobacion`, con el PDR listo para la cofirma. Nivel 4 (por ejemplo, una naviera que la Safe no aprobó): `bloqueada` |
 | ADVANCE_PAID | Si ya pasó la fecha límite más `refundGrace` (leído del escrow, con la misma comparación `now > shipmentDeadline + refundGrace`), llama a `refundAfterDeadline` ([paso 6](../flujo/paso-6-reembolso.md)), haya o no atestación. Si no, presenta la atestación de la naviera con `submitShipment` ([paso 4](../flujo/paso-4-embarque.md)), con dos controles antes de simular (abajo). Sin atestación, recuerda la fecha límite a 5, 3 y 1 día, una vez cada uno: si una vuelta llega tarde, salta al recordatorio más cercano y no repite los anteriores |
 | SHIPPED | Pasada la ventana de disputa, compara los documentos contra la orden y la atestación, firma el `DocumentDecision`, guarda la evidencia y llama a `releaseBalance` ([paso 5](../flujo/paso-5-saldo.md)). Si no son conformes, retiene y avisa: el importador puede liberar a mano o abrir una disputa |
@@ -23,7 +24,7 @@ Lee de TradeEscrow el estado de cada orden guardada cuyo importador es su Safe y
 
 Toda llamada se simula antes de enviarse (T2.5): si revertiría, la operación queda retenida con el nombre del error y no se gasta gas. El nombre sale de los errores de TradeEscrow, del FundingGate (con los heredados de `PDRVerifier` y OpenZeppelin), de Roles (`NoMembership`, `ConditionViolation`, `ModuleTransactionFailed`) y del token; un error desconocido queda como hex (`engine/src/agent/errors.ts`). Dos pruebas exigen que los errores del escrow y del gate que decodifica el agente sean exactamente `ESCROW_ERRORS` y `GATE_ERRORS` de `schemas`, con las mismas firmas que el contrato compilado. El servicio no guarda estado propio aparte de los avisos ya enviados: la fuente de verdad es la cadena, así que repetir una vuelta no envía nada dos veces.
 
-Para quién vale: el relayer no gana autoridad. Sin un PDR o una firma válida, el gate y el escrow revierten, y la llave de política firma solo PDR (`engine/src/keys.ts`). Pruebas: `engine/src/agent/agent.test.ts`, contra TradeEscrow y FundingGate compilados, con el mock de Roles de Trade: una orden va del depósito al saldo sin pasos manuales y el PDR del depósito verifica con `keel verify`.
+Para quién vale: el relayer no gana autoridad (tampoco al abrir: `open` solo acepta las firmas de las dos partes). Sin un PDR o una firma válida, el gate y el escrow revierten, y la llave de política firma solo PDR (`engine/src/keys.ts`). Pruebas: `engine/src/agent/agent.test.ts`, contra TradeEscrow y FundingGate compilados, con el mock de Roles de Trade: una orden va del depósito al saldo sin pasos manuales y el PDR del depósito verifica con `keel verify`.
 
 # Antes de presentar el embarque
 
@@ -41,11 +42,11 @@ Mientras la [decisión abierta 15](../decisiones/abiertas.md) siga abierta, son 
 | Archivo | Contenido | Lo escribe |
 | --- | --- | --- |
 | `registry.json` | `parties` (dirección, `account` en el directorio del bot y, para el importador, `taxId`) y `history` (montos anteriores por exportador) | Onboarding (Área 4) |
-| `orders/<orderId>/order.json` | `order` (la `PurchaseOrder`), `terms` (los `OrderTerms`) y `label` (la etiqueta de los avisos, como `PO-0131`) | App (Área 4) |
+| `orders/<orderId>/order.json` | `order` (la `PurchaseOrder`), `terms` (los `OrderTerms`), `label` (la etiqueta de los avisos, como `PO-0131`) y, para que el agente la abra, `sigImporter` y `sigExporter` (las firmas EIP-712 sobre la orden) | App (Área 4) |
 | `orders/<orderId>/shipment.json` | `attestation` y `sigCarrier` | Naviera (en la demo, un script) |
 | `orders/<orderId>/documents.json` | `extractions` (`transport` e `invoice`) y `fileHashes` | Ingesta (Área 3) |
 
-La orden que vale es la que guarda el escrow; del archivo solo se usan los términos, y el motor comprueba que su hash sea el `termsHash` firmado. Los proveedores conocidos y los terceros de confianza no vienen de un archivo: se leen del FundingGate (abajo).
+Un `open` repetido no se envía dos veces: tras abrirse la orden queda OPEN, y si dos versiones usan el mismo nonce el escrow acepta solo la primera (`OrderExists`), por eso cada versión nueva lleva un nonce nuevo. `open` no genera aviso al bot: el primero es `order_funded`. La orden que vale es la que guarda el escrow; del archivo solo se usan los términos, y el motor comprueba que su hash sea el `termsHash` firmado. Los proveedores conocidos y los terceros de confianza no vienen de un archivo: se leen del FundingGate (abajo).
 
 # Avisos para el bot (T2.6)
 
