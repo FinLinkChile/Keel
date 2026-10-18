@@ -30,7 +30,8 @@ export type TradeOrderEntry = {
 export const compactAccount = (account: string) => account.replace(/[\s-]/g, '');
 
 // agent: orders/<orderId>/order.json
-export type StoredOrder = { order: PurchaseOrder; terms: OrderTerms; label: string };
+// The signatures only exist once the phones signed; demo-data has no keys, so it leaves them out
+export type StoredOrder = { order: PurchaseOrder; terms: OrderTerms; label: string; sigImporter?: Hex; sigExporter?: Hex };
 
 // agent: registry.json
 export type Registry = {

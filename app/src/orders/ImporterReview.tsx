@@ -18,6 +18,7 @@ import {
   signingSetup,
   type OrderCheck,
 } from '@/data/signOrder';
+import { sendSignedOrder } from '@/ingest/signedOrder';
 import { useSession } from '@/session';
 import { AgentNotes } from '@/ui/AgentNotes';
 import { BottomSheet } from '@/ui/BottomSheet';
@@ -114,6 +115,8 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
     try {
       const move = await importerSigns(proposals, proposal!, { signer, setup, now: Date.now() / 1000 });
       if (!move.ok) setFailed({ checks: move.checks, differences: move.differences ?? [] });
+      // Hands the signed order to the servers (decision 15). Signing is done either way
+      else void sendSignedOrder({ ingestUrl: config.ingestUrl, proposal: move.proposal });
     } catch {
       setProblem('The wallet could not sign. Try again.');
     }

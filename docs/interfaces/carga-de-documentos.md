@@ -64,6 +64,8 @@ Por cada orden, ingesta necesita saber quién puede subir documentos y adónde s
 - `uploaders` son billeteras de personas (EOA). Una Safe no puede firmar aquí: firman sus dueños o el encargado de compras. La verificación ERC-1271 de una Safe queda como trabajo futuro.
 - `knownDestinations` son las cuentas registradas del exportador. Una factura que las imprime no levanta alerta.
 
+**[PROPUESTA] Área 4 (18 de octubre):** la app ya envía la orden firmada a `POST {ingestUrl}/trade/orders` al terminar la firma del importador, con `{ order, terms, label, sigImporter, sigExporter }` en JSON canónico y sin cabecera de autenticación (la autenticación son las dos firmas). Si la ruta no existe (404) o ingesta no responde, la app lo ignora y la firma queda igual. A confirmar con el Área 3, que verificaría ambas firmas, registraría los `uploaders` y escribiría el `order.json` del agente (decisión abierta 15).
+
 En el prototipo el registro es un archivo. **[ABIERTO]** Quién lo mantiene y si debería leerse de los eventos `OrderOpened` del escrow (ver [decisiones abiertas](../decisiones/abiertas.md)).
 
 # Paquete de documentos
