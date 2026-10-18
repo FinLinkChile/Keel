@@ -115,6 +115,12 @@ describe("evaluateFunding", () => {
       ["the document verifier is the importer", { documentVerifier: order.importer }],
       ["the document verifier is the exporter", { documentVerifier: order.exporter }],
       ["the document verifier is the carrier", { documentVerifier: order.carrier }],
+      // The checks TradeEscrow.open added: no third role is the payout address, and the three differ
+      ["the document verifier is the payout address", { documentVerifier: order.payoutAddress }],
+      ["the document verifier is the arbiter", { documentVerifier: order.arbiter }],
+      ["the carrier is the payout address", { carrier: order.payoutAddress }],
+      ["the arbiter is the payout address", { arbiter: order.payoutAddress }],
+      ["the carrier is the arbiter", { arbiter: order.carrier }],
     ])("blocks an order where %s", (_case, over) => {
       const o = { ...order, ...over };
       const ctx = { ...context, escrowOrder: { state: "OPEN" as const, orderHash: structHash("PurchaseOrder", o) } };

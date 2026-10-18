@@ -4,13 +4,13 @@ title: "Alcance: dentro, fuera y lo que no prometemos"
 description: "Qué entra en la entrega, qué se declara como trabajo futuro, qué no se promete y la hoja de ruta por fases."
 tags: [alcance, trabajo-futuro, hoja-de-ruta]
 modo: ambos
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T18:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T20:30:00Z }
 ---
 
 # Dentro
 
 - Importación de productos desde China por empresas chilenas, con liquidación en el corredor Chile y Hong Kong.
-- Despliegue en Base Sepolia, una red de prueba pública, con la naviera, el árbitro y el verificador registrados como terceros de confianza en el gate. La red cerrada es el destino del piloto **[PROPUESTA]**.
+- Despliegue en Base Sepolia, una red de prueba pública, con la naviera, el árbitro y el verificador registrados como terceros de confianza en el gate. La red cerrada es el destino del piloto.
 - Firma de la orden de compra por ambas partes.
 - Depósito, bloqueo, anticipo, saldo y reembolso por vencimiento.
 - Atestación de embarque firmada por un tercero (en el prototipo, una llave de prueba).
@@ -31,6 +31,9 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T18:00:00Z }
 - Pago del flete a la naviera.
 - Certificados por tipo de producto (origen, análisis, salud, Sernapesca, Seremi de Salud).
 - Otros corredores y la exportación desde Chile.
+- Seguridad de borde reforzada: CloudFront con AWS WAF delante de la API. **[PROPUESTA]**
+- Autenticación de las personas con proveedores terceros reconocidos legalmente en cada país. **[PROPUESTA]**
+- Ampliar el sistema de seguridad a medida que Keel entra a cada país, según su legislación y sus obligaciones: hoy es un MVP ([MVP y seguridad por país](mvp-y-seguridad-por-pais.md)). **[PROPUESTA]**
 
 # Lo que no prometemos
 
@@ -48,4 +51,4 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T18:00:00Z }
 | 1. Piloto Chile-Hong Kong | Red cerrada con participantes identificados, identidad verificada de empresas, una naviera o agente de carga como firmante del embarque, stablecoin regulada | Un importador real con un proveedor real |
 | 2. Integración bancaria | Banco o proveedor de pagos como riel de liquidación y como financista | Pagos sin exigir cripto a las partes |
 
-La red de la competencia es Base Sepolia; el token de pago sigue por decidir ([decisión abierta 1](../decisiones/abiertas.md)). Qué se recorta si falta tiempo está en [recortes](../trabajo/recortes.md).
+La red de la competencia es Base Sepolia; el token de pago es el USDC de prueba de Circle ([decisión 1](../decisiones/abiertas.md)). Qué se recorta si falta tiempo está en [recortes](../trabajo/recortes.md).

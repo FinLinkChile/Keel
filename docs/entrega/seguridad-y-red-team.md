@@ -25,4 +25,4 @@ Batería de 30 a 50 escenarios documentados: cambio de cuenta, BL fabricado, BL 
 
 Resultados publicados en el repositorio como red team abierto.
 
-El contenido del informe es la tarea T5.3 y la batería la T5.4 del [Área 5](../trabajo/area-5-redteam-evidencia.md).
+El contenido del informe es la tarea T5.3 y la batería la T5.4 del [Área 5](../trabajo/area-5-redteam-evidencia.md). La tabla de niveles de los contratos, las frases de los errores en cadena y los riesgos declarados del Área 1 están en [tablas de seguridad del Área 1](tablas-de-seguridad-area-1.md).

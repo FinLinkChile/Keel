@@ -24,6 +24,9 @@ import {
   requiredDocsHash,
   structHash,
   termsHash,
+  type TradeRolesParams,
+  tradeRolesConfigCalls,
+  tradeRolesConfigHash,
   typedDataDigest,
 } from "./hash";
 import {
@@ -290,5 +293,88 @@ describe("termsHash (proposal)", () => {
   it("rejects malformed terms instead of hashing them", () => {
     expect(() => termsHash({ ...terms, orderNumber: "po-42" })).toThrow();
     expect(() => termsHash({ ...terms, hsCodes: [] })).toThrow();
+  });
+});
+
+// The library TradeRolesConfig (contracts/script) is internal, so a harness written here exposes it
+const ROLES_HARNESS = "test/TradeRolesConfigHarness.sol";
+const ROLES_HARNESS_SOURCE = `// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.24;
+import {TradeRolesConfig} from "../script/TradeRolesConfig.sol";
+contract TradeRolesConfigHarness {
+    function configHash(TradeRolesConfig.Params memory p) external pure returns (bytes32) {
+        return TradeRolesConfig.configHash(p);
+    }
+    function calls(TradeRolesConfig.Params memory p) external pure returns (TradeRolesConfig.Call[] memory) {
+        return TradeRolesConfig.calls(p);
+    }
+}
+`;
+
+async function loadRolesHarness() {
+  const input = {
+    language: "Solidity",
+    sources: { [ROLES_HARNESS]: { content: ROLES_HARNESS_SOURCE } },
+    settings: {
+      remappings: ["@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/"],
+      optimizer: { enabled: true, runs: 200 },
+      outputSelection: { "*": { "*": ["abi", "evm.deployedBytecode.object"] } },
+    },
+  };
+  const findImports = (path: string) => ({ contents: readFileSync(CONTRACTS + path, "utf8") });
+  const output = JSON.parse(solc.compile(JSON.stringify(input), { import: findImports }));
+  const errors = (output.errors ?? []).filter((e: { severity: string }) => e.severity === "error");
+  if (errors.length > 0) throw new Error(errors.map((e: { formattedMessage: string }) => e.formattedMessage).join("\n"));
+  const contract = output.contracts[ROLES_HARNESS].TradeRolesConfigHarness;
+  const abi = contract.abi as Abi;
+  const code = hexToBytes(`0x${contract.evm.deployedBytecode.object}`);
+  const evm = await createEVM();
+  return async <T>(functionName: string, args: unknown[]): Promise<T> => {
+    const data = hexToBytes(encodeFunctionData({ abi, functionName, args }));
+    const result = await evm.runCode({ code, data, gasLimit: 10_000_000n });
+    if (result.exceptionError) throw new Error(`${functionName} reverted: ${result.exceptionError.error}`);
+    return decodeFunctionResult({ abi, functionName, data: bytesToHex(result.returnValue) }) as T;
+  };
+}
+
+describe("rolesConfigHash: TypeScript against TradeRolesConfig.sol", () => {
+  let call: Awaited<ReturnType<typeof loadRolesHarness>>;
+  beforeAll(async () => {
+    call = await loadRolesHarness();
+  }, 120_000);
+
+  // The values of the fork tests (contracts/test/fork/ForkBase.sol)
+  const params: TradeRolesParams = {
+    token: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+    escrow: address(0xe5),
+    gate: address(0x9a),
+    agentRole: word("AGENT"),
+    cosignedRole: word("AGENT_COSIGNED"),
+    agentAllowanceKey: word("keel.trade.allowance.agent"),
+    cosignedAllowanceKey: word("keel.trade.allowance.cosigned"),
+    agentCap: 20_000_000_000n,
+    cosignedCap: 200_000_000_000n,
+    period: 30n * 86_400n,
+  };
+
+  it("builds the same ordered calls and the same hash", async () => {
+    const sol = await call<readonly { to: Hex; data: Hex }[]>("calls", [params]);
+    expect(sol.map((c) => c.data)).toEqual(tradeRolesConfigCalls(params).map((c) => c.data));
+    expect(await call<Hex>("configHash", [params])).toBe(tradeRolesConfigHash(params));
+  });
+
+  it("changes with every parameter", async () => {
+    const changed: Partial<TradeRolesParams>[] = [
+      { escrow: address(0xe6) },
+      { gate: address(0x9b) },
+      { cosignedAllowanceKey: params.agentAllowanceKey },
+      { agentCap: params.agentCap + 1n },
+      { period: params.period - 1n },
+    ];
+    for (const c of changed) {
+      const p = { ...params, ...c };
+      expect(tradeRolesConfigHash(p)).not.toBe(tradeRolesConfigHash(params));
+      expect(await call<Hex>("configHash", [p])).toBe(tradeRolesConfigHash(p));
+    }
   });
 });

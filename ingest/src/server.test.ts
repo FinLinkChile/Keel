@@ -2,7 +2,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ALIAS_IDS } from "@keel/schemas";
-import { createHandler, ServerConfigError, type LogEntry, type TradeLogEntry } from "./server";
+import { createHandler, ServerConfigError, type LogEntry, type ProformaLogEntry, type TradeLogEntry } from "./server";
 import { SettingsStore, type SettingsAudit } from "./settings";
 import { IngestStore } from "./store";
 import { composeEmail, fakeDns, makeDomain, signEmail } from "./testing/renderEmail";
@@ -18,7 +18,7 @@ const ADMIN = "a".repeat(40);
 let server: Server;
 let url: string;
 let settings: SettingsStore;
-const logs: (LogEntry | SettingsAudit | TradeLogEntry)[] = [];
+const logs: (LogEntry | SettingsAudit | TradeLogEntry | ProformaLogEntry)[] = [];
 
 const newStore = () =>
   SettingsStore.open({

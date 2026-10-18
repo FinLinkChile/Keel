@@ -5,6 +5,7 @@
 import { z } from "zod";
 
 export * from "./personal";
+export * from "./api";
 
 // ---------------------------------------------------------------------------
 // 2.1 Document extraction (output of the quarantined extractor)
@@ -123,7 +124,7 @@ export const OrderTerms = z
     invoiceAmountMinor: z.bigint().positive(),
     // Harmonized System codes of the goods
     hsCodes: z.array(z.string().regex(/^[0-9]{6,10}$/)).min(1),
-    // keccak256 of the full order document, with the proforma
+    // keccak256 of the file the order comes from: the proforma's fileHash (POST /trade/proforma)
     documentHash: z.string().regex(/^0x[0-9a-f]{64}$/),
   })
   .strict();
@@ -331,6 +332,8 @@ export const GATE_EVENTS = [
   "ChangeVetoed",
   "SupplierRemoved",
   "ThirdPartyRemoved",
+  // The guardian (pause only) was set, or cleared with the zero address
+  "GuardianSet",
   // Inherited from OpenZeppelin EIP712 (ERC-5267)
   "EIP712DomainChanged",
 ] as const;
@@ -364,6 +367,12 @@ export const GATE_ERRORS = [
   "AllowanceNotConsumed",
   // Registries and pause
   "OnlySafeOrCosigner",
+  // emergencyPause by someone other than the Safe, the cosigner or the guardian
+  "OnlyPauser",
+  // The guardian would be the policy signer, the cosigner or the Safe
+  "InvalidGuardian",
+  // A new policy signer or cosigner would be the guardian
+  "SignerIsGuardian",
   "ChangeNotPending",
   "AlreadyRegistered",
   "NotRegistered",

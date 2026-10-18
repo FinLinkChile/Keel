@@ -1,0 +1,6 @@
+{
+  "extends": "../tsconfig.base.json",
+  // ingest's ambient types: the ingest handlers and the bot's ingest mappers type-check against
+  // @keel/ingest (same include as bot/tsconfig.json)
+  "include": ["src", "scripts", "../ingest/src/types"]
+}
