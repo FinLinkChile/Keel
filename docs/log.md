@@ -1,5 +1,9 @@
 # Historial de la documentación
 
+## 2026-10-18
+
+* **Nuevo (arquitectura) [PROPUESTA] del Área 2 (Darienn): la arquitectura de AWS queda documentada en cinco conceptos** que salen de revisar app, ingesta, bot, motor y contratos en `dev` y en las ramas abiertas: [componentes](arquitectura/aws-componentes.md), [API y datos](arquitectura/aws-api-y-datos.md), [llaves y secretos](arquitectura/aws-llaves-y-secretos.md), [recorrido de una orden](arquitectura/aws-recorrido-de-una-orden.md) y [pendientes](arquitectura/aws-pendientes.md); [despliegue en AWS](arquitectura/despliegue-aws.md) pasa a ser el hub con los principios. Por qué: el detalle solo vivía en el artifact y el equipo lee `docs/`. **Afecta a las Áreas 1, 3 y 4:** la carga de documentos por URL prefirmada y asíncrona cambia el contrato de ingesta, la app necesita una API de propuestas y consulta de órdenes, y se retiran los comandos del bot. **Decisiones abiertas que toca:** 1 (token de pago), 13 y 15 (dónde viven la orden y sus términos, y quién llama `open`). Ninguno de los pendientes tiene tarea asignada.
+
 ## 2026-10-17
 
 * **Decisión [PROPUESTA] del Área 2 (Darienn): el bot de Telegram solo envía en AWS.** El sistema no recibe mensajes desde Telegram: no hay webhook ni ruta `/telegram`, y se retiran el polling y los comandos `/start` y `/status`, que hoy responden con textos fijos (`bot/src/adapters/telegram/commands.ts`). Por qué: el sistema se opera desde la app, donde firma la billetera, y el bot nunca firma ni decide. **Afecta al Área 4**, dueña del bot, que debe confirmarlo ([despliegue en AWS](arquitectura/despliegue-aws.md)).

@@ -1,16 +1,34 @@
 ---
 type: Arquitectura
 title: "Despliegue en AWS"
-description: "Cómo se propone correr Keel en AWS sin servidores propios y por dónde entran las peticiones a la API: HTTP API con throttling ahora, REST API con WAF en producción."
+description: "Cómo se propone correr Keel en AWS sin servidores propios: principios, mapa de los conceptos de la arquitectura y por dónde entran las peticiones a la API (HTTP API con throttling ahora, REST API con WAF en producción)."
 tags: [aws, serverless, despliegue, api, waf, throttling]
 modo: trade
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-10-17T21:00:00Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-10-18T15:00:00Z }
 ---
 
 **[PROPUESTA]** del Área 2 (Darienn), 17 de octubre de 2026. Falta que el equipo la confirme.
 
 Keel corre en una cuenta AWS con servicios administrados, sin servidores propios: Lambda, API Gateway, SQS, DynamoDB, S3, EventBridge Scheduler, KMS, Secrets Manager, Systems Manager y CloudWatch. La red se abstrae como una URL de RPC ([stack](stack.md)). El diagrama interactivo con cada función, ruta, tabla, cola y llave está en el artifact [Keel en AWS](https://claude.ai/artifact/Vt92pMCFZFGcJUhnCKwYXY): la página 1 muestra el flujo simple y la página 2 la arquitectura ampliada.
+
+## Principios del despliegue
+
+1. **La red es una URL de RPC.** Todo lo que habla con la cadena la recibe por configuración, hoy la de Base Sepolia (84532). Cambiar de red es cambiar la URL, el `chainId` y `contracts/deployments/<chainId>.json`.
+2. **El motor no cambia.** Es una librería pura que las Lambdas del agente y del monitor importan, sin red ni LLM propios. Lo que cambia es dónde corre y dónde guarda su estado.
+3. **La cadena es la fuente de verdad del estado.** Las tablas guardan lo que la cadena no tiene: la orden firmada, las extracciones y los avisos.
+4. **Las llaves de servidor van en KMS y la del dueño nunca entra a AWS.** Una llave por rol y un rol de IAM por función.
+5. **Cada capa asume que la anterior pudo fallar.** Sin un PDR válido el gate y el escrow revierten, y cada decisión deja evidencia con su hash antes de enviarse.
+
+## Dónde está cada cosa
+
+| Concepto | Qué responde |
+| --- | --- |
+| [Componentes](aws-componentes.md) | Qué servicio cumple cada función, qué es hoy en el repo y su estado |
+| [API y datos](aws-api-y-datos.md) | Las rutas, quién las llama y cómo se autentican; las tablas y buckets |
+| [Llaves y secretos](aws-llaves-y-secretos.md) | Qué va en KMS, qué nunca entra a AWS y qué va en Secrets Manager |
+| [Recorrido de una orden](aws-recorrido-de-una-orden.md) | Qué piezas intervienen en cada paso y cómo trabaja el agente por vueltas |
+| [Pendientes](aws-pendientes.md) | Qué falta construir por área, decisiones abiertas y riesgos |
 
 ## Entrada a la API
 
