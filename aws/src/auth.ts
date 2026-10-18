@@ -3,8 +3,9 @@
 // its owners and representatives sign for it, and the handler checks that the recovered EOA
 // represents the party it acts for (`represents` below). Authentication says who asks; what they
 // may do is each route's check.
-import { API_EIP712_TYPES, API_HEADERS, API_MAX_SKEW_SECONDS, apiDomain, type Hex } from "@keel/schemas";
-import { keccak256, recoverTypedDataAddress, toBytes } from "viem";
+import { API_HEADERS, API_MAX_SKEW_SECONDS, type Hex } from "@keel/schemas";
+import { apiBodyHash, apiRequestTypedData } from "@keel/schemas/hash";
+import { recoverTypedDataAddress } from "viem";
 
 export type AuthRejection = "missing_signature" | "stale_signature" | "bad_signature" | "signer_mismatch";
 
@@ -18,7 +19,9 @@ export interface SignedRequest {
   headers: Record<string, string | undefined>;
 }
 
-export const bodyHash = (body: string): Hex => keccak256(toBytes(body));
+// One builder for both sides, in schemas: the app signs with it and the server verifies with it
+export { apiRequestTypedData };
+export const bodyHash = apiBodyHash;
 
 export async function authenticate(req: SignedRequest, chainId: number, now: Date = new Date()): Promise<AuthResult> {
   const h = (name: string) => req.headers[name] ?? req.headers[name.toLowerCase()];
@@ -31,10 +34,7 @@ export async function authenticate(req: SignedRequest, chainId: number, now: Dat
   let signer: Hex;
   try {
     signer = await recoverTypedDataAddress({
-      domain: apiDomain(chainId),
-      types: API_EIP712_TYPES,
-      primaryType: "ApiRequest",
-      message: { method: req.method.toUpperCase(), path: req.path, bodyHash: bodyHash(req.body), issuedAt: BigInt(issuedAt) },
+      ...apiRequestTypedData(chainId, req.method, req.path, req.body, issuedAt),
       signature: signature as Hex,
     });
   } catch {
@@ -43,17 +43,6 @@ export async function authenticate(req: SignedRequest, chainId: number, now: Dat
   // A body or path changed after signing recovers another address
   if (signer.toLowerCase() !== claimed.toLowerCase()) return { ok: false, reason: "signer_mismatch" };
   return { ok: true, signer };
-}
-
-// What the client sends: used by the app (app/src/data/api.ts) and the CLI tools of the carrier
-// and the arbiter (aws/scripts/), so both sides build the same message.
-export function apiRequestTypedData(chainId: number, method: string, path: string, body: string, issuedAt: number) {
-  return {
-    domain: apiDomain(chainId),
-    types: API_EIP712_TYPES,
-    primaryType: "ApiRequest" as const,
-    message: { method: method.toUpperCase(), path, bodyHash: bodyHash(body), issuedAt: BigInt(issuedAt) },
-  };
 }
 
 // Whether `signer` may act for `party`: the party itself (an EOA such as an exporter, carrier or
