@@ -2,6 +2,7 @@
 import {
   type DocumentDecision,
   ESCROW_STATES,
+  type EscrowEvent,
   type EscrowState,
   type Hex,
   type PurchaseOrder,
@@ -21,7 +22,22 @@ export const ESCROW_ABI = parseAbi([
   "function submitShipment(bytes32 orderId, ShipmentAttestation att, bytes sigCarrier)",
   "function releaseBalance(bytes32 orderId, DocumentDecision d, bytes sigVerifier)",
   "function refundAfterDeadline(bytes32 orderId)",
+  // Permissionless calls the agent relays with signatures people gave (open, BalanceApproval,
+  // CancelOrder, DisputeResolution): the relayer adds no authority, the escrow checks each one
+  "function approveBalance(bytes32 orderId, bytes sigImporter)",
+  "function cancel(bytes32 orderId, bytes sigImporter, bytes sigExporter)",
+  "function resolve(bytes32 orderId, uint256 toImporter, uint256 toExporter, bytes sigArbiter)",
+  "function cancelNonceOf(bytes32 orderId) view returns (uint256)",
+  // Every event of the escrow, for the indexer that mirrors order states (aws/src/handlers/indexer.ts)
+  "event OrderOpened(bytes32 indexed orderId, bytes32 orderHash, address indexed importer, address indexed exporter, address payoutAddress, uint256 totalAmount)",
   "event OrderFunded(bytes32 indexed orderId, uint256 amount)",
+  "event AdvanceReleased(bytes32 indexed orderId, address indexed to, uint256 amount)",
+  "event ShipmentAccepted(bytes32 indexed orderId, bytes32 attestationHash, bytes32 blKey, uint64 onBoardDate)",
+  "event BalanceReleased(bytes32 indexed orderId, address indexed to, uint256 amount, bytes32 authorizationDigest)",
+  "event Refunded(bytes32 indexed orderId, address indexed to, uint256 amount)",
+  "event DisputeRaised(bytes32 indexed orderId, address indexed by)",
+  "event DisputeResolved(bytes32 indexed orderId, uint256 toImporter, uint256 toExporter)",
+  "event OrderCancelled(bytes32 indexed orderId, uint256 refunded)",
   // Every error TradeEscrow declares (schemas ESCROW_ERRORS, checked in escrow.test.ts)
   "error InvalidState()",
   "error OrderExists()",
@@ -93,6 +109,44 @@ export const refundCall = (escrow: Hex, orderId: Hex): Call => ({
   to: escrow,
   data: encodeFunctionData({ abi: ESCROW_ABI, functionName: "refundAfterDeadline", args: [orderId] }),
 });
+
+// The importer's BalanceApproval: the escrow rebuilds it from the attestation it accepted
+export const approveBalanceCall = (escrow: Hex, orderId: Hex, sigImporter: Hex): Call => ({
+  to: escrow,
+  data: encodeFunctionData({ abi: ESCROW_ABI, functionName: "approveBalance", args: [orderId, sigImporter] }),
+});
+
+// CancelOrder{orderId, cancelNonceOf(orderId)} signed by both parties
+export const cancelCall = (escrow: Hex, orderId: Hex, sigImporter: Hex, sigExporter: Hex): Call => ({
+  to: escrow,
+  data: encodeFunctionData({ abi: ESCROW_ABI, functionName: "cancel", args: [orderId, sigImporter, sigExporter] }),
+});
+
+// DisputeResolution signed by the arbiter; the recipients are fixed by the order
+export const resolveCall = (escrow: Hex, orderId: Hex, toImporter: bigint, toExporter: bigint, sigArbiter: Hex): Call => ({
+  to: escrow,
+  data: encodeFunctionData({ abi: ESCROW_ABI, functionName: "resolve", args: [orderId, toImporter, toExporter, sigArbiter] }),
+});
+
+export const cancelNonceOfCall = (escrow: Hex, orderId: Hex): Call => ({
+  to: escrow,
+  data: encodeFunctionData({ abi: ESCROW_ABI, functionName: "cancelNonceOf", args: [orderId] }),
+});
+
+export const decodeCancelNonce = (data: Hex): bigint => decodeFunctionResult({ abi: ESCROW_ABI, functionName: "cancelNonceOf", data });
+
+// The state each escrow event leaves its order in (contracts/src/TradeEscrow.sol). AdvanceReleased
+// moves nothing: fund emits it right after OrderFunded, in the same transaction.
+export const EVENT_STATE: Partial<Record<EscrowEvent, EscrowState>> = {
+  OrderOpened: "OPEN",
+  OrderFunded: "ADVANCE_PAID",
+  ShipmentAccepted: "SHIPPED",
+  BalanceReleased: "SETTLED",
+  Refunded: "REFUNDED",
+  DisputeRaised: "DISPUTED",
+  DisputeResolved: "RESOLVED",
+  OrderCancelled: "CANCELLED",
+};
 
 // The funding time is private in the escrow: the agent reads it from the block of OrderFunded,
 // which fund emits once per order (only from OPEN).

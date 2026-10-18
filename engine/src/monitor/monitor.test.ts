@@ -69,6 +69,7 @@ describe("monitor of use outside the system (T2.8)", () => {
     logs: async (addresses, from, to) =>
       recorded.filter((l) => l.blockNumber >= from && l.blockNumber <= to && addresses.some((a) => a.toLowerCase() === l.address.toLowerCase())),
     attestationHash: async (e, orderId) => (await chain.read<{ attestationHash: Hex }>("TradeEscrow", e, "orderOf", [orderId])).attestationHash,
+    importerOf: async (e, orderId) => (await chain.read<{ po: { importer: Hex } }>("TradeEscrow", e, "orderOf", [orderId])).po.importer,
   });
 
   // The pause, simulated then sent by `who`, as rpcChain does it
@@ -89,7 +90,7 @@ describe("monitor of use outside the system (T2.8)", () => {
     );
 
   const watch = (pauser?: ReturnType<typeof pauserFor>) =>
-    new Monitor({ chainId: 1, gate, escrow, evidenceDir, fromBlock: block + 1n }, { chain: monitorChain(), pauser });
+    new Monitor({ chainId: 1, gate, escrow, safe, evidenceDir, fromBlock: block + 1n }, { chain: monitorChain(), pauser });
 
   beforeEach(async () => {
     chain = await createChain(artifacts);
@@ -268,6 +269,62 @@ describe("monitor of use outside the system (T2.8)", () => {
     expect(incident).toMatchObject({ reason: "UNKNOWN_DOCUMENT_DECISION", orderId: order.orderId, action: "paused" });
   });
 
+  // A release by a decision the engine never issued, on the order `order` of this chain
+  async function forgedRelease(order: { orderId: Hex }) {
+    const attestation = await ship(order as never);
+    const decision = {
+      orderId: order.orderId,
+      attestationHash: structHash("ShipmentAttestation", attestation),
+      docsHash: docsHash(FILES),
+      policyHash: tradePolicyHash(policy),
+      inputsHash: word("forged inputs"),
+      expiresAt: chain.time() + 3600n,
+    };
+    const sig = await policySigner.signTypedData({ domain: keelDomain(1, escrow), types: { DocumentDecision: EIP712_TYPES.DocumentDecision }, primaryType: "DocumentDecision", message: decision });
+    await send("TradeEscrow", escrow, "releaseBalance", [order.orderId, decision, sig], ATTACKER);
+  }
+
+  it("a forged release on an order of another Safe is none of this monitor's business and pauses nothing", async () => {
+    const order = await openOrder(1n);
+    await fund(order, true);
+    await forgedRelease(order);
+    let paused = 0;
+    const pauser = { address: guardian.address, pause: async () => (paused++, { hash: word("tx"), status: "success" as const }) };
+    // The same chain, watched as the Safe of another importer
+    const other = new Monitor({ chainId: 1, gate, escrow, safe: address(0x5afe), evidenceDir, fromBlock: 1n }, { chain: monitorChain(), pauser });
+    expect(reasons(await other.tick())).not.toContain("UNKNOWN_DOCUMENT_DECISION");
+    expect(paused).toBe(0);
+    // Watched as its own Safe, the same release is an incident
+    const own = new Monitor({ chainId: 1, gate, escrow, safe, evidenceDir, fromBlock: 1n }, { chain: monitorChain(), pauser });
+    expect(await own.tick()).toContainEqual(expect.objectContaining({ reason: "UNKNOWN_DOCUMENT_DECISION", action: "paused" }));
+    expect(paused).toBe(1);
+  });
+
+  it("when whose order it is cannot be read, it alerts and does not pause", async () => {
+    const order = await openOrder(1n);
+    await fund(order, true);
+    await forgedRelease(order);
+    let paused = 0;
+    const pauser = { address: guardian.address, pause: async () => (paused++, { hash: word("tx"), status: "success" as const }) };
+    const failing: MonitorChain = { ...monitorChain(), importerOf: async () => Promise.reject(new Error("fetch failed for https://rpc.example/v1/SECRETKEY")) };
+    const monitor = new Monitor({ chainId: 1, gate, escrow, safe, evidenceDir, fromBlock: 1n }, { chain: failing, pauser });
+    const incident = (await monitor.tick()).find((e) => e.reason === "UNKNOWN_DOCUMENT_DECISION");
+    expect(incident).toMatchObject({ action: "alerted" });
+    expect(incident?.pauseRevert).toContain("ORDER_READ_FAILED");
+    expect(incident?.pauseRevert).not.toContain("SECRETKEY");
+    expect(paused).toBe(0);
+  });
+
+  it("stops after maxRangesPerTick and the next tick continues where it stopped", async () => {
+    const monitor = new Monitor({ chainId: 1, gate, escrow, safe, evidenceDir, fromBlock: 1n, maxRange: 2n, maxRangesPerTick: 1 }, { chain: monitorChain() });
+    const all: string[] = [];
+    all.push(...reasons(await monitor.tick()));
+    expect(monitor.cursor).toBe(3n);
+    for (let i = 0; i < 10 && monitor.cursor <= block; i++) all.push(...reasons(await monitor.tick()));
+    expect(monitor.cursor).toBe(block + 1n);
+    expect(all).toEqual(["GUARDIAN_SET", "SUPPLIER_QUEUED", "THIRD_PARTY_QUEUED", "THIRD_PARTY_QUEUED", "THIRD_PARTY_QUEUED"]);
+  });
+
   it("reports configuration changes without acting on them", async () => {
     const monitor = watch(pauserFor(guardian.address));
     await asSafe(gate, chain.calldata("FundingGate", "queueSupplier", [exporter.address, address(0xbeef)]));
@@ -282,9 +339,52 @@ describe("monitor of use outside the system (T2.8)", () => {
   });
 
   it("reads each block once and in chunks", async () => {
-    const monitor = new Monitor({ chainId: 1, gate, escrow, evidenceDir, fromBlock: 1n, maxRange: 2n }, { chain: monitorChain() });
+    const monitor = new Monitor({ chainId: 1, gate, escrow, safe, evidenceDir, fromBlock: 1n, maxRange: 2n }, { chain: monitorChain() });
     // The setup set the guardian, then queued one supplier and three third parties
     expect(reasons(await monitor.tick())).toEqual(["GUARDIAN_SET", "SUPPLIER_QUEUED", "THIRD_PARTY_QUEUED", "THIRD_PARTY_QUEUED", "THIRD_PARTY_QUEUED"]);
     expect(await monitor.tick()).toEqual([]);
+  });
+
+  it("a process that restarts resumes from the cursor and the pause it persisted", async () => {
+    const [first, second] = [await openOrder(1n), await openOrder(2n)];
+    const start = block + 1n;
+    const before = new Monitor({ chainId: 1, gate, escrow, safe, evidenceDir, fromBlock: start }, { chain: monitorChain(), pauser: pauserFor(guardian.address) });
+    await fund(first, false, ATTACKER);
+    const latest = block;
+    expect(await before.tick()).toMatchObject([{ reason: "UNKNOWN_FUNDING_PDR", action: "paused" }]);
+    // The pause landed after the block it read: the next run sees it
+    expect(before.cursor).toBe(latest + 1n);
+    expect(before.paused).toBe(true);
+
+    // The next run starts where the last one stopped, and does not pause twice
+    await asSafe(gate, chain.calldata("FundingGate", "unpause", []));
+    await fund(second, false, ATTACKER);
+    const after = new Monitor(
+      { chainId: 1, gate, escrow, safe, evidenceDir, fromBlock: before.cursor, pausedHere: before.paused },
+      { chain: monitorChain(), pauser: pauserFor(guardian.address) },
+    );
+    expect(after.paused).toBe(true);
+    const events = await after.tick();
+    // GateUnpaused clears the pause it kept, so the new incident pauses again
+    expect(reasons(events)).toEqual(["GATE_PAUSED", "GATE_UNPAUSED", "UNKNOWN_FUNDING_PDR"]);
+    expect(events[2]).toMatchObject({ action: "paused" });
+  });
+
+  it("asks the evidence hook, not the directory, whether the engine issued a PDR", async () => {
+    const order = await openOrder(1n);
+    await fund(order, false);
+    const asked: Hex[] = [];
+    const monitor = new Monitor(
+      { chainId: 1, gate, escrow, safe, evidenceDir, fromBlock: 1n },
+      {
+        chain: monitorChain(),
+        isIssued: async (hash) => {
+          asked.push(hash);
+          return true;
+        },
+      },
+    );
+    expect(reasons(await monitor.tick())).not.toContain("UNKNOWN_FUNDING_PDR");
+    expect(asked).toHaveLength(1);
   });
 });

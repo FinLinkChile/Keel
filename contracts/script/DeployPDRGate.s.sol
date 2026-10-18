@@ -6,9 +6,11 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {PDRGate} from "../src/PDRGate.sol";
 import {IRoles} from "../src/IRoles.sol";
+import {DeploymentsFile} from "./DeploymentsFile.sol";
 
 /// @notice Deploys PDRGate against an existing Safe + Roles Modifier and records the address
-/// in deployments/<chainId>.json (integration point 2, Wednesday Oct 14).
+/// in deployments/<chainId>.json (integration point 2, Wednesday Oct 14), merged with what Keel
+/// Trade wrote there (see DeploymentsFile.sol): this script owns only `pdrGate` and `personal`.
 /// @dev After deploying, the Safe must still (through the Delay path):
 ///   1. assign the AGENTE role in Roles to the gate address (and to nothing else, decision D4);
 ///   2. scope the COSIGNATARIO role to PDRGate.pause() and Roles membership revocation.
@@ -50,18 +52,39 @@ contract DeployPDRGate is Script {
 
         console2.log("PDRGate", address(gate));
 
-        string memory o = "deployment";
-        vm.serializeUint(o, "chainId", block.chainid);
-        vm.serializeAddress(o, "safe", safe);
-        vm.serializeAddress(o, "roles", roles);
-        vm.serializeAddress(o, "usdc", usdc);
-        vm.serializeAddress(o, "policySigner", policySigner);
-        vm.serializeAddress(o, "cosigner", cosigner);
-        vm.serializeBytes32(o, "policyHash", policyHash);
-        vm.serializeBytes32(o, "agentRoleKey", roleKey);
-        string memory json = vm.serializeAddress(o, "pdrGate", address(gate));
+        writeDeployment(
+            vm.envOr("KEEL_DEPLOYMENTS_FILE", DeploymentsFile.defaultPath(block.chainid)),
+            Personal(usdc, safe, roles, policySigner, cosigner, policyHash, roleKey, address(gate))
+        );
+    }
+
+    struct Personal {
+        address usdc;
+        address safe;
+        address roles;
+        address policySigner;
+        address cosigner;
+        bytes32 policyHash;
+        bytes32 agentRoleKey;
+        address pdrGate;
+    }
+
+    /// @notice Writes the Personal gate into `path`, keeping every key another script owns (Keel
+    /// Trade writes the top-level safe, roles, signers and its contracts). This script owns only
+    /// `pdrGate` and the `personal` object; chainId and usdc are shared and must match.
+    function writeDeployment(string memory path, Personal memory d) public {
+        string memory root = "personal-root";
         vm.createDir("./deployments", true);
-        string memory path = string.concat("./deployments/", vm.toString(block.chainid), ".json");
+        DeploymentsFile.load(vm, root, path, block.chainid, d.usdc);
+        string memory p = "personal-object";
+        vm.serializeAddress(p, "safe", d.safe);
+        vm.serializeAddress(p, "roles", d.roles);
+        vm.serializeAddress(p, "policySigner", d.policySigner);
+        vm.serializeAddress(p, "cosigner", d.cosigner);
+        vm.serializeBytes32(p, "policyHash", d.policyHash);
+        string memory personal = vm.serializeBytes32(p, "agentRoleKey", d.agentRoleKey);
+        vm.serializeString(root, "personal", personal);
+        string memory json = vm.serializeAddress(root, "pdrGate", d.pdrGate);
         vm.writeJson(json, path);
     }
 }

@@ -9,7 +9,7 @@ import type { KeelData, NeedsYou, Order, Party, Role } from './types';
 export type NeedsItem =
   // `proposed`: the order was proposed on this phone, so its signature screen is here
   | { key: string; kind: 'sign_order'; order: Order; counterparty: Party; proposed: boolean }
-  | { key: string; kind: 'upload_documents'; order: Order; counterparty: Party }
+  | { key: string; kind: 'upload_documents' | 'approve_balance' | 'sign_cancel'; order: Order; counterparty: Party }
   | { key: string; kind: 'verify_supplier'; supplier: Party };
 
 export async function loadNeedsItems(d: KeelData, role: Role, isProposed: (orderId: Hex) => Promise<boolean>): Promise<NeedsItem[]> {
@@ -50,6 +50,12 @@ export function needsItemText(item: NeedsItem, role: Role): { title: string; det
   const { order, counterparty } = item;
   if (item.kind === 'upload_documents') {
     return { title: `Upload documents for ${order.label}`, detail: 'Ship, then upload the transport document and the invoice' };
+  }
+  if (item.kind === 'approve_balance') {
+    return { title: `Release the balance of ${order.label}`, detail: `${counterparty.short} shipped. You can approve the balance now` };
+  }
+  if (item.kind === 'sign_cancel') {
+    return { title: `Cancel ${order.label}?`, detail: `${counterparty.short} signed a cancellation. It takes both signatures` };
   }
   return role === 'importer'
     ? { title: `Sign ${order.label}`, detail: `${counterparty.short} signed. Yours is the last signature` }

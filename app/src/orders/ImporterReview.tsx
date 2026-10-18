@@ -7,6 +7,7 @@ import { config } from '@/config';
 import { proposals, useData } from '@/data';
 import { agentNotes } from '@/data/agentNotes';
 import { tokenToCents } from '@/data/amounts';
+import { apiProblem } from '@/data/apiProblem';
 import { importerRejects, importerSigns, reviewForImporter, type Review } from '@/data/proposalFlow';
 import {
   CHECK_WORDS,
@@ -114,8 +115,8 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
     try {
       const move = await importerSigns(proposals, proposal!, { signer, setup, now: Date.now() / 1000 });
       if (!move.ok) setFailed({ checks: move.checks, differences: move.differences ?? [] });
-    } catch {
-      setProblem('The wallet could not sign. Try again.');
+    } catch (e) {
+      setProblem(apiProblem(e) ?? 'The wallet could not sign. Try again.');
     }
     setBusy(false);
   }
@@ -261,7 +262,7 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
             label="Reject the order"
             onPress={async () => {
               setRejecting(false);
-              await importerRejects(proposals, proposal);
+              await importerRejects(proposals, proposal).catch((e) => setProblem(apiProblem(e) ?? 'The order could not be rejected. Try again.'));
             }}
           />
           <Button label="Keep reviewing" variant="secondary" onPress={() => setRejecting(false)} />

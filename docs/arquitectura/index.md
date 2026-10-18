@@ -1,5 +1,11 @@
 # Arquitectura
 
+* [Despliegue en AWS](despliegue-aws.md) - Cómo se propone correr Keel en AWS sin servidores propios: principios, mapa de los conceptos de la arquitectura y por dónde entran las peticiones a la API (HTTP API con throttling ahora, REST API con WAF en producción).
+* [Componentes de la arquitectura en AWS](aws-componentes.md) - Qué servicio de AWS cumple cada función de Keel Trade, qué hace, qué es hoy en el repo y si existe, es nuevo, cambia o falta decidirlo.
+* [API y datos en AWS](aws-api-y-datos.md) - Las rutas de la API con quién las llama y cómo se autentica cada una, y las tablas y buckets que reemplazan a los archivos y al SQLite de hoy.
+* [Llaves y secretos en AWS](aws-llaves-y-secretos.md) - Qué llaves pasan a KMS, cuáles nunca entran a AWS, qué secretos van en Secrets Manager y qué hace falta para firmar desde KMS.
+* [Recorrido de una orden en AWS](aws-recorrido-de-una-orden.md) - Qué piezas intervienen en cada paso del flujo y cómo trabaja el agente por vueltas: cola por Safe, candado y nonce, evidencia antes de enviar, indexador y monitor.
+* [Pendientes de la arquitectura en AWS](aws-pendientes.md) - Qué falta construir por área, qué decisiones abiertas toca y qué riesgos quedan declarados.
 * [Custodia y rotación de llaves](custodia-de-llaves.md) - Qué llaves existen, quién tiene cada una, qué puede hacer un atacante que robe una, dónde se limita y con qué prueba, cómo se rota y qué falta construir.
 * [Datos personales y privacidad (Ley 21.719)](datos-personales.md) - Qué datos de personas y empresas guarda Keel, dónde vive cada uno, para qué, a quién se transfiere, qué queda en la cadena, qué pueden usar los análisis y qué falta definir.
 * [Evidencia y bitácora](evidencia-y-bitacora.md) - Qué queda registrado de cada intento, dónde se guardan los PDR y por qué los reverts deliberados son la evidencia más fuerte.

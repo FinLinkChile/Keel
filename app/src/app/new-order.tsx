@@ -8,6 +8,7 @@ import { config } from '@/config';
 import { proposals, useData, type SupplierRecord } from '@/data';
 import { buildOrder, REQUIRED_DOCS, type BuiltOrder, type FormField } from '@/data/newOrder';
 import { newProposal } from '@/data/proposals';
+import { apiProblem } from '@/data/apiProblem';
 import { agentNotes, type AgentNote } from '@/data/agentNotes';
 import {
   advanceBpsOf,
@@ -174,7 +175,7 @@ function NewOrderScreen() {
     );
     if (built.kind === 'blocked') return setBlocked({ fields: built.fields, problems: built.problems });
     setBlocked(undefined);
-    // Kept on this phone until the supplier signs. Nothing leaves the device.
+    // Kept on this phone until the supplier signs, or sent to the Keel API when it is configured
     const asked = proforma?.reading?.proforma;
     const quote = asked && {
       amountCents: asked.amount_minor,
@@ -183,7 +184,11 @@ function NewOrderScreen() {
       latestShipmentDate: asked.latest_shipment_date,
     };
     const proposal = newProposal(built, form.goods, Date.now() / 1000, quote);
-    await proposals.save(proposal);
+    try {
+      await proposals.save(proposal);
+    } catch (e) {
+      return setNotice(apiProblem(e) ?? 'The order could not be saved. Try again.');
+    }
     router.replace({ pathname: '/new-order-sent', params: { orderId: proposal.orderId } });
   }
 

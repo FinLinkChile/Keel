@@ -4,7 +4,7 @@ import type { UploadResult } from './client';
 // the order, and the copy never suggests it does.
 export type UploadStatus = {
   // Status word on the right of the document row, when the upload went through
-  word?: 'Accepted' | 'Under review' | 'Already uploaded';
+  word?: 'Accepted' | 'Under review' | 'Already uploaded' | 'Uploaded';
   // Line under the document name when it did not, with what to do next
   problem?: string;
 };
@@ -17,6 +17,9 @@ export function uploadStatus(result: UploadResult): UploadStatus {
       return { word: 'Under review' };
     case 'duplicate':
       return { word: 'Already uploaded' };
+    // Stored for reading; the outcome comes as a notice, not on this screen yet
+    case 'sent':
+      return { word: 'Uploaded' };
     case 'rejected':
       switch (result.reason) {
         case 'bad_signature':

@@ -146,7 +146,15 @@ function NeedsYouSheet({ item, role }: { item: Item; role: Role }) {
   }
 
   const { order, counterparty } = item;
-  const signing = item.kind === 'sign_order';
+  const lead =
+    item.kind === 'sign_order'
+      ? `${shortName(counterparty)} signed. `
+      : item.kind === 'approve_balance'
+        ? `${shortName(counterparty)} shipped. `
+        : item.kind === 'sign_cancel'
+          ? `${shortName(counterparty)} asked to cancel. `
+          : 'Ship and upload. ';
+  const action = item.kind === 'upload_documents' ? 'Upload' : 'Review';
   return (
     <Sheet>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -157,7 +165,7 @@ function NeedsYouSheet({ item, role }: { item: Item; role: Role }) {
           </View>
         </View>
         <Text size={14} color="textMuted" leading={1.35} style={{ flex: 1 }}>
-          {signing ? `${shortName(counterparty)} signed. ` : 'Ship and upload. '}
+          {lead}
           <Text size={14} weight={700}>
             Your turn.
           </Text>
@@ -184,7 +192,7 @@ function NeedsYouSheet({ item, role }: { item: Item; role: Role }) {
           currencyColor="textFaint"
         />
         {/* Review opens the signature (04, 10a); Upload opens the order (10) */}
-        <Button label={signing ? 'Review' : 'Upload'} variant="go" onPress={() => router.push(needsItemHref(item, role))} />
+        <Button label={action} variant="go" onPress={() => router.push(needsItemHref(item, role))} />
       </View>
     </Sheet>
   );

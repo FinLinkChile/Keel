@@ -8,7 +8,7 @@ import { readInvoice, type InvoiceReading } from "../agreement";
 import { detectBeneficiaryChange } from "../beneficiaryChange";
 import type { ExtractorProvider } from "../extractor";
 import type { AliasTable } from "../parser";
-import { MAX_EMAILS_PER_SENDER_PER_DAY, type IngestStore, type StoredChangeRequest } from "../store";
+import { MAX_EMAILS_PER_SENDER_PER_DAY, type IngestRepo, type StoredChangeRequest } from "../repo";
 import { authenticateEmail, type AuthFailure, type AuthSummary, type Envelope } from "./auth";
 import { extractInvoicePdf, MimeError, type MimeFailure } from "./mime";
 
@@ -40,7 +40,7 @@ export type EmailOutcome =
 
 export interface ReceiveOptions {
   requireDmarc: boolean;
-  store: IngestStore;
+  store: IngestRepo;
   resolver?: DNSResolver;
 }
 
@@ -59,8 +59,8 @@ export async function receiveEmail(
   if (authResult.status === "quarantined") return quarantine(authResult.reason);
 
   // Only authenticated mail counts against a sender, so nobody can spend a domain's quota
-  if (!store.recordEmail(messageHash, authResult.fromDomain)) return { status: "duplicate", messageHash, auth };
-  if (store.emailsFromSender(authResult.fromDomain) > MAX_EMAILS_PER_SENDER_PER_DAY) return quarantine("rate_limited");
+  if (!(await store.recordEmail(messageHash, authResult.fromDomain))) return { status: "duplicate", messageHash, auth };
+  if ((await store.emailsFromSender(authResult.fromDomain)) > MAX_EMAILS_PER_SENDER_PER_DAY) return quarantine("rate_limited");
 
   let pdf: Uint8Array;
   try {
@@ -81,8 +81,8 @@ export async function receiveEmail(
   const change = detectBeneficiaryChange(alias, reading.extraction, reading.destinations);
   if (change) {
     // Nobody signs out of fatigue: one pending request per alias, and a pause after a "no"
-    if (store.inCooldown(alias.alias)) return quarantine("change_cooldown");
-    const stored = store.addChangeRequest({
+    if (await store.inCooldown(alias.alias)) return quarantine("change_cooldown");
+    const stored = await store.addChangeRequest({
       aliasId: alias.alias,
       previous: alias.knownDestinations ?? [],
       proposed: change.proposed,
@@ -98,6 +98,6 @@ export async function receiveEmail(
   }
 
   // Recorded only once it enters the payment path; PDRGate enforces it again on chain
-  store.recordInvoice(reading.invoiceKey, messageHash);
+  await store.recordInvoice(reading.invoiceKey, messageHash);
   return { ...reading, messageHash, auth };
 }

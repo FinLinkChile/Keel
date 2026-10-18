@@ -64,6 +64,36 @@ describe("agent chain over JSON-RPC", () => {
     expect(asked).toEqual([{ address: escrow, topics: orderFundedTopics(orderId), fromBlock: "0x7", toBlock: "latest" }]);
   });
 
+  it("gives up waiting for a receipt after receiptTimeoutMs", async () => {
+    const hash = keccak256(toBytes("tx"));
+    const url = await node((method) => {
+      switch (method) {
+        case "eth_chainId":
+          return { result: "0x1" };
+        case "eth_getTransactionCount":
+          return { result: "0x0" };
+        case "eth_estimateGas":
+          return { result: "0x5208" };
+        case "eth_gasPrice":
+        case "eth_maxPriorityFeePerGas":
+          return { result: "0x1" };
+        case "eth_getBlockByNumber":
+          return { result: { number: "0x1", hash, timestamp: "0x1", baseFeePerGas: "0x1", transactions: [] } };
+        case "eth_sendRawTransaction":
+          return { result: hash };
+        case "eth_getTransactionReceipt":
+        case "eth_getTransactionByHash":
+          return { result: null };
+        default:
+          return { error: { code: -32601, message: "method not found" } };
+      }
+    });
+    const started = Date.now();
+    const error = await rpcChain(url, relayer, { receiptTimeoutMs: 300 }).send(call).catch((e) => e);
+    expect(error.name).toBe("WaitForTransactionReceiptTimeoutError");
+    expect(Date.now() - started).toBeLessThan(5000);
+  }, 15_000);
+
   it("an order never funded has no funding time", async () => {
     const url = await node((method) => (method === "eth_getLogs" ? { result: [] } : { error: { code: -32601, message: "method not found" } }));
     expect(await rpcChain(url, relayer).fundedAt(call.to, keccak256(toBytes("order")))).toBeUndefined();
