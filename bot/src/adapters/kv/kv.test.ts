@@ -1,6 +1,6 @@
 // The cloud adapters over an in-memory store: each "invocation" builds a fresh NotifyService and
 // directory, as a Lambda does, so only what is in the store carries over.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { NotifyService } from "../../application/notify";
 import { RetryableSendError, type ChatId } from "../../application/ports";
 import type { Message } from "../../domain/message";
@@ -9,7 +9,7 @@ import { CHATS, HASH, MemoryLogger, MemorySender, NOW_MS, nov, SAMPLES } from ".
 import { handleQueueMessage } from "../inbound/queue-source";
 import { RecipientsAdmin } from "./kv-admin";
 import { KvDirectory, KvOrders } from "./kv-directory";
-import { KvNotifyState } from "./kv-notify-state";
+import { CLAIM_LEASE_SECONDS, KvNotifyState } from "./kv-notify-state";
 import { MemoryKeyValueStore } from "./memory-store";
 
 const ORDER_ID = `0x${"12".repeat(32)}`;
@@ -87,6 +87,59 @@ describe("NotifyService on the key-value store", () => {
     expect(flaky.sent.map((s) => s.chatId).sort()).toEqual([CHATS.acme.owner, CHATS.acme.operator, CHATS.lingnan.owner, CHATS.lingnan.operator].sort());
   });
 
+  it("returns the cap slot after a retryable failure, so retries do not eat the cap", async () => {
+    const { kv, clock } = await seeded();
+    let down = true;
+    const sender = {
+      send: async (chatId: ChatId) => {
+        if (down && chatId === CHATS.acme.owner) throw new RetryableSendError("telegram");
+      },
+    } as unknown as MemorySender;
+    // Cap of 1: the owner's only slot of the hour must survive three failed attempts
+    for (let i = 0; i < 3; i++) await invocation(kv, clock, sender, 1).service.notify(SAMPLES.balance_released);
+    down = false;
+    const log = invocation(kv, clock, sender, 1);
+    expect(await log.service.notify(SAMPLES.balance_released)).toEqual({ status: "accepted", sent: 1 });
+    expect(log.logger.entries).toContainEqual(expect.objectContaining({ event: "sent", chatId: CHATS.acme.owner }));
+  });
+
+  it("releases the claim when the store throws before the send, so the redelivery reaches the chat", async () => {
+    const { kv, clock } = await seeded();
+    const state = new KvNotifyState(kv, clock);
+    const flaky = vi.spyOn(state, "admit").mockRejectedValueOnce(new Error("ProvisionedThroughputExceeded"));
+    const sender = new MemorySender();
+    const service = new NotifyService(
+      { directory: new KvDirectory(kv), renderer: templateRenderer, sender, clock: { now: clock }, logger: new MemoryLogger(), state },
+      { maxMessagesPerChatPerHour: 30 },
+    );
+    await expect(service.notify(SAMPLES.balance_released)).rejects.toThrow("ProvisionedThroughputExceeded");
+    flaky.mockRestore();
+    // The redelivery: every chat gets it exactly once
+    expect(await service.notify(SAMPLES.balance_released)).toEqual({ status: "accepted", sent: 4 });
+    expect(sender.sent).toHaveLength(4);
+  });
+
+  it("frees a claim left by a crashed invocation once the lease ends, but not a confirmed one", async () => {
+    const { kv, clock, advance } = await seeded();
+    const state = new KvNotifyState(kv, clock);
+    expect(await state.claim("n-crash", 111)).toBe(true);
+    expect(await state.claim("n-crash", 222)).toBe(true);
+    await state.confirm("n-crash", 222);
+    advance((CLAIM_LEASE_SECONDS - 1) * 1000);
+    expect(await state.claim("n-crash", 111)).toBe(false);
+    advance(2000);
+    expect(await state.claim("n-crash", 111)).toBe(true);
+    expect(await state.claim("n-crash", 222)).toBe(false);
+  });
+
+  it("keeps a chat claimed for good after a final send error", async () => {
+    const { kv, clock, advance } = await seeded();
+    const sender = { send: async (chatId: ChatId) => { if (chatId === CHATS.acme.owner) throw new TypeError("blocked"); } } as unknown as MemorySender;
+    await invocation(kv, clock, sender).service.notify(SAMPLES.balance_released);
+    advance((CLAIM_LEASE_SECONDS + 60) * 1000);
+    expect(await new KvNotifyState(kv, clock).claim(SAMPLES.balance_released.id, CHATS.acme.owner)).toBe(false);
+  });
+
   it("does not retry a final failure", async () => {
     const { kv, clock } = await seeded();
     const sender = { send: async (chatId: ChatId) => { if (chatId === CHATS.acme.owner) throw new TypeError("blocked"); } } as unknown as MemorySender;
@@ -140,6 +193,48 @@ describe("RecipientsAdmin", () => {
     ).rejects.toThrow(/not in the directory/);
     await expect(admin.apply({ accounts: { "Bad Id": null } }, "x")).rejects.toThrow(/does not validate/);
     expect(await admin.view()).toEqual(DIRECTORY);
+  });
+});
+
+describe("RecipientsAdmin audit and references", () => {
+  it("writes the audit before the entries, so a failed audit changes nothing", async () => {
+    const { kv, clock } = await seeded();
+    const failing = Object.create(kv) as MemoryKeyValueStore;
+    failing.put = async (pk, sk, ...rest) => {
+      if (pk === "audit#recipients") throw new Error("audit down");
+      return kv.put(pk, sk, ...rest);
+    };
+    const change = { accounts: { lingnan: { kind: "company", name: "Lingnan", roles: { owner: [999] } } } };
+    await expect(new RecipientsAdmin(failing, clock).apply(change, "ops")).rejects.toThrow("audit down");
+    expect((await new RecipientsAdmin(kv).view()).accounts.lingnan?.name).toBe("Lingnan Hydrocolloids");
+    // The retry applies it and audits it
+    expect(await new RecipientsAdmin(kv, clock).apply(change, "ops")).not.toBeNull();
+  });
+
+  it("leaves the intent on record when an entry write fails halfway", async () => {
+    const { kv, clock } = await seeded();
+    const failing = Object.create(kv) as MemoryKeyValueStore;
+    failing.put = async (pk, sk, ...rest) => {
+      if (pk === "account#lingnan") throw new Error("store down");
+      return kv.put(pk, sk, ...rest);
+    };
+    const change = { accounts: { lingnan: { kind: "company", name: "Lingnan", roles: { owner: [999] } } } };
+    await expect(new RecipientsAdmin(failing, clock).apply(change, "ops")).rejects.toThrow("store down");
+    const audits = await kv.query("audit#recipients", "");
+    expect(audits.at(-1)).toMatchObject({ actor: "ops", changes: { accounts: { lingnan: { to: { name: "Lingnan" } } } } });
+  });
+
+  it("refuses to delete an account that a stored order still names", async () => {
+    const { kv } = await seeded();
+    const admin = new RecipientsAdmin(kv);
+    await expect(admin.apply({ accounts: { lingnan: null } }, "x")).rejects.toThrow(/lingnan.*PO-0142/);
+    await expect(admin.apply({ accounts: { "hk-arbitration": null } }, "x")).rejects.toThrow(/PO-0142/);
+    expect(await admin.view()).toEqual(DIRECTORY);
+    // Deleting the order in the same request is fine
+    await admin.apply({ accounts: { lingnan: null }, orders: { [ORDER_ID]: null } }, "x");
+    expect((await admin.view()).accounts.lingnan).toBeUndefined();
+    // And an account no order names goes alone
+    await admin.apply({ accounts: { ana: null } }, "x");
   });
 });
 

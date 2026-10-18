@@ -52,6 +52,14 @@ describe('orderFromView', () => {
   });
 });
 
+describe('orderFromView shipment', () => {
+  it('keeps the attested shipment of the view', async () => {
+    const shipment = { attestation: { blNumberHash: `0x${'ab'.repeat(32)}`, onBoardDate: '1790000000' }, sigCarrier: '0x12' as Hex };
+    expect(orderFromView(await viewFrom('SHIPPED', { shipment }), 'harbor-line').shipment).toEqual(shipment);
+    expect(orderFromView(await viewFrom('ADVANCE_PAID'), 'harbor-line')).not.toHaveProperty('shipment');
+  });
+});
+
 describe('needFromApi', () => {
   it('maps each action of GET /needs-you', () => {
     const id = `0x${'11'.repeat(32)}` as Hex;

@@ -47,10 +47,16 @@ export interface NotifyState {
   // Records a notice id. True the first time it is seen.
   firstSeen(noticeId: string): Promise<boolean>;
   // Claims the delivery of a notice to one chat: true the first time only, so a notice that
-  // arrives twice (a producer retry, a queue redelivery) reaches each chat once.
+  // arrives twice (a producer retry, a queue redelivery) reaches each chat once. In a store the
+  // claim is a short lease: if the invocation dies before confirm(), the chat is free again
+  // once the lease ends, so a crash mid-send never loses the notice.
   claim(noticeId: string, chatId: ChatId): Promise<boolean>;
-  // Gives a claim back after a send that failed and will be retried.
+  // Turns the lease into the long record, once the send is over for good (sent, or a final error).
+  confirm(noticeId: string, chatId: ChatId): Promise<void>;
+  // Gives a claim back after a failure that will be retried.
   release(noticeId: string, chatId: ChatId): Promise<void>;
+  // Gives back the cap slot `admit` counted for a message that was not delivered.
+  refund(chatId: ChatId, now: number): Promise<void>;
   // Records a document hold on one side of an order. True if that side already had one.
   documentHold(orderRef: string, side: string): Promise<boolean>;
   // Counts one capped message for a chat at `now` (Unix ms) against `max` per hour.

@@ -1,9 +1,11 @@
 import { EIP712_TYPES, keelDomain, type BalanceApproval, type CancelOrder, type Hex, type ShipmentAttestation } from '@keel/schemas';
 import { structHash } from '@keel/schemas/hash';
-import { encodeAbiParameters, hashTypedData } from 'viem';
+import { encodeAbiParameters, hashTypedData, hexToString } from 'viem';
 
+import { formatMinor } from '../ui/format';
 import type { Signer } from '../wallet/signer';
 
+import { tokenToCents } from './amounts';
 import { isApiError, type ApiClient, type OrderView } from './api';
 import type { SigningSetup } from './signOrder';
 import type { Role } from './types';
@@ -78,10 +80,47 @@ export function attestationOf(raw: Record<string, unknown>): ShipmentAttestation
   };
 }
 
-// The attestationHash a BalanceApproval names, computed here from the attestation itself rather
-// than taken from the server: the importer approves the shipment it can see
+// The attestationHash a BalanceApproval names, computed here from the attestation fields of the
+// order view instead of read from a hash field the server sends. The fields themselves still come
+// from the API: the confirmation sheet shows them (balanceApprovalDetails) so the importer
+// approves what it was shown, but this app does not check them against the chain or the carrier's
+// signature; the escrow checks that signature when the shipment is submitted (submitShipment).
 export function attestationHashOf(view: Pick<OrderView, 'shipment'>): Hex | undefined {
   return view.shipment ? structHash('ShipmentAttestation', attestationOf(view.shipment.attestation)) : undefined;
+}
+
+// What the importer sees before approving the balance: the amount and the fields of the
+// attestation the signature names, read from the order view itself. The signature binds the hash
+// of that same attestation (attestationHashOf). undefined when the view holds no shipment, so
+// there is nothing to confirm (and approveBalance refuses as well).
+export interface BalanceApprovalDetails {
+  // USDC, 2 decimals
+  balance: string;
+  // UTC day, YYYY-MM-DD
+  onBoardDate: string;
+  portOfLoading: string;
+  blNumberHash: string;
+}
+
+const shortHash = (h: string) => (h.length > 14 ? `${h.slice(0, 8)}…${h.slice(-6)}` : h);
+
+export function balanceApprovalDetails(view: Pick<OrderView, 'shipment' | 'locked'>): BalanceApprovalDetails | undefined {
+  if (!view.shipment) return undefined;
+  const a = attestationOf(view.shipment.attestation);
+  // The port travels as bytes32 text (CNSZX); anything else is shown as its hash
+  let port: string = shortHash(a.portOfLoading);
+  try {
+    const text = hexToString(a.portOfLoading).replace(/\0+$/, '');
+    if (/^[A-Z0-9]{1,31}$/.test(text)) port = text;
+  } catch {
+    // keep the hash
+  }
+  return {
+    balance: formatMinor(tokenToCents(BigInt(view.locked))),
+    onBoardDate: new Date(Number(a.onBoardDate) * 1000).toISOString().slice(0, 10),
+    portOfLoading: port,
+    blNumberHash: shortHash(a.blNumberHash),
+  };
 }
 
 // ---------------------------------------------------------------- with the API
@@ -137,8 +176,9 @@ export async function signCancellation(api: ApiClient, signer: Signer, setup: Si
   }
 }
 
-// Escrow states where each action applies (TradeEscrow; aws/src/orders/rules.ts)
-export const CANCELLABLE_STATES = ['NONE', 'OPEN', 'ADVANCE_PAID', 'DISPUTED'] as const;
+// Escrow states where each action applies (TradeEscrow; aws/src/orders/rules.ts). NONE is not
+// one: the escrow's cancel reverts there, so a cancellation is never offered for an order it has not opened.
+export const CANCELLABLE_STATES = ['OPEN', 'ADVANCE_PAID', 'DISPUTED'] as const;
 export const canCancel = (state: string) => (CANCELLABLE_STATES as readonly string[]).includes(state);
 export const canApproveBalance = (view: Pick<OrderView, 'state' | 'shipment' | 'closing'>) => view.state === 'SHIPPED' && !!view.shipment && !view.closing?.balanceApproval;
 // raiseDispute is only valid from SHIPPED

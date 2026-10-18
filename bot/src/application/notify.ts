@@ -168,16 +168,27 @@ export class NotifyService {
         reached.add(chatId);
         if (!(await this.state.claim(notice.id, chatId))) continue;
 
-        if (capped) {
-          const admission = await this.state.admit(chatId, now, this.options.maxMessagesPerChatPerHour);
-          if (admission !== "admitted") {
-            this.counters.rateLimited++;
-            logger.log({ event: "rate_limited", noticeId: notice.id, kind: notice.kind, chatId });
-            if (admission === "over_cap_first") await this.sendOverflow(chatId);
-            continue;
+        // From here the claim is a lease. Whatever is not final gives it back, so the redelivery
+        // reaches this chat; a crash before confirm() frees it when the lease ends.
+        let admitted = false;
+        try {
+          if (capped) {
+            const admission = await this.state.admit(chatId, now, this.options.maxMessagesPerChatPerHour);
+            if (admission !== "admitted") {
+              this.counters.rateLimited++;
+              logger.log({ event: "rate_limited", noticeId: notice.id, kind: notice.kind, chatId });
+              if (admission === "over_cap_first") await this.sendOverflow(chatId);
+              await this.state.confirm(notice.id, chatId);
+              continue;
+            }
+            admitted = true;
           }
+          message ??= renderer.render(notice, recipient, { ...ctx, repeatDocumentHold: holdsBefore.has(recipient.side ?? "") });
+        } catch (err) {
+          // The store or the template failed before anything was sent: not final
+          await this.giveBack(notice.id, chatId, now, admitted);
+          throw err;
         }
-        message ??= renderer.render(notice, recipient, { ...ctx, repeatDocumentHold: holdsBefore.has(recipient.side ?? "") });
         try {
           await sender.send(chatId, message);
           this.counters.sent++;
@@ -187,15 +198,34 @@ export class NotifyService {
           this.counters.sendFailed++;
           const again = err instanceof RetryableSendError;
           if (again) {
-            await this.state.release(notice.id, chatId);
+            await this.giveBack(notice.id, chatId, now, admitted);
             retry++;
+          } else {
+            await this.state.confirm(notice.id, chatId);
           }
           logger.log({ event: "send_failed", noticeId: notice.id, kind: notice.kind, chatId, error: errorName(err), ...(again ? { retry: true } : {}) });
+          continue;
         }
+        await this.state.confirm(notice.id, chatId);
       }
     }
     if (!first && sent === 0 && retry === 0) return { status: "duplicate" };
     return { status: "accepted", sent, ...(retry > 0 ? { retry } : {}) };
+  }
+
+  // Frees a chat for the redelivery: the claim goes back and so does the cap slot, so retries do
+  // not eat the hourly cap. Best effort: if the store fails here, the lease ends by itself.
+  private async giveBack(noticeId: string, chatId: ChatId, now: number, admitted: boolean): Promise<void> {
+    try {
+      await this.state.release(noticeId, chatId);
+    } catch {
+      // The lease expires on its own
+    }
+    try {
+      if (admitted) await this.state.refund(chatId, now);
+    } catch {
+      // One slot of the cap stays used until the hour ends
+    }
   }
 
   // Sides of the order that had a document hold before this notice; records this one.

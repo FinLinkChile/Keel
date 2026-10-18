@@ -47,6 +47,12 @@ export class MemoryKeyValueStore implements KeyValueStore {
     return count + 1;
   }
 
+  async decrement(pk: string, sk: string, attr: string) {
+    const item = this.live(pk, sk);
+    if (!item || typeof item[attr] !== "number" || (item[attr] as number) <= 0) return;
+    this.items.set(`${pk}\n${sk}`, { ...item, [attr]: (item[attr] as number) - 1 });
+  }
+
   async setOnce(pk: string, sk: string, attr: string, ttl: number) {
     const item = this.live(pk, sk) ?? { pk, sk, ttl };
     if (item[attr] === true) return false;

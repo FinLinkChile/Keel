@@ -8,7 +8,8 @@
 // - a send Telegram may accept later (429, 5xx, network) or a store error: the message is
 //   reported and SQS delivers it again; the per-chat claims keep chats already reached from
 //   getting it twice;
-// - an invalid message: logged with its id and the error code, and dropped. It never comes back.
+// - an invalid message: logged as {event:"queue_invalid", messageId, code} (alarm on that name)
+//   and dropped. It never comes back.
 //
 // Environment: BOT_TABLE, KEEL_CHAIN_ID (or KEEL_SECRETS_PREFIX), APP_BASE_URL (optional),
 // BOT_PERSONAL_ACCOUNT_ID (optional, enables Keel Personal ingest outcomes),
@@ -55,7 +56,8 @@ export async function notifyBatch(event: SQSEvent, env: Env): Promise<SQSBatchRe
         personalAccountId: personal.success ? personal.data : undefined,
         orders: (orderId) => orders.book(orderId),
         now: rt.now,
-        log: (entry) => logJson({ ...entry, messageId: record.messageId }),
+        // queue_invalid is the event a CloudWatch metric filter and alarm watch: keep its name and `code`
+        log: (entry) => logJson({ ...entry, ...(entry.event === "queue_invalid" ? { code: entry.error } : {}), messageId: record.messageId }),
       });
       logJson({ event: "queue_message", messageId: record.messageId, outcome });
       if (outcome === "retry") batchItemFailures.push({ itemIdentifier: record.messageId });

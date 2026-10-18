@@ -12,6 +12,9 @@ const HOUR_MS = 3_600_000;
 const DAY_S = 24 * 60 * 60;
 // Long enough to cover any redelivery or producer retry of the same notice
 export const NOTICE_TTL_SECONDS = 30 * DAY_S;
+// A claim is a lease until the send is over: longer than the notify Lambda's timeout (60 s), so
+// a live invocation never loses it, short enough that a crashed one frees the chat soon.
+export const CLAIM_LEASE_SECONDS = 5 * 60;
 // A document hold is "the second one" for the life of an order
 export const HOLD_TTL_SECONDS = 365 * DAY_S;
 
@@ -31,7 +34,15 @@ export class KvNotifyState implements NotifyState {
   }
 
   claim(noticeId: string, chatId: ChatId): Promise<boolean> {
-    return this.kv.put(keys.notice(noticeId), keys.claim(chatId), {}, { ifAbsent: true, ttl: this.ttl(NOTICE_TTL_SECONDS) });
+    return this.kv.put(keys.notice(noticeId), keys.claim(chatId), {}, { ifAbsent: true, ttl: this.ttl(CLAIM_LEASE_SECONDS) });
+  }
+
+  async confirm(noticeId: string, chatId: ChatId): Promise<void> {
+    await this.kv.put(keys.notice(noticeId), keys.claim(chatId), {}, { ttl: this.ttl(NOTICE_TTL_SECONDS) });
+  }
+
+  async refund(chatId: ChatId, now: number): Promise<void> {
+    await this.kv.decrement(keys.window(chatId), keys.hour(Math.floor(now / HOUR_MS) * HOUR_MS), "count");
   }
 
   release(noticeId: string, chatId: ChatId): Promise<void> {

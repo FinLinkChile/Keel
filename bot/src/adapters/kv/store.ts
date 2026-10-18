@@ -32,6 +32,8 @@ export interface KeyValueStore {
   delete(pk: string, sk: string): Promise<void>;
   // Adds one to a counter unless it already reached `max`. The new value, or undefined at `max`.
   increment(pk: string, sk: string, attr: string, max: number, ttl: number): Promise<number | undefined>;
+  // Takes one off a counter that is above zero. Nothing happens at zero or when it is absent.
+  decrement(pk: string, sk: string, attr: string): Promise<void>;
   // Sets a flag that was not set: true for the first caller only.
   setOnce(pk: string, sk: string, attr: string, ttl: number): Promise<boolean>;
 }
