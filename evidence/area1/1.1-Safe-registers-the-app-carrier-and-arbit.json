@@ -1,0 +1,67 @@
+{
+  "schema": "keel.area1.evidence/v1",
+  "chainId": 84532,
+  "contracts": {
+    "safe": "0x366E72921895dBFD7688822418BE43E02551Ee82",
+    "roles": "0xD60f4297ed883D9b567A5A511F0735b2A7b19592",
+    "tradeEscrow": "0x8346c6F1AfbaFF8140D35116fAF5ec07e4232970",
+    "fundingGate": "0x2bc56bbB5B47B493009531e751C8Bd90513e927f",
+    "token": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+  },
+  "caseId": "1.1",
+  "phase": 1,
+  "title": "Safe registers the app carrier and arbiter",
+  "kind": "state-change",
+  "setup": [
+    {
+      "label": "Safe: queueThirdParty(APP_CARRIER, CARRIER)",
+      "hash": "0xea75ecb1fdd0800ffc59e67169679c340bcc18051e8664931348220f793e20c9",
+      "blockNumber": "48297502",
+      "from": "0x998207c916dcf1a0f14a24ddbf46332eedce6fd6",
+      "to": "0x366e72921895dbfd7688822418be43e02551ee82",
+      "status": "success",
+      "gasUsed": "138256",
+      "gasLimit": "188625"
+    },
+    {
+      "label": "Safe: queueThirdParty(APP_ARBITER, ARBITER)",
+      "hash": "0x3e435345b6218f9880013a387dc609f18f59d68dac651ce59f0b493d35a3c3e1",
+      "blockNumber": "48297504",
+      "from": "0x998207c916dcf1a0f14a24ddbf46332eedce6fd6",
+      "to": "0x366e72921895dbfd7688822418be43e02551ee82",
+      "status": "success",
+      "gasUsed": "138256",
+      "gasLimit": "188625"
+    }
+  ],
+  "passed": true,
+  "details": {
+    "configDelay": "120",
+    "changes": [
+      {
+        "label": "queueThirdParty(APP_CARRIER, CARRIER)",
+        "changeId": "7",
+        "activatesAt": "1792363412",
+        "queuedEarlier": false
+      },
+      {
+        "label": "queueThirdParty(APP_ARBITER, ARBITER)",
+        "changeId": "8",
+        "activatesAt": "1792363416",
+        "queuedEarlier": false
+      }
+    ],
+    "activatesAt": "1792363416",
+    "appCarrier": "0xB4B5591aFF224D76dE4D59F9fD832f5aC26B7708",
+    "appArbiter": "0x21fbA41765a1e643F5b185309d3ea8179341Ac9b",
+    "registryAfter": {
+      "carrier": true,
+      "arbiter": true
+    }
+  },
+  "notes": [
+    "Each change counts only from activatesAt = queue time + configDelay, enforced by FundingGate.",
+    "Checked first: neither address is the Safe, a Safe owner, the cosigner, the guardian, the policy signer or the relayer, and neither has code."
+  ],
+  "writtenAt": "2026-10-18T22:44:34.454Z"
+}

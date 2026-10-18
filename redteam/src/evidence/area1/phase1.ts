@@ -47,10 +47,10 @@ async function gateRejection(
 
 // ------------------------------------------------------------------ 1.1 registrations
 
-const SUPPLIER = 1;
-const THIRD_PARTY = 2;
+export const SUPPLIER = 1;
+export const THIRD_PARTY = 2;
 
-interface Wanted {
+export interface Wanted {
   label: string;
   kind: typeof SUPPLIER | typeof THIRD_PARTY;
   subject: Hex;
@@ -64,7 +64,7 @@ interface Earlier {
   tx: TxRef;
 }
 
-const callFor = (ctx: Ctx, w: Wanted) =>
+export const callFor = (ctx: Ctx, w: Wanted) =>
   w.kind === SUPPLIER ? gateCall(ctx, "queueSupplier", [w.subject, w.payout]) : gateCall(ctx, "queueThirdParty", [w.subject, w.roles]);
 
 // The newest change for the same subject that is not vetoed: for a supplier the same pair, for a
@@ -117,7 +117,7 @@ async function queuedTx(ctx: Ctx, changeId: bigint, queuedAt: bigint, label: str
   };
 }
 
-async function planRegistrations(ctx: Ctx, wanted: Wanted[]) {
+export async function planRegistrations(ctx: Ctx, wanted: Wanted[]) {
   const configDelay = await gateRead<bigint>(ctx, "configDelay");
   const plan: { w: Wanted; earlier?: Earlier }[] = [];
   for (const w of wanted) {

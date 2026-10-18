@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { parseArgs } from "node:util";
 import type { Hex } from "@keel/schemas";
 import { isHash } from "viem";
+import { appSetup } from "./appSetup";
 import { CaseFailure, connect, type Ctx } from "./chain";
 import { checkRegistryReady, preflight } from "./checks";
 import {
@@ -44,6 +45,7 @@ const { values: v, positionals } = parseArgs({
     order: { type: "string" },
     "order-b": { type: "string" },
     bl: { type: "string" },
+    "policy-hash": { type: "string" },
   },
 });
 
@@ -69,8 +71,8 @@ async function main() {
     console.log(summaryTable(recs));
     return;
   }
-  if (!command || !["phase1", "phase3", "open-order"].includes(command)) {
-    throw new PreconditionError("usage: cli.ts phase1 [--steps 1.1,1.2] | open-order | phase3 <repeat-deposit|exporter-dispute|late-attestation|duplicate-bl> | summary --out <dir> (see README.md)");
+  if (!command || !["phase1", "phase3", "open-order", "app-setup"].includes(command)) {
+    throw new PreconditionError("usage: cli.ts phase1 [--steps 1.1,1.2] | app-setup --policy-hash <hash> | open-order | phase3 <repeat-deposit|exporter-dispute|late-attestation|duplicate-bl> | summary --out <dir> (see README.md)");
   }
   loadEnvFile(v.env);
   const rpcUrl = v["rpc-url"] ?? process.env.BASE_SEPOLIA_RPC_URL;
@@ -108,6 +110,8 @@ async function main() {
   try {
     if (command === "phase1") {
       await runPhase1(ctx, sink, v.steps?.split(",").map((s) => s.trim()));
+    } else if (command === "app-setup") {
+      await appSetup(ctx, sink, (v["policy-hash"] ?? "") as Hex);
     } else if (command === "open-order") {
       // An order for a real deposit of phase 3 (the deposit itself is the real flow's)
       await preflight(ctx, { senders: ["exporter"] });

@@ -43,6 +43,7 @@ Run from the repo root after `forge build` in `contracts/`. Each order totals `-
 ```sh
 TSX=node_modules/.bin/tsx; CLI=redteam/src/evidence/area1/cli.ts
 $TSX $CLI phase1 [--steps 1.3,1.4] [--out DIR]     # default: every step, in order
+$TSX $CLI app-setup --policy-hash <hash>           # Delay policy + app carrier and arbiter (below)
 $TSX $CLI open-order [--deadline-seconds 600]       # an order for a real deposit of phase 3
 $TSX $CLI phase3 repeat-deposit   --tx <deposit tx hash>
 $TSX $CLI phase3 exporter-dispute --order <orderId>
@@ -50,6 +51,8 @@ $TSX $CLI phase3 duplicate-bl     --order <orderId A> --order-b <orderId B> [--b
 $TSX $CLI phase3 late-attestation --order <orderId>  # waits deadline + grace, showing the time left
 $TSX $CLI summary --out DIR                          # table of every file in DIR
 ```
+
+`app-setup` runs in one process, so the owner's nonces never collide: it checks that the Delay has nothing pending, queues `FundingGate.setPolicyHash` on it (as `SetTradePolicy.s.sol`), queues `APP_CARRIER_ADDRESS` and `APP_ARBITER_ADDRESS` with the idempotent 1.1 (after checking that neither is the Safe, a Safe owner, the cosigner, the guardian, the policy signer or `RELAYER_ADDRESS`, nor has code), waits for the cooldown, runs `executeNextTx`, waits for `configDelay` and reads back the policy hash and both roles. It writes `1.0-…` (policy) and `1.1-…app carrier and arbiter`.
 
 Common options: `--rpc-url` (default `$BASE_SEPOLIA_RPC_URL`), `--deployments` (default `contracts/deployments/<chainId>.json`), `--out` (default a new temporary directory), `--live` (required for a real chain).
 
