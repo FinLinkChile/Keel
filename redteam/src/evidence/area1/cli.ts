@@ -21,6 +21,7 @@ import {
 } from "./config";
 import { openOrder, trustedParties } from "./orders";
 import { runPhase1 } from "./phase1";
+import { rotateGuardian } from "./rotateGuardian";
 import { duplicateBl, exporterDisputeBeforeShipment, lateAttestation, repeatDeposit } from "./phase3";
 import { type CaseRecord, Sink, summaryTable } from "./record";
 
@@ -71,8 +72,8 @@ async function main() {
     console.log(summaryTable(recs));
     return;
   }
-  if (!command || !["phase1", "phase3", "open-order", "app-setup"].includes(command)) {
-    throw new PreconditionError("usage: cli.ts phase1 [--steps 1.1,1.2] | app-setup --policy-hash <hash> | open-order | phase3 <repeat-deposit|exporter-dispute|late-attestation|duplicate-bl> | summary --out <dir> (see README.md)");
+  if (!command || !["phase1", "phase3", "open-order", "app-setup", "rotate-guardian"].includes(command)) {
+    throw new PreconditionError("usage: cli.ts phase1 [--steps 1.1,1.2] | app-setup --policy-hash <hash> | rotate-guardian [--tx <setGuardian hash>] | open-order | phase3 <repeat-deposit|exporter-dispute|late-attestation|duplicate-bl> | summary --out <dir> (see README.md)");
   }
   loadEnvFile(v.env);
   const rpcUrl = v["rpc-url"] ?? process.env.BASE_SEPOLIA_RPC_URL;
@@ -112,6 +113,8 @@ async function main() {
       await runPhase1(ctx, sink, v.steps?.split(",").map((s) => s.trim()));
     } else if (command === "app-setup") {
       await appSetup(ctx, sink, (v["policy-hash"] ?? "") as Hex);
+    } else if (command === "rotate-guardian") {
+      await rotateGuardian(ctx, sink, v.tx ? hash32("tx", v.tx) : undefined);
     } else if (command === "open-order") {
       // An order for a real deposit of phase 3 (the deposit itself is the real flow's)
       await preflight(ctx, { senders: ["exporter"] });

@@ -22,8 +22,8 @@ function delayAbi(ctx: Ctx): Abi {
   }
 }
 
-// The app's parties must be plain accounts with no other role in the deployment.
-async function checkAppParties(ctx: Ctx, parties: Record<string, Hex>) {
+// The given accounts must be plain accounts with no other role in the deployment.
+export async function checkPlainAccounts(ctx: Ctx, parties: Record<string, Hex>, what: string) {
   const owners = await read<Hex[]>(ctx, ctx.d.safe, safeAbi, "getOwners");
   const forbidden: [string, Hex][] = [
     ["Safe", ctx.d.safe],
@@ -45,7 +45,7 @@ async function checkAppParties(ctx: Ctx, parties: Record<string, Hex>) {
     if (code && code !== "0x") throw new PreconditionError(`${name} ${a} has code; nothing sent`);
   }
   if (entries[0]?.[1].toLowerCase() === entries[1]?.[1].toLowerCase()) throw new PreconditionError("the carrier and the arbiter are the same address");
-  console.log(`  app parties ok: not the Safe, its ${owners.length} owners, cosigner, guardian, policySigner or relayer; no code`);
+  console.log(`  ${what} ok: not the Safe, its ${owners.length} owners, cosigner, guardian, policySigner or relayer; no code`);
 }
 
 export async function appSetup(ctx: Ctx, sink: Sink, policyHash: Hex) {
@@ -53,7 +53,7 @@ export async function appSetup(ctx: Ctx, sink: Sink, policyHash: Hex) {
   await preflight(ctx, { senders: ["owner"] });
   const carrier = envAddress("APP_CARRIER_ADDRESS");
   const arbiter = envAddress("APP_ARBITER_ADDRESS");
-  await checkAppParties(ctx, { APP_CARRIER_ADDRESS: carrier, APP_ARBITER_ADDRESS: arbiter });
+  await checkPlainAccounts(ctx, { APP_CARRIER_ADDRESS: carrier, APP_ARBITER_ADDRESS: arbiter }, "app parties");
 
   // ---- Delay: nothing pending, the owner is a module, it acts on the gate's Safe
   const abi = delayAbi(ctx);
