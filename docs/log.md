@@ -1,5 +1,9 @@
 # Historial de la documentación
 
+## 2026-10-18
+
+* **Decisión 17 cerrada, Área 2 (Darienn): el relayer del servicio del agente envía `open` y paga el gas.** Faltaba quién llamaba a `TradeEscrow.open`: T2.11 daba por hecho que la orden ya estaba abierta. `open` no pide permiso, la autoridad son las firmas del importador y del exportador, así que el relayer no gana poder; la interfaz (Área 4) firma y entrega la orden con las dos firmas, y el motor y el relayer ejecutan, como en los demás pasos. El agente solo abre órdenes de su Safe. Implementado en `engine/src/agent/` (acción `open`, firmas en `order.json`) con tres pruebas contra el TradeEscrow compilado. **Afecta al Área 4:** `order.json` debe traer `sigImporter` y `sigExporter`. Ver [servicio del agente](arquitectura/servicio-del-agente.md) y [Área 2](trabajo/area-2-motor.md).
+
 ## 2026-10-17
 
 * **Actualización del Área 2 (Darienn):** el agente y el monitor toman el escrow, la Safe, el gate y las llaves de cupo de `contracts/deployments/<chainId>.json` (el archivo que escribe `DeployTrade` del Área 1, PR #77) y buscan los logs del escrow desde su `deployBlock`, como pidió el Área 1 en la revisión del PR #54. Las variables `KEEL_ESCROW`, `KEEL_SAFE`, `KEEL_FUNDING_GATE` y las de cupo quedan solo para lo que el archivo no tiene; si lo contradicen, el agente no arranca. El comentario de `documentHash` en `schemas/` dice ahora que es el `fileHash` de la proforma, como decidió el Área 4 en el PR #66. Ver [servicio del agente](arquitectura/servicio-del-agente.md).

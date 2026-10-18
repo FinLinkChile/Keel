@@ -126,11 +126,12 @@ Para cada orden en curso, el agente ejecuta `refundAfterDeadline` cuando pasó l
 
 **T2.11 Servicio del agente (agregada por Trade). [PROPUESTA]**
 El proceso que une la ingesta, el motor, el PDR y el relayer. Sin él no hay orden de punta a punta (punto de integración del viernes 16, acto 1 de la demo). Vive en `engine/`, separado de las funciones puras: el motor sigue sin red y el servicio es el único que lee la cadena y envía transacciones.
+* **Apertura (paso 1, [decisión 17](../decisiones/abiertas.md)):** el relayer envía `open(po, sigImporter, sigExporter)` con las dos firmas que el Área 4 deja junto a la orden en `order.json`. Solo abre órdenes cuyo `importer` es la Safe del agente y simula antes de enviar (T2.5): una firma inválida, un token no permitido o una separación de roles rota se retiene con el nombre del error y sin gastar gas. No da autoridad al relayer, porque la autoridad son las firmas. Una vez abierta, la vuelta siguiente sigue con el depósito.
 * **Depósito (paso 2):** detecta una orden abierta en el escrow, lee el estado de la orden, los registros y el cupo del FundingGate, arma el `FundingContext`, llama a `evaluateFunding`, firma el PDR (T2.4), simula la llamada (T2.5) y la envía con el relayer al gate de Trade. Nivel 3: entrega la solicitud de cofirma al Área 4. Nivel 2 o 4: retiene y avisa (T2.6).
 * **Gatillo 2 (paso 5):** recibe las extracciones y el hash de cada archivo del Área 3, lee la atestación registrada (`ShipmentAccepted`) y los `OrderTerms` de la orden, llama a `issueDocumentPdr`, guarda la evidencia y envía `releaseBalance`. Si los documentos no son conformes, retiene y avisa; la salida manual es la `BalanceApproval` del importador.
 * **Plazos:** corre la vigilancia de T2.10.
 * **Llaves:** el relayer solo paga gas y envía; el firmante de política firma en un proceso separado ([custodia de llaves](../arquitectura/custodia-de-llaves.md)). El servicio no gana autoridad nueva: sin un PDR o una firma válida, el gate y el escrow revierten.
-* De dónde salen la orden, los términos, los proveedores conocidos y el historial de montos es la [decisión abierta 15](../decisiones/abiertas.md). Mientras no se cierre, el servicio los lee de archivos locales de la demo.
+* De dónde salen la orden, los términos, los proveedores conocidos y el historial de montos es la [decisión abierta 15](../decisiones/abiertas.md). Mientras no se cierre, el servicio los lee de archivos locales de la demo. Las firmas para `open` viajan con la orden: lo que sigue abierto es dónde viven, no quién envía `open`.
 * Cómo funciona, qué archivos lee y qué avisos emite: [servicio del agente](../arquitectura/servicio-del-agente.md).
 
 # Listo cuando
