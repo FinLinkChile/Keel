@@ -15,8 +15,9 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { AppState, View } from 'react-native';
 
+import { syncOrdersWithIngest } from '@/data';
 import { LanguageProvider } from '@/i18n';
 import { SessionProvider } from '@/session';
 import { Splash } from '@/ui/Splash';
@@ -68,6 +69,14 @@ export default function RootLayout() {
 // Drawn again whenever the theme changes, so it reads the new palette
 function Shell({ opening, onOpened }: { opening: boolean; onOpened: () => void }) {
   const { mode } = useTheme();
+  // Signed orders ingest has not taken yet go again when the app opens or comes back
+  useEffect(() => {
+    void syncOrdersWithIngest();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void syncOrdersWithIngest();
+    });
+    return () => sub.remove();
+  }, []);
   return (
     <>
       <StatusBar style={mode === 'light' ? 'dark' : 'light'} />

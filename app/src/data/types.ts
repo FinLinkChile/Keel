@@ -115,7 +115,10 @@ export type NeedsYou =
   // From the Keel API (GET /needs-you): the shipment is attested, the importer may release the
   // balance; and the other side signed a cancellation this side has not signed yet
   | { kind: 'approve_balance'; orderId: Hex }
-  | { kind: 'sign_cancel'; orderId: Hex; cancelNonce?: string };
+  | { kind: 'sign_cancel'; orderId: Hex; cancelNonce?: string }
+  // Ingest refused the order signed on this phone (POST /trade/orders): until it takes it, nobody
+  // can upload the order's documents. `reason` is ingest's code.
+  | { kind: 'register_order'; orderId: Hex; reason?: string };
 
 // A supplier that went through the supplier check, with the payout account registered then. The
 // payout address is the only place an order takes its payee from.

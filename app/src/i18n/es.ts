@@ -708,4 +708,16 @@ export const es: Record<string, string> = {
   "Refunds in the year": "Reembolsos en el año",
   "Advance negotiated": "Anticipo negociado",
   "Total negotiated": "Total negociado",
+  // Signed orders handed to ingest
+  "{label} is not registered yet": "{label} aún no está registrada",
+  "Keel could not register it. It tries again when you open the app": "Keel no pudo registrarla. Lo intenta de nuevo cuando abres la app",
+  "Keel does not know your company yet. Ask Keel to register it; the app tries again": "Keel aún no conoce a tu empresa. Pide a Keel que la registre; la app lo vuelve a intentar",
+  "Keel could not check your signature for your company. Ask Keel to register your wallet": "Keel no pudo comprobar tu firma por tu empresa. Pide a Keel que registre tu billetera",
+  "The supplier's signature does not match the order. Do not ship against it": "La firma del proveedor no coincide con la orden. No embarques contra ella",
+  "The terms do not match the signed order. Send a new order": "Las condiciones no coinciden con la orden firmada. Envía una orden nueva",
+  "The order id does not match its parties. Send a new order": "El id de la orden no coincide con sus partes. Envía una orden nueva",
+  "Keel already has a different order with this id. Send a new order": "Keel ya tiene otra orden con este id. Envía una orden nueva",
+  "Keel could not read this order. Update the app": "Keel no pudo leer esta orden. Actualiza la app",
+  "Keel has not registered this order yet. ": "Keel aún no registra esta orden. ",
+  "See why.": "Mira por qué.",
 };

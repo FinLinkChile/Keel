@@ -29,6 +29,11 @@ export type Proposal = {
   signedAt?: number;
   // What the proforma asked for, to compare with what was agreed
   quote?: Quote;
+  // Unix seconds when ingest registered the signed order (POST /trade/orders): from then its
+  // parties may upload the documents and the agent has its order.json
+  ingestRegisteredAt?: number;
+  // The last refusal of ingest, until it registers the order: the HTTP status and its reason code
+  ingestRefusal?: { status: number; reason?: string };
 };
 
 // "PO0158" -> "PO-0158"

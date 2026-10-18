@@ -36,6 +36,7 @@ npm run demo-data -w app -- --exporter 0x… [--importer 0x…] [--out <dir>]
 |---|---|---|
 | `<out>/ingest-orders.json` | ingest, as `INGEST_ORDERS_FILE` | The open orders a test wallet can upload to: `orderId`, `payoutAddress` and `carrier` from the order, the wallets as `uploaders`, and the exporter's registered bank account as `knownDestinations`, so its own invoice raises no unknown account alert |
 | `<out>/agent/orders/<orderId>/order.json` | the agent (Area 2) | `{ order, terms, label }`: the `PurchaseOrder` with its real `termsHash` and `requiredDocsHash`, the `OrderTerms` and the label of the bot notices |
+| `<out>/agent/orders/<orderId>/order.json` (signed) | the agent (Area 2) | The same file plus `sigImporter` and `sigExporter`, which the agent needs to send `open` (decision 17). `demo-data` has no keys, so it cannot write them: the phones produce them when both sign. After the importer signs, the app posts the file to `{EXPO_PUBLIC_INGEST_URL}/trade/orders` ([signed order](../docs/interfaces/orden-firmada.md)); ingest checks both signatures, lets the parties upload documents and writes the file for the agent. The app records whether ingest took it and sends it again after signing and whenever it opens; a refusal shows as a notice with its reason. Signing never waits for it |
 | `<out>/agent/registry.json` | the agent | `parties` (address, bot account, the importer's RUT) and `history` (settled amounts by exporter) |
 | `<out>/bot-orders.json` | the bot, as `BOT_ORDERS_FILE` | The label and the bot accounts of each order, by order id |
 

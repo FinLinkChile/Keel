@@ -156,7 +156,9 @@ function NeedsYouSheet({ item, role }: { item: Item; role: Role }) {
         ? t('{name} shipped. ', { name: shortName(counterparty) })
         : item.kind === 'sign_cancel'
           ? t('{name} asked to cancel. ', { name: shortName(counterparty) })
-          : t('Ship and upload. ');
+          : item.kind === 'register_order'
+            ? t('Keel has not registered this order yet. ')
+            : t('Ship and upload. ');
   const action = item.kind === 'upload_documents' ? 'Upload' : 'Review';
   return (
     <Sheet>
@@ -170,7 +172,7 @@ function NeedsYouSheet({ item, role }: { item: Item; role: Role }) {
         <Text size={14} color="textMuted" leading={1.35} style={{ flex: 1 }}>
           {lead}
           <Text size={14} weight={700}>
-            {t('Your turn.')}
+            {item.kind === 'register_order' ? t('See why.') : t('Your turn.')}
           </Text>
         </Text>
         <Text mono size={12} color="textFaint">

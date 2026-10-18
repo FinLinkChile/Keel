@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { config } from '@/config';
-import { proposals, useData } from '@/data';
+import { proposals, syncOrdersWithIngest, useData } from '@/data';
 import { tokenToCents } from '@/data/amounts';
 import { apiProblem } from '@/data/apiProblem';
 import { importerRejects, importerSigns, reviewForImporter, type Review } from '@/data/proposalFlow';
@@ -103,6 +103,8 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
     try {
       const move = await importerSigns(proposals, proposal!, { signer, setup, now: Date.now() / 1000 });
       if (!move.ok) setFailed({ checks: move.checks, differences: move.differences ?? [] });
+      // Hands the signed order to ingest; signing is done either way, and a failed send is retried
+      else void syncOrdersWithIngest();
     } catch (e) {
       setProblem(apiProblem(e) ?? t('The wallet could not sign. Try again.'));
     }
