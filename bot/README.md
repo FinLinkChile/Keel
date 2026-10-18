@@ -101,14 +101,14 @@ Ingest names an order by its bytes32 `orderId` and the parties by wallet address
 ```json
 {
   "orders": {
-    "0x0000000000000000000000000000000000000000000000000000000000000142": {
+    "0xd4ea1e15e78409b5ac70c0f757355733cb4685325bb9b238122ad8be30768f8e": {
       "label": "PO-0142", "importer": "acme-imports", "exporter": "lingnan", "arbiter": "hk-arbitration", "shipmentDeadline": 1795132800
     }
   }
 }
 ```
 
-The bytes32 id becomes the notice's `orderRef`, so the app link opens the same order. Startup fails if the file does not validate, if a label is not a valid `orderLabel`, if an account is not in the directory or if an order names the same account twice. There is no address map: ingest's outcomes already say which side uploaded (`party`), and an address is never shown. `examples/orders.json` holds the three demo orders, and the act files use their ids.
+The bytes32 id becomes the notice's `orderRef`, so the app link opens the same order. Startup fails if the file does not validate, if a label is not a valid `orderLabel`, if an account is not in the directory or if an order names the same account twice. There is no address map: ingest's outcomes already say which side uploaded (`party`), and an address is never shown. `examples/orders.json` holds the three demo orders, and the act files use their ids. The ids are computed as the escrow opens an order, `keccak256(abi.encode(importer, exporter, nonce))`, from the app's demo data: regenerate the examples with `npm run bot-examples -w app`, and a real order book for test wallets with `npm run demo-data -w app` (`bot-orders.json`).
 
 ## Layers
 
@@ -137,23 +137,27 @@ Every notice has `id` (one per event, used to deduplicate), `occurredAt` (Unix s
 
 In Trade, `orderRef` is opaque and only builds the app URL; `orderLabel` is what is shown, `^[A-Z]{1,4}-[0-9]{1,6}$`, so a phone number cannot pass as a label. Order notices carry `parties: { importer, exporter, arbiter? }` with account ids only. Wallet notices carry the `accountId` of the company that owns the wallet.
 
+The Source column says what produces each notice today, and the chain event behind it (names in `docs/interfaces/eventos-y-errores.md`). The agent (T2.6) posts the order notices when it sends the step, not from escrow events; a listener of the escrow events does not exist yet, so a kind that only has an event has no producer.
+
 | kind | Source | Fields |
 |---|---|---|
-| `order_opened` | `OrderOpened` | `amountMinor`, `currency`, `shipmentDeadline` |
-| `order_funded` | `OrderFunded` (not `FundingExecuted`: the same deposit would notify twice) | `amountMinor`, `currency` |
-| `advance_released` | `AdvanceReleased` | `amountMinor`, `currency` |
-| `shipment_accepted` | `ShipmentAccepted`. The order is shipped; the balance does not leave yet | `onBoardDate`, `balanceReleasableAt?` (shipment time plus the order's dispute window, shown as a date when present) |
-| `balance_released` | `BalanceReleased`. Per `area1/trade-escrow`, the balance leaves when the dispute window closes (`releaseBalance`) or earlier if the importer approves it (`approveBalance`) | `amountMinor`, `currency` |
-| `refunded` | `Refunded` | `amountMinor`, `currency` |
-| `order_cancelled` | `OrderCancelled` | `amountMinor`, `currency` |
-| `dispute_raised` | `DisputeRaised` | `raisedBy` |
-| `dispute_resolved` | `DisputeResolved` | `toImporterMinor`, `toExporterMinor`, `currency` |
-| `operation_held` | `OperationHeld` and the monitor | `reason`, `deadline?`, `amountMinor?` with `currency?`, `diffs?` (only with `two_source_mismatch`) |
-| `deadline_approaching` | T2.6 scheduler | `deadline`, `daysLeft` |
-| `account_change_attempt` | ingest (Trade) | none. Never the account, the sender or the text |
-| `change_queued` | Delay | `changeKind`, `effectiveAt` |
-| `transfer_blocked` | Roles Modifier revert (act 4) | `txHash` |
-| `agent_revoked`, `gate_paused` | `AgentRoleRevoked`, `GatePaused` | none |
+| `order_opened` | `OrderOpened` of the escrow. No producer yet: the agent does not send it | `amountMinor`, `currency`, `shipmentDeadline` |
+| `order_funded` | The agent, when it sends `fund`. Chain event: `OrderFunded` of the escrow (not `FundingExecuted` of the gate: the same deposit would notify twice) | `amountMinor`, `currency` |
+| `advance_released` | The agent, when it sends `fund` with an advance. Chain event: `AdvanceReleased`, emitted inside `fund` with `OrderFunded` | `amountMinor`, `currency` |
+| `shipment_accepted` | The agent, when it sends `submitShipment`. Chain event: `ShipmentAccepted`. The order is shipped; the balance does not leave yet | `onBoardDate`, `balanceReleasableAt?` (shipment time plus the order's dispute window, shown as a date when present) |
+| `balance_released` | The agent, when it sends `releaseBalance`. Chain event: `BalanceReleased`, which also comes from `approveBalance` (the importer approves it earlier). The balance leaves when the dispute window closes or the importer approves | `amountMinor`, `currency` |
+| `refunded` | The agent, when it sends `refundAfterDeadline`. Chain event: `Refunded` | `amountMinor`, `currency` |
+| `order_cancelled` | `OrderCancelled` of the escrow. No producer yet | `amountMinor`, `currency` |
+| `dispute_raised` | `DisputeRaised` of the escrow. No producer yet | `raisedBy` |
+| `dispute_resolved` | `DisputeResolved` of the escrow. No producer yet | `toImporterMinor`, `toExporterMinor`, `currency` |
+| `operation_held` | Never a chain event: a held operation never reaches the chain, and the gate has no `OperationHeld`. Two producers. The agent (T2.6, `POST /notices`) for `new_supplier_wait`, `over_limit_cosign`, `funding_blocked`, `simulation_failed`, `agent_data_incomplete` and the document reasons it can name (`hidden_text`, `account_change_mention`, `documents_mismatch`). Ingest's `trade_upload` (see "For Area 3") for `two_source_mismatch`, `documents_mismatch`, `bl_reused`, `document_unreadable` and `hidden_text` | `reason`, `deadline?`, `amountMinor?` with `currency?`, `diffs?` (only with `two_source_mismatch`) |
+| `deadline_approaching` | The agent (T2.6), at 5, 3 and 1 days | `deadline`, `daysLeft` |
+| `account_change_attempt` | Ingest's `trade_upload`, from an alert | none. Never the account, the sender or the text |
+| `change_queued` | `ChangeQueued` of the gate (`FundingGate`, the trust registry; not a Delay), posted by the monitor of Area 2 (T2.8, PR #60): `kind` 1 (a supplier pair) is `supplier_added`, `kind` 2 (a third party) is `role_change` | `changeKind`, `effectiveAt` |
+| `transfer_blocked` | A call refused by the Roles Modifier. A revert leaves no event for the bot to read, so there is no producer yet; only the act 4 demo file sends it | `txHash` |
+| `unauthorized_execution` | the monitor of Area 2 (T2.8, `POST /notices`): a deposit or a balance release made with an approval the engine never issued | `txHash`. Never an address or an amount |
+| `agent_revoked` | `AgentRoleRevoked`, which only `PDRGate` (Personal) has. The Trade gate has no such event, so there is no Trade producer yet | none |
+| `gate_paused` | `GatePaused`, emitted by both gates; the monitor of Area 2 (T2.8, PR #60) posts it | none |
 | `payment_held` | engine (T2.6) | `aliasId`, `amountClp`, `dueDate`, `reason` |
 | `payment_deadline` | T2.6 scheduler, at 5, 3 and 1 days (three ids) | `aliasId`, `amountClp`, `dueDate`, `daysLeft` |
 | `invoice_needs_cosign` | ingest, `escalated` (tier 3) | `aliasId`, `diffs` |
@@ -168,7 +172,7 @@ Enums of the bot. How producers reach the bot is not decided yet: `POST /notices
 
 * `operation_held.reason`: `new_supplier_wait`, `over_limit_cosign`, `documents_mismatch`, `two_source_mismatch`, `hidden_text`, `account_change_mention`, `bl_reused` (the bill of lading already settled another order) and `document_unreadable` (neither reader could read it; the importer is asked to get a clean copy). Three more come from the engine (T2.6): `funding_blocked` (the engine refused the deposit), `simulation_failed` (the step would revert on chain, so nothing was sent) and `agent_data_incomplete` (the agent's data does not match the order). Document reasons are the six from `documents_mismatch` to `document_unreadable`: the exporter gets the generic version.
 * `payment_held.reason`: `issuer_mismatch`, `amount_out_of_range`, `over_period_limit`, `fx_divergence`, `account_change_request`, `hidden_text`, `simulation_failed`.
-* `change_queued.changeKind`: `limit`, `supplier_added`, `role_change`, `policy_signer`. An assumption, to align with what Area 1's Delay queues once it exists.
+* `change_queued.changeKind`: `limit`, `supplier_added`, `role_change`, `policy_signer`. The gate's `ChangeQueued` has two kinds, a supplier pair and a third party, and only they have a producer (`supplier_added`, `role_change`). The gate queues no spending limit, and `PolicySignerSet` is not a queued change, so `limit` and `policy_signer` have none today; the enum values stay until Area 1 and Area 2 say whether they will. `ChangeVetoed` of the gate has no Trade notice: the monitor only logs it.
 * `currency`: `USD`, `EUR`, `CNY`, `HKD`, the commercial invoice enum. Decimals per currency live in `presentation/format.ts`, because the payment token is open decision 1.
 
 ### Two source mismatch (T3.5)
@@ -194,6 +198,7 @@ Trade diffs cover the twelve fields ingest compares on a transport document and 
 | `account_change_attempt` | owner, operator | owner | |
 | `change_queued` | cosigner, owner | | |
 | `transfer_blocked`, `agent_revoked`, `gate_paused` | owner, cosigner | | |
+| `unauthorized_execution` | owner, operator, cosigner | | |
 | `dispute_raised`, `dispute_resolved` | owner, operator | owner, operator | owner |
 
 The exporter is never told which control fired: "hidden text" would teach an attacker what is detected. A second document hold on the same order tells the exporter that another document is under review.
@@ -214,6 +219,7 @@ Both HTTP routes share one server on `BOT_HOST:BOT_PORT`, each with its own Bear
 * `POST /ingest/outcomes`: `Authorization: Bearer <BOT_INGEST_TOKEN>`; ingest's own output, which the bot maps (see "For Area 3").
 * `file-source`: `npm run notify -w bot -- <file>`. The examples in `examples/` are the four Trade demo acts and `personal-two-sources.json`, with fictitious accounts and chats. `examples.test.ts` keeps them valid.
 * `ingest-mapper`: turns ingest's `escalated`, `held` and `change_requested` outcomes and `changeDigest` into notices. It imports from `@keel/ingest` with `import type` only, because ingest pulls heavy SDKs. It is written against ingest's types but not wired to ingest: how producers reach the bot is not decided yet, and wiring it is Area 3's side. The personal `accountId` comes from configuration, since ingest knows no accounts.
+* `ingest-trade-mapper`: turns a Trade `TradeOutcome` into zero, one or several notices (see "For Area 3"). It reads the outcome through a copy of its shape that parsing strips down to what is read, so `alert.found` and any other field never exist for the code that builds a notice. A test checks the copy against ingest's types and its constants.
 
 ### For Area 3
 
@@ -238,7 +244,7 @@ Authorization: Bearer <BOT_INGEST_TOKEN>
 * After `receiveEmail`, post its outcome. After `IngestStore.changeDigest(since)`, post the requests with the same `since`.
 * Answers: `401` without the token; `400` with `invalid_body` if the body lacks this shape, `mapper_failed` if the outcome cannot be mapped (only the error class is logged) or `source_disabled` if the source is not configured; `202` with `{ "status": "accepted" | "duplicate" | "rejected" | "ignored" }`. `ignored` is for `quarantined`, `duplicate` and `ready` emails: nothing to tell. `rejected` means the mapped notice did not validate.
 * Posting the same outcome twice is safe: the notice id comes from the message hash or the request id.
-* `trade_upload` answers `501` for now. Its mapper is written once `area3/trade-ingest` is merged, because the `TradeOutcome` type is not on `dev` yet. It needs `BOT_ORDERS_FILE` to turn the `orderId` into a label and accounts. Planned mapping:
+* `trade_upload` needs `BOT_ORDERS_FILE` to turn the `orderId` into a label, the accounts and the shipment deadline; without it the source is disabled (`400 source_disabled`), and an `orderId` that is not in the file gives `400 mapper_failed`. One upload can give several notices, and then the answer is `{ "status": <first of accepted, duplicate, rejected>, "notices": [<each status>] }`. Mapping:
 
 | `TradeOutcome` | Notice |
 |---|---|
@@ -246,9 +252,12 @@ Authorization: Bearer <BOT_INGEST_TOKEN>
 | `held`, `doc_type_mismatch` | `operation_held` `documents_mismatch` |
 | `held`, `bl_used_by_other_order` | `operation_held` `bl_reused` |
 | `held`, `parser_failed` or `extractor_failed` | `operation_held` `document_unreadable` |
-| any reading with `alert` | `account_change_attempt`. The destinations in `found` never reach the chat |
-| `ready` without `alert` | nothing |
-| `rejected`, `quarantined`, `duplicate` | nothing |
+| a reading (`ready` or `disagreement`) with `alert` | `account_change_attempt`, next to the hold if there is one. The destinations in `found`, the triggers and the reminder code never reach the chat: the message already says the account only changes with a new order signed by both sides |
+| a reading (`ready` or `disagreement`) whose extraction has `hidden_text_detected` | `operation_held` `hidden_text`, next to any other hold |
+| `ready` without `alert` or hidden text | nothing |
+| `rejected`, `quarantined`, `duplicate` | nothing (ingest logs them) |
+
+Each notice id is made from the file hash and the reason (the alert's id for an alert), so reporting the same upload twice sends it once. A comparison field that the bot does not know is dropped from `diffs`; the hold still goes out. The currency and amount of a disagreement come from the parser's reading and are used only to show an amount that disagrees.
 
 ### Adding a producer
 
@@ -261,7 +270,9 @@ Authorization: Bearer <BOT_INGEST_TOKEN>
 
 Grouping is ingest's job (T3.2, `changeDigest`); the bot sends what arrives. As a safety net, each chat gets at most `BOT_MAX_MESSAGES_PER_CHAT_PER_HOUR` messages per window. Past the cap the chat gets one fixed message ("More alerts arrived this hour. See them in Keel.") and nothing more until the next window; what was not sent is logged and counted.
 
-Chain and engine notices an attacker cannot repeat at will always go out: `operation_held`, `transfer_blocked`, `agent_revoked`, `gate_paused` and `payment_held`. Everything else counts toward the cap, including what is born from emails or documents (`account_change_attempt`, `change_requested`, `invoice_needs_cosign`, `invoice_held`), because an attacker can send hundreds.
+Chain and engine notices an attacker cannot repeat at will always go out: `operation_held`, `transfer_blocked`, `unauthorized_execution`, `agent_revoked`, `gate_paused` and `payment_held`. Everything else counts toward the cap, including what is born from emails or documents (`account_change_attempt`, `change_requested`, `invoice_needs_cosign`, `invoice_held`), because an attacker can send hundreds.
+
+The source decides, not only the kind: `operation_held` is not capped when it comes from the agent or the engine (`POST /notices`), but a hold that ingest produced from a document (`POST /ingest/outcomes`) counts, because an uploader can repeat it. The route says where a notice was born; it is never read from the notice.
 
 ## Known limits
 

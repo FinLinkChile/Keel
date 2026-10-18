@@ -6,7 +6,7 @@
 // a proposal.
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type RequestListener, type Server, type ServerResponse } from "node:http";
-import type { NotifyResult } from "../../application/notify";
+import type { NoticeOrigin, NotifyResult } from "../../application/notify";
 import { Notice } from "../../domain/notice";
 import { ConfigError } from "../config/env";
 
@@ -32,7 +32,7 @@ async function readBody(req: IncomingMessage): Promise<Buffer | null> {
 }
 
 export interface NoticeSink {
-  notify(input: unknown): Promise<NotifyResult>;
+  notify(input: unknown, origin?: NoticeOrigin): Promise<NotifyResult>;
 }
 
 // A route receives the parsed JSON body once the token and the size are checked.
@@ -72,23 +72,35 @@ export function createHttpHandler(routes: HttpRoutes): RequestListener {
   };
 }
 
-// The body is a Notice or an array of them. 400 if any notice does not validate (nothing is
-// sent), 202 otherwise with each notice's status.
+// What a route answers, apart from how it travels: the HTTP routes reply with it, and the queue
+// source (queue-source.ts) reads the code to tell a bad message from a delivered one.
+export interface Delivery {
+  code: number;
+  body: object;
+}
+
 function noticesRoute(sink: NoticeSink): JsonRoute {
   return async (json, res) => {
-    const notices = Array.isArray(json) ? json : [json];
-    if (notices.length === 0 || notices.length > MAX_NOTICES) return reply(res, 400, { error: "bad_batch_size" });
-    // All or nothing at the schema level, so a producer never gets half a batch sent.
-    const invalid = notices.findIndex((n) => !Notice.safeParse(n).success);
-    if (invalid >= 0) {
-      // Through the service anyway, so the rejection is logged and counted like any other.
-      await sink.notify(notices[invalid]);
-      return reply(res, 400, { error: "invalid_notice", index: invalid });
-    }
-    const results: NotifyResult["status"][] = [];
-    for (const n of notices) results.push((await sink.notify(n)).status);
-    reply(res, 202, { results });
+    const { code, body } = await deliverNotices(sink, json);
+    reply(res, code, body);
   };
+}
+
+// The body is a Notice or an array of them. 400 if any notice does not validate (nothing is
+// sent), 202 otherwise with each notice's status.
+export async function deliverNotices(sink: NoticeSink, json: unknown): Promise<Delivery> {
+  const notices = Array.isArray(json) ? json : [json];
+  if (notices.length === 0 || notices.length > MAX_NOTICES) return { code: 400, body: { error: "bad_batch_size" } };
+  // All or nothing at the schema level, so a producer never gets half a batch sent.
+  const invalid = notices.findIndex((n) => !Notice.safeParse(n).success);
+  if (invalid >= 0) {
+    // Through the service anyway, so the rejection is logged and counted like any other.
+    await sink.notify(notices[invalid]);
+    return { code: 400, body: { error: "invalid_notice", index: invalid } };
+  }
+  const results: NotifyResult["status"][] = [];
+  for (const n of notices) results.push((await sink.notify(n)).status);
+  return { code: 202, body: { results } };
 }
 
 export function startHttpServer(handler: RequestListener, host: string, port: number): Promise<Server> {

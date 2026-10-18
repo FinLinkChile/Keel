@@ -105,10 +105,11 @@ describe("injection", () => {
 
   it("rejects a name or any extra field", async () => {
     const withName = { ...SAMPLES.order_funded, parties: { ...SAMPLES.order_funded.parties, name: PAYLOADS[0] } };
+    const incident = { ...SAMPLES.unauthorized_execution, from: PAYLOADS[2], amountMinor: 5_000_000 };
     const topLevel = { ...SAMPLES.order_funded, name: PAYLOADS[1] };
     const inDiff = heldWithDiffs(1, 2, "amount_minor") as Notice & { diffs: object[] };
     const diffNote = { ...inDiff, diffs: [{ ...inDiff.diffs[0], note: PAYLOADS[0] }] };
-    for (const n of [withName, topLevel, diffNote]) {
+    for (const n of [withName, topLevel, diffNote, incident]) {
       const { result, texts } = await deliver(n);
       expect(result.status).toBe("rejected");
       expect(texts).toHaveLength(0);
@@ -123,6 +124,8 @@ describe("injection", () => {
         { ...SAMPLES.operation_held, reason: p },
         { ...SAMPLES.change_queued, accountId: p },
         { ...SAMPLES.transfer_blocked, txHash: p },
+        { ...SAMPLES.unauthorized_execution, txHash: p },
+        { ...SAMPLES.unauthorized_execution, accountId: p },
       ]) {
         const { result, texts } = await deliver(n);
         expect(result.status).toBe("rejected");

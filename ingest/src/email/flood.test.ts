@@ -112,7 +112,7 @@ describe("change requests", () => {
     const t = setup();
     const first = await t.send({ ...newAccount, folio: "1" });
     if (first.outcome.status !== "change_requested") throw new Error("expected a change request");
-    expect(t.store.resolveChange(first.outcome.changeRequest.id, "vetoed")).toBe(true);
+    expect(await t.store.resolveChange(first.outcome.changeRequest.id, "vetoed")).toBe(true);
 
     expect((await t.send({ ...newAccount, folio: "2" })).outcome).toMatchObject({
       status: "quarantined",
@@ -126,7 +126,7 @@ describe("change requests", () => {
     const t = setup();
     const first = await t.send({ ...newAccount, folio: "1" });
     if (first.outcome.status !== "change_requested") throw new Error("expected a change request");
-    t.store.resolveChange(first.outcome.changeRequest.id, "approved");
+    await t.store.resolveChange(first.outcome.changeRequest.id, "approved");
     expect((await t.send({ bankLines: ["Banco Chile Cuenta Corriente N° 555555555"], folio: "2" })).outcome.status).toBe(
       "change_requested",
     );
@@ -136,14 +136,14 @@ describe("change requests", () => {
     const t = setup();
     const since = new Date(Date.UTC(2026, 9, 12));
     await t.send({ ...newAccount, folio: "1" });
-    const digest = t.store.changeDigest(since);
+    const digest = await t.store.changeDigest(since);
     expect(digest).toHaveLength(1);
     expect(digest[0]).toMatchObject({ aliasId: ALIAS, status: "pending", proposed: [{ value: "987654321" }] });
   });
 });
 
 describe("IngestStore", () => {
-  it("enforces one pending request per alias in the database itself", () => {
+  it("enforces one pending request per alias in the database itself", async () => {
     const store = new IngestStore(":memory:");
     const request = {
       aliasId: ALIAS,
@@ -155,8 +155,8 @@ describe("IngestStore", () => {
       messageHash: "m",
       createdAt: new Date().toISOString(),
     };
-    expect(store.addChangeRequest(request)).toBeDefined();
-    expect(store.addChangeRequest(request)).toBeUndefined();
-    expect(store.resolveChange(999, "approved")).toBe(false);
+    expect(await store.addChangeRequest(request)).toBeDefined();
+    expect(await store.addChangeRequest(request)).toBeUndefined();
+    expect(await store.resolveChange(999, "approved")).toBe(false);
   });
 });

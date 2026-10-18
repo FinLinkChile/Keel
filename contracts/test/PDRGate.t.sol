@@ -6,6 +6,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {PDRGate} from "../src/PDRGate.sol";
 import {IPDRGate} from "../src/IPDRGate.sol";
+import {IPDRVerifier} from "../src/IPDRVerifier.sol";
+import {PDRVerifier} from "../src/PDRVerifier.sol";
 import {IRoles} from "../src/IRoles.sol";
 import {PaymentIntent, PolicyDecision} from "../src/KeelTypes.sol";
 import {MockUSDC, MockSafe, MockRoles, MockRolesReturnsFalse, Mock1271} from "./mocks/Mocks.sol";
@@ -122,7 +124,7 @@ contract PDRGateTest is Test {
     function test_tier3_acceptsSmartWalletCosigner() public {
         Mock1271 cw = new Mock1271(vm.addr(cosignerPk));
         vm.prank(owner);
-        safe.exec(address(gate), abi.encodeCall(PDRGate.setCosigner, (address(cw))));
+        safe.exec(address(gate), abi.encodeCall(PDRVerifier.setCosigner, (address(cw))));
         PaymentIntent memory i = _intent(landlord, 250e6, _key("rent|202610"));
         PolicyDecision memory d = _decision(i, 3);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(cosignerPk, gate.digestOf(d));
@@ -135,11 +137,11 @@ contract PDRGateTest is Test {
 
     function test_revert_GateIsPaused() public {
         vm.prank(owner);
-        safe.exec(address(gate), abi.encodeCall(PDRGate.pause, ()));
+        safe.exec(address(gate), abi.encodeCall(PDRVerifier.pause, ()));
         PaymentIntent memory i = _intent(power, 10e6, _key("a"));
         PolicyDecision memory d = _decision(i, 1);
         bytes memory sig = _sign(policyPk, d);
-        vm.expectRevert(IPDRGate.GateIsPaused.selector);
+        vm.expectRevert(IPDRVerifier.GateIsPaused.selector);
         gate.execute(i, d, sig, "");
     }
 
@@ -148,7 +150,7 @@ contract PDRGateTest is Test {
         PolicyDecision memory d = _decision(i, 1);
         bytes memory sig = _sign(policyPk, d);
         i.amountUsdc += 1; // one unit (0.000001 USDC) more than approved
-        vm.expectRevert(IPDRGate.IntentMismatch.selector);
+        vm.expectRevert(IPDRVerifier.IntentMismatch.selector);
         gate.execute(i, d, sig, "");
     }
 
@@ -157,7 +159,7 @@ contract PDRGateTest is Test {
         PolicyDecision memory d = _decision(i, 1);
         d.calldataHash = keccak256(abi.encodeCall(IERC20.transfer, (attacker, i.amountUsdc)));
         bytes memory sig = _sign(policyPk, d);
-        vm.expectRevert(IPDRGate.CalldataMismatch.selector);
+        vm.expectRevert(IPDRVerifier.CalldataMismatch.selector);
         gate.execute(i, d, sig, "");
     }
 
@@ -166,7 +168,7 @@ contract PDRGateTest is Test {
         PolicyDecision memory d = _decision(i, 1);
         d.calldataHash = keccak256(abi.encodeCall(IERC20.approve, (power, type(uint256).max)));
         bytes memory sig = _sign(policyPk, d);
-        vm.expectRevert(IPDRGate.CalldataMismatch.selector);
+        vm.expectRevert(IPDRVerifier.CalldataMismatch.selector);
         gate.execute(i, d, sig, "");
     }
 
@@ -174,7 +176,7 @@ contract PDRGateTest is Test {
         PaymentIntent memory i = _intent(power, 10e6, _key("a"));
         PolicyDecision memory d = _decision(i, 1);
         bytes memory sig = _sign(attackerPk, d);
-        vm.expectRevert(IPDRGate.BadPolicySignature.selector);
+        vm.expectRevert(IPDRVerifier.BadPolicySignature.selector);
         gate.execute(i, d, sig, "");
     }
 
@@ -182,7 +184,7 @@ contract PDRGateTest is Test {
         PaymentIntent memory i = _intent(power, 10e6, _key("a"));
         PolicyDecision memory d = _decision(i, 1);
         bytes memory sig = _sign(cosignerPk, d);
-        vm.expectRevert(IPDRGate.BadPolicySignature.selector);
+        vm.expectRevert(IPDRVerifier.BadPolicySignature.selector);
         gate.execute(i, d, sig, "");
     }
 
@@ -191,7 +193,7 @@ contract PDRGateTest is Test {
         PolicyDecision memory d = _decision(i, 1);
         bytes memory sig = _sign(policyPk, d);
         d.inputsHash = keccak256("fx:manipulated");
-        vm.expectRevert(IPDRGate.BadPolicySignature.selector);
+        vm.expectRevert(IPDRVerifier.BadPolicySignature.selector);
         gate.execute(i, d, sig, "");
     }
 
@@ -201,7 +203,7 @@ contract PDRGateTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(policyPk, gate.digestOf(d));
         uint256 n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
         bytes memory flipped = abi.encodePacked(r, bytes32(n - uint256(s)), v == 27 ? uint8(28) : uint8(27));
-        vm.expectRevert(IPDRGate.BadPolicySignature.selector);
+        vm.expectRevert(IPDRVerifier.BadPolicySignature.selector);
         gate.execute(i, d, flipped, "");
     }
 
@@ -210,8 +212,8 @@ contract PDRGateTest is Test {
         PolicyDecision memory d = _decision(i, 1);
         bytes memory sig = _sign(policyPk, d);
         vm.prank(owner);
-        safe.exec(address(gate), abi.encodeCall(PDRGate.setPolicyHash, (keccak256("rules-v2"))));
-        vm.expectRevert(IPDRGate.StalePolicy.selector);
+        safe.exec(address(gate), abi.encodeCall(PDRVerifier.setPolicyHash, (keccak256("rules-v2"))));
+        vm.expectRevert(IPDRVerifier.StalePolicy.selector);
         gate.execute(i, d, sig, "");
     }
 
@@ -220,7 +222,7 @@ contract PDRGateTest is Test {
         PolicyDecision memory d = _decision(i, 1);
         bytes memory sig = _sign(policyPk, d);
         vm.warp(block.timestamp + 1 hours + 1);
-        vm.expectRevert(IPDRGate.Expired.selector);
+        vm.expectRevert(IPDRVerifier.Expired.selector);
         gate.execute(i, d, sig, "");
     }
 
@@ -229,7 +231,7 @@ contract PDRGateTest is Test {
         i.deadline = uint64(block.timestamp - 1);
         PolicyDecision memory d = _decision(i, 1);
         bytes memory sig = _sign(policyPk, d);
-        vm.expectRevert(IPDRGate.Expired.selector);
+        vm.expectRevert(IPDRVerifier.Expired.selector);
         gate.execute(i, d, sig, "");
     }
 
@@ -240,7 +242,7 @@ contract PDRGateTest is Test {
         j.nonce = i.nonce;
         PolicyDecision memory d = _decision(j, 1);
         bytes memory sig = _sign(policyPk, d);
-        vm.expectRevert(IPDRGate.NonceUsed.selector);
+        vm.expectRevert(IPDRVerifier.NonceUsed.selector);
         gate.execute(j, d, sig, "");
     }
 
@@ -260,7 +262,7 @@ contract PDRGateTest is Test {
         PaymentIntent memory i = _intent(landlord, 250e6, _key("rent"));
         PolicyDecision memory d = _decision(i, 3);
         bytes memory sig = _sign(policyPk, d);
-        vm.expectRevert(IPDRGate.MissingCosignature.selector);
+        vm.expectRevert(IPDRVerifier.MissingCosignature.selector);
         gate.execute(i, d, sig, "");
     }
 
@@ -268,7 +270,7 @@ contract PDRGateTest is Test {
         PaymentIntent memory i = _intent(landlord, 250e6, _key("rent"));
         PolicyDecision memory d = _decision(i, 3);
         bytes memory sig = _sign(policyPk, d);
-        vm.expectRevert(IPDRGate.MissingCosignature.selector);
+        vm.expectRevert(IPDRVerifier.MissingCosignature.selector);
         gate.execute(i, d, sig, sig);
     }
 
@@ -277,7 +279,7 @@ contract PDRGateTest is Test {
         PolicyDecision memory d = _decision(i, 3);
         bytes memory sig = _sign(policyPk, d);
         d.tier = 1; // relayer tries to skip the cosigner
-        vm.expectRevert(IPDRGate.BadPolicySignature.selector);
+        vm.expectRevert(IPDRVerifier.BadPolicySignature.selector);
         gate.execute(i, d, sig, "");
     }
 
@@ -287,7 +289,7 @@ contract PDRGateTest is Test {
             PaymentIntent memory i = _intent(power, 10e6, _key("a"));
             PolicyDecision memory d = _decision(i, t);
             bytes memory sig = _sign(policyPk, d);
-            vm.expectRevert(PDRGate.InvalidTier.selector);
+            vm.expectRevert(IPDRVerifier.InvalidTier.selector);
             gate.execute(i, d, sig, "");
         }
     }
@@ -334,15 +336,15 @@ contract PDRGateTest is Test {
         address[3] memory callers = [attacker, vm.addr(cosignerPk), vm.addr(policyPk)];
         for (uint256 k; k < 3; k++) {
             vm.startPrank(callers[k]);
-            vm.expectRevert(PDRGate.OnlySafe.selector);
+            vm.expectRevert(IPDRVerifier.OnlySafe.selector);
             gate.setPolicySigner(callers[k]);
-            vm.expectRevert(PDRGate.OnlySafe.selector);
+            vm.expectRevert(IPDRVerifier.OnlySafe.selector);
             gate.setPolicyHash(bytes32(0));
-            vm.expectRevert(PDRGate.OnlySafe.selector);
+            vm.expectRevert(IPDRVerifier.OnlySafe.selector);
             gate.setCosigner(callers[k]);
-            vm.expectRevert(PDRGate.OnlySafe.selector);
+            vm.expectRevert(IPDRVerifier.OnlySafe.selector);
             gate.unpause();
-            vm.expectRevert(PDRGate.OnlySafe.selector);
+            vm.expectRevert(IPDRVerifier.OnlySafe.selector);
             gate.pause();
             vm.stopPrank();
         }
@@ -364,7 +366,7 @@ contract PDRGateTest is Test {
         PaymentIntent memory i = _intent(power, 10e6, _key("a"));
         PolicyDecision memory d = _decision(i, 1);
         bytes memory sig = _sign(policyPk, d);
-        vm.expectRevert(PDRGate.ExecutionFailed.selector);
+        vm.expectRevert(IPDRVerifier.ExecutionFailed.selector);
         gate.execute(i, d, sig, "");
         assertFalse(gate.nonceUsed(i.nonce));
         assertFalse(gate.invoicePaid(i.invoiceKey));
@@ -393,15 +395,15 @@ contract PDRGateTest is Test {
     function test_setPolicySigner_rotation_oldSignerRejectedNewSignerPays() public {
         uint256 newPolicyPk = 0xBEEF;
         vm.expectEmit(false, false, false, true, address(gate));
-        emit PDRGate.PolicySignerSet(vm.addr(newPolicyPk));
+        emit IPDRVerifier.PolicySignerSet(vm.addr(newPolicyPk));
         vm.prank(owner);
-        safe.exec(address(gate), abi.encodeCall(PDRGate.setPolicySigner, (vm.addr(newPolicyPk))));
+        safe.exec(address(gate), abi.encodeCall(PDRVerifier.setPolicySigner, (vm.addr(newPolicyPk))));
         assertEq(gate.policySigner(), vm.addr(newPolicyPk));
 
         PaymentIntent memory i = _intent(power, 10e6, _key("a"));
         PolicyDecision memory d = _decision(i, 1);
         bytes memory oldSig = _sign(policyPk, d);
-        vm.expectRevert(IPDRGate.BadPolicySignature.selector);
+        vm.expectRevert(IPDRVerifier.BadPolicySignature.selector);
         gate.execute(i, d, oldSig, "");
 
         vm.prank(relayer);
@@ -416,57 +418,57 @@ contract PDRGateTest is Test {
     }
 
     function test_revert_ZeroAddress_constructorSafe() public {
-        vm.expectRevert(PDRGate.ZeroAddress.selector);
+        vm.expectRevert(IPDRVerifier.ZeroAddress.selector);
         _deploy(address(0), address(roles), address(usdc), vm.addr(policyPk), vm.addr(cosignerPk));
     }
 
     function test_revert_ZeroAddress_constructorRoles() public {
-        vm.expectRevert(PDRGate.ZeroAddress.selector);
+        vm.expectRevert(IPDRVerifier.ZeroAddress.selector);
         _deploy(address(safe), address(0), address(usdc), vm.addr(policyPk), vm.addr(cosignerPk));
     }
 
     function test_revert_ZeroAddress_constructorUsdc() public {
-        vm.expectRevert(PDRGate.ZeroAddress.selector);
+        vm.expectRevert(IPDRVerifier.ZeroAddress.selector);
         _deploy(address(safe), address(roles), address(0), vm.addr(policyPk), vm.addr(cosignerPk));
     }
 
     function test_revert_ZeroAddress_constructorPolicySigner() public {
-        vm.expectRevert(PDRGate.ZeroAddress.selector);
+        vm.expectRevert(IPDRVerifier.ZeroAddress.selector);
         _deploy(address(safe), address(roles), address(usdc), address(0), vm.addr(cosignerPk));
     }
 
     function test_revert_ZeroAddress_constructorCosigner() public {
-        vm.expectRevert(PDRGate.ZeroAddress.selector);
+        vm.expectRevert(IPDRVerifier.ZeroAddress.selector);
         _deploy(address(safe), address(roles), address(usdc), vm.addr(policyPk), address(0));
     }
 
     function test_revert_ZeroAddress_setPolicySigner() public {
         vm.prank(owner);
-        vm.expectRevert(PDRGate.ZeroAddress.selector);
-        safe.exec(address(gate), abi.encodeCall(PDRGate.setPolicySigner, (address(0))));
+        vm.expectRevert(IPDRVerifier.ZeroAddress.selector);
+        safe.exec(address(gate), abi.encodeCall(PDRVerifier.setPolicySigner, (address(0))));
     }
 
     function test_revert_ZeroAddress_setCosigner() public {
         vm.prank(owner);
-        vm.expectRevert(PDRGate.ZeroAddress.selector);
-        safe.exec(address(gate), abi.encodeCall(PDRGate.setCosigner, (address(0))));
+        vm.expectRevert(IPDRVerifier.ZeroAddress.selector);
+        safe.exec(address(gate), abi.encodeCall(PDRVerifier.setCosigner, (address(0))));
     }
 
     function test_revert_SignerIsCosigner_constructor() public {
-        vm.expectRevert(PDRGate.SignerIsCosigner.selector);
+        vm.expectRevert(IPDRVerifier.SignerIsCosigner.selector);
         _deploy(address(safe), address(roles), address(usdc), vm.addr(policyPk), vm.addr(policyPk));
     }
 
     function test_revert_SignerIsCosigner_setPolicySigner() public {
         vm.prank(owner);
-        vm.expectRevert(PDRGate.SignerIsCosigner.selector);
-        safe.exec(address(gate), abi.encodeCall(PDRGate.setPolicySigner, (vm.addr(cosignerPk))));
+        vm.expectRevert(IPDRVerifier.SignerIsCosigner.selector);
+        safe.exec(address(gate), abi.encodeCall(PDRVerifier.setPolicySigner, (vm.addr(cosignerPk))));
     }
 
     function test_revert_SignerIsCosigner_setCosigner() public {
         vm.prank(owner);
-        vm.expectRevert(PDRGate.SignerIsCosigner.selector);
-        safe.exec(address(gate), abi.encodeCall(PDRGate.setCosigner, (vm.addr(policyPk))));
+        vm.expectRevert(IPDRVerifier.SignerIsCosigner.selector);
+        safe.exec(address(gate), abi.encodeCall(PDRVerifier.setCosigner, (vm.addr(policyPk))));
     }
 
     // ------------------------------------------------------------------ fuzz properties (T1.7)

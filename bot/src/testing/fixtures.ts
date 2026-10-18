@@ -55,6 +55,7 @@ export const SAMPLES: { [K in NoticeKind]: Extract<Notice, { kind: K }> } = {
   account_change_attempt: { ...order, id: "n-12", kind: "account_change_attempt" },
   change_queued: { ...wallet, id: "n-13", kind: "change_queued", changeKind: "supplier_added", effectiveAt: oct(17) },
   transfer_blocked: { ...wallet, id: "n-14", kind: "transfer_blocked", txHash: HASH },
+  unauthorized_execution: { ...wallet, id: "n-14b", kind: "unauthorized_execution", txHash: HASH },
   agent_revoked: { ...wallet, id: "n-15", kind: "agent_revoked" },
   gate_paused: { ...wallet, id: "n-16", kind: "gate_paused" },
   payment_held: { ...personal, id: "p-1", kind: "payment_held", aliasId: "LUZ", amountClp: 45990, dueDate: oct(17), reason: "fx_divergence" },

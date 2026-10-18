@@ -18,3 +18,4 @@
 * [Datos firmados e interfaz de TradeEscrow](datos-firmados-e-interfaz.md) - Structs PurchaseOrder y ShipmentAttestation campo por campo, y la tabla de funciones del contrato con quién llama, desde qué estado y qué verifica.
 * [Amenazas que el flujo debe resistir](amenazas.md) - Modelo de amenazas de Keel Trade: cada amenaza con su ejemplo, la defensa y el riesgo residual declarado.
 * [Alcance: dentro, fuera y lo que no prometemos](alcance.md) - Qué entra en la entrega, qué se declara como trabajo futuro, qué no se promete y la hoja de ruta por fases.
+* [MVP y seguridad por país](mvp-y-seguridad-por-pais.md) - Qué es Keel hoy (un MVP), las promesas de seguridad a futuro (CloudFront con WAF, autenticación de personas con terceros legales de cada país) y cómo se amplía el sistema según la legislación de cada país.

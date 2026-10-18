@@ -5,7 +5,7 @@ description: "Objetivo, entregables y tareas T5.1 a T5.7: coordinación, verific
 tags: [area-5, red-team, evidencia, entrega, t5]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T22:00:00Z }
 ---
 
 **Perfil sugerido:** quien coordine, escriba bien en inglés y piense como atacante.
@@ -53,7 +53,7 @@ Confirmar además si se puede citar al importador entrevistado.
 * Lista de riesgos conocidos, sin "ninguno conocido".
   * Comunes: configuración de Roles no auditada por terceros; firmante de política en un servidor; riesgo de emisor del token de pago; Telegram como canal; la bitácora prueba lo registrado, no que nada se haya escapado.
   * **Personal (base):** fuentes del tipo de cambio; puente fiat centralizado.
-  * **Trade (agregado):** contrato de escrow propio, sin auditoría de terceros; naviera y árbitro representados por llaves de prueba; registro de partes administrado por Keel; colusión de exportador y naviera; el anticipo solo se recupera por disputa; verificación pública limitada en una red cerrada.
+  * **Trade (agregado):** contrato de escrow propio, sin auditoría de terceros; naviera y árbitro representados por llaves de prueba; proveedores y terceros de confianza aprobados por la propia empresa en su gate, sin verificación de identidad en la cadena; colusión de exportador y naviera; el anticipo no se recupera en la cadena (la disputa solo reparte el saldo restante y no se abre antes del embarque), solo por acuerdo entre las partes fuera de la cadena; verificación pública limitada en una red cerrada.
 * Tabla de llaves de T2.7.
 
 **T5.4 Batería de red team (40 escenarios mínimo).**
@@ -119,6 +119,8 @@ Agregado por Trade:
 12. Revert por falta de PDR válido (gate).
 13. Revocación del rol por el botón de pánico y depósito posterior que revierte.
 14. Disputa resuelta por el árbitro (si T4.10 y la disputa no se recortan).
+
+Parte del Área 1 (17 de octubre): `redteam/src/evidence/area1/` (TypeScript con viem, en `@keel/redteam`) envía los reverts de los registros, del gate y del escrow con gas fijo después de capturar el error con `eth_call`, y deja un JSON por caso con hash, bloque, error esperado y obtenido, y el comando `cast run` para reproducirlo. Cubre los puntos 9, 10, 11 y 12 de Trade, el alta con espera y el veto de proveedor, `UnknownSupplier`, `UntrustedParty`, `NotOwnOrder`, `CalldataMismatch`, `GateIsPaused` y `DeadlinePassed`. El formato del JSON es **[PROPUESTA]**: el Área 5 lo adapta al de `evidence/`. La fase 3 necesita 3 depósitos reales de 1 USDC hechos por el flujo real (Área 2) sobre órdenes abiertas con `open-order`.
 
 **T5.6 Documento técnico y README.**
 * Documento técnico: arquitectura con diagrama, algoritmo central (motor más PDR más gate, y en Trade además el escrow), diseño de seguridad y comparación honesta con el estado del arte (Leash, Coinbase, Cobo, Safe con Roles, PACE).

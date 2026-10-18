@@ -1,11 +1,11 @@
 ---
 type: Área de trabajo
 title: "Área 3: ingesta de documentos y extracción en cuarentena"
-description: "Objetivo, entregables y tareas T3.1 a T3.8: canal autenticado, protección contra inundación, parser, extractor, concordancia, cambio de cuenta, idempotencia y corpus."
+description: "Objetivo, entregables y tareas T3.1 a T3.9: canal autenticado, protección contra inundación, parser, extractor, concordancia, cambio de cuenta, idempotencia, corpus y lectura de la proforma."
 tags: [area-3, ingesta, extractor, parser, t3]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T00:30:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T03:00:00Z }
 ---
 
 **Perfil sugerido:** backend con experiencia en LLM, parsing de PDF y correo.
@@ -64,6 +64,15 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T00:30:00Z }
   * Legítimos: al menos 12 conjuntos (BL o guía aérea más factura), anonimizados, coherentes con una orden de prueba cada uno.
   * Adversariales: al menos 25 variantes: factura con cuenta de cobro distinta, texto blanco con instrucciones, letra diminuta, homoglifos en el número de BL, fecha *on board* alterada, monto alterado, BL de otra orden, BL repetido con otro píxel, firma escaneada pegada, inyección en el campo del consignatario.
 * Cada caso lleva su resultado esperado. Los corpus los usa el Área 5 para medir.
+
+**T3.9 Lectura de la proforma (agregada por Trade) [PROPUESTA].**
+Sirve al paso 0 del flujo: el agente lee la proforma y propone la orden estructurada; quienes la aprueban y firman son las personas ([paso 0](../flujo/paso-0-negociacion.md)). No estaba asignada: `docs/trabajo/areas-y-carpetas.md` pone la recepción de la proforma en `ingest/`, y T4.9 tiene solo la pantalla del importador. La toma el Área 3 (Daniela) hasta que el equipo confirme.
+* Ruta de ingesta para que el importador suba la proforma desde la app, con la misma firma EIP-712 de billetera que la carga de documentos (T3.1).
+* Acepta PDF y también foto o escaneo (cámara, escáner de Notas), porque la proforma no decide pagos: la lee el extractor en cuarentena, con un esquema sin texto libre.
+* Devuelve solo campos tipados para prellenar la orden en la pantalla de revisión (T4.2): proveedor, número de proforma, monto y moneda, incoterm, códigos arancelarios y fecha de embarque. **Nunca la cuenta de cobro**, que sale del registro del proveedor verificado (principio 1).
+* Sin segundo lector para fotos: la revisión humana antes de firmar cumple ese papel, y lo que vale es la orden firmada, con el hash de la proforma dentro de `termsHash`.
+* No guarda la proforma ni decide nada: solo ayuda a llenar la orden.
+* Implementada en `ingest/src/trade/proforma.ts` (`POST /trade/proforma`): importadores registrados, 20 proformas por importador y día, y la misma lectura sin llamar otra vez al modelo para un archivo repetido. Contrato en [lectura de la proforma](../interfaces/lectura-de-proforma.md).
 
 # Decisiones de implementación en Keel Trade **[PROPUESTA]**
 

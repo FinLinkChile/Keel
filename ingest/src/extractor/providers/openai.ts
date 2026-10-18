@@ -1,6 +1,15 @@
 import OpenAI from "openai";
 import { ExtractionError, type ExtractionRequest, type ExtractorProvider } from "../contract";
 
+function attachmentContent(request: ExtractionRequest): OpenAI.Responses.ResponseInputContent[] {
+  const a = request.attachment;
+  if (!a) return [];
+  const url = `data:${a.mediaType};base64,${a.data}`;
+  return a.mediaType === "application/pdf"
+    ? [{ type: "input_file", filename: "document.pdf", file_data: url }]
+    : [{ type: "input_image", image_url: url, detail: "high" }];
+}
+
 export class OpenAIProvider implements ExtractorProvider {
   readonly provider = "openai";
   private readonly client: OpenAI;
@@ -8,8 +17,9 @@ export class OpenAIProvider implements ExtractorProvider {
   constructor(
     apiKey: string,
     readonly model: string,
+    timeoutMs?: number,
   ) {
-    this.client = new OpenAI({ apiKey });
+    this.client = new OpenAI({ apiKey, ...(timeoutMs ? { timeout: timeoutMs } : {}) });
   }
 
   async complete(request: ExtractionRequest): Promise<string> {
@@ -18,7 +28,7 @@ export class OpenAIProvider implements ExtractorProvider {
       res = await this.client.responses.create({
         model: this.model,
         instructions: request.system,
-        input: [{ role: "user", content: [{ type: "input_text", text: request.user }] }],
+        input: [{ role: "user", content: [...attachmentContent(request), { type: "input_text", text: request.user }] }],
         text: {
           format: {
             type: "json_schema",

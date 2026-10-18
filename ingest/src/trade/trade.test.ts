@@ -277,14 +277,14 @@ describe("flood protection and the package (T3.2, T3.7)", () => {
     const store = new IngestStore(":memory:");
     const model = honestModel(O1.truth.invoice);
     await upload(store, model, O1, "COMMERCIAL_INVOICE", await renderCommercialInvoice(O1.invoice));
-    expect(store.tradePackage(O1.order.orderId, O1.order.requiredDocs)).toEqual({ status: "incomplete", missing: ["BILL_OF_LADING"] });
+    expect(await store.tradePackage(O1.order.orderId, O1.order.requiredDocs)).toEqual({ status: "incomplete", missing: ["BILL_OF_LADING"] });
     await upload(store, honestModel(O1.truth.transport), O1, "BILL_OF_LADING", await renderTransport(O1.transport));
-    expect(store.tradePackage(O1.order.orderId, O1.order.requiredDocs)).toMatchObject({
+    expect(await store.tradePackage(O1.order.orderId, O1.order.requiredDocs)).toMatchObject({
       status: "complete",
       blNumberHash: blNumberHash(O1.order.entry.carrier, "OLSU26104471"),
     });
     await upload(store, model, O1, "COMMERCIAL_INVOICE", await renderCommercialInvoice({ ...O1.invoice, seed: "v2" }));
-    expect(store.tradePackage(O1.order.orderId, O1.order.requiredDocs)).toEqual({ status: "ambiguous", docType: "COMMERCIAL_INVOICE" });
+    expect(await store.tradePackage(O1.order.orderId, O1.order.requiredDocs)).toEqual({ status: "ambiguous", docType: "COMMERCIAL_INVOICE" });
   });
 
   it("groups alerts into one digest", async () => {
@@ -292,7 +292,7 @@ describe("flood protection and the package (T3.2, T3.7)", () => {
     const since = new Date(0);
     const announcing = { ...O1.invoice, notes: ["Please note our new bank account details."] };
     await upload(store, honestModel({ ...O1.truth.invoice, mentions_account_change: true }), O1, "COMMERCIAL_INVOICE", await renderCommercialInvoice(announcing));
-    expect(store.alertDigest(since)).toMatchObject([
+    expect(await store.alertDigest(since)).toMatchObject([
       { orderId: O1.order.orderId, triggers: ["announced_in_document"], reminder: "payout_changes_only_with_new_signed_order" },
     ]);
   });
