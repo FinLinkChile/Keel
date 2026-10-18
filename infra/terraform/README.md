@@ -1,8 +1,8 @@
 # Keel en AWS (Terraform)
 
-Crea la arquitectura de [despliegue en AWS](../../docs/arquitectura/despliegue-aws.md): 19 funciones Lambda, API HTTP con 27 rutas, 6 tablas de DynamoDB, buckets de documentos y de evidencia (Object Lock), colas SQS con cola de fallidos, 3 llaves KMS secp256k1, parámetros y secretos de Systems Manager, programadores, alarmas y presupuesto. **[PROPUESTA]**: nunca se ha aplicado a una cuenta real.
+Crea la arquitectura de [despliegue en AWS](../../docs/arquitectura/despliegue-aws.md): 19 funciones Lambda, API HTTP con 29 rutas, 6 tablas de DynamoDB, buckets de documentos y de evidencia (Object Lock), colas SQS con cola de fallidos, 3 llaves KMS secp256k1, parámetros de configuración de Systems Manager, programadores, alarmas y presupuesto. **[PROPUESTA]**: nunca se ha aplicado a una cuenta real.
 
-La llave de los dueños de la Safe nunca entra aquí. Ningún valor secreto va en git ni en el estado: los secretos se crean con el valor `CAMBIAR` y se cargan a mano.
+La llave de los dueños de la Safe nunca entra aquí. Terraform no crea ni lee los secretos: un parámetro gestionado por Terraform guarda su valor descifrado en `terraform.tfstate`, así que se crean a mano (paso 3) y Terraform solo da permiso a cada función para leer los suyos. El estado queda sin llaves ni tokens, pero igual conviene guardarlo fuera de carpetas sincronizadas (OneDrive) o en el backend S3 comentado en `versions.tf`.
 
 ## Requisitos
 
@@ -28,10 +28,10 @@ La llave de los dueños de la Safe nunca entra aquí. Ningún valor secreto va e
 
    Variables útiles en un `terraform.tfvars` (fuera de git): `alert_email` (activa alarmas por correo y el presupuesto), `app_origin` (CORS), `key_source_*` (`ssm` en la demo, `kms` cuando el Área 1 haya registrado las direcciones de KMS en los contratos).
 
-3. Cargar los secretos que lista la salida `secrets_to_load`, uno por uno:
+3. Crear los secretos que lista la salida `secrets_to_load`, uno por uno, desde tu terminal (nunca en un chat ni en un archivo del repositorio). La primera vez sin `--overwrite`; para cambiar un valor, con `--overwrite`:
 
    ```bash
-   aws ssm put-parameter --overwrite --type SecureString --name /keel-secrets/84532/rpc_url --value "https://…"
+   aws ssm put-parameter --type SecureString --name /keel-secrets/84532/rpc_url --value "https://…"
    ```
 
    | Secreto | Qué es |
@@ -42,7 +42,9 @@ La llave de los dueños de la Safe nunca entra aquí. Ningún valor secreto va e
    | `bot_inbound_token`, `bot_admin_token`, `directory_admin_token`, `ingest_webhook_token`, `ingest_admin_token` | Tokens de al menos 32 caracteres, todos distintos |
    | `llm_keys` | JSON `{"anthropic": "…", "openai": "…", "gemini": "…", "compat": "…"}` con las que existan |
 
-4. Cargar el directorio del bot con `PUT /bot/recipients` y los proveedores con `POST /suppliers` (ver [avisos al bot](../../docs/interfaces/avisos-al-bot.md)).
+   Hasta que un secreto exista, la función que lo usa falla al leerlo (`ParameterNotFound`) en vez de seguir sin él.
+
+4. Registrar quién representa a la Safe del importador con `POST /importers`, los proveedores con `POST /suppliers` (los dos con el token `directory_admin_token`) y el directorio del bot con `PUT /bot/recipients` (ver [avisos al bot](../../docs/interfaces/avisos-al-bot.md)). Sin el primer paso, toda ruta del importador responde `not_importer`.
 
 5. En la app, `EXPO_PUBLIC_API_URL` igual a la salida `api_endpoint`.
 

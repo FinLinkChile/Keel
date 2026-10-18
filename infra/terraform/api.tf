@@ -22,6 +22,15 @@ resource "aws_apigatewayv2_stage" "default" {
     throttling_rate_limit  = var.api_throttle_rate
     throttling_burst_limit = var.api_throttle_burst
   }
+
+  # La lectura de la proforma llama al LLM: el tope mas bajo (docs/arquitectura/despliegue-aws.md)
+  route_settings {
+    route_key              = "POST /trade/proforma"
+    throttling_rate_limit  = var.proforma_throttle_rate
+    throttling_burst_limit = var.proforma_throttle_burst
+  }
+
+  depends_on = [aws_apigatewayv2_route.r]
 }
 
 resource "aws_apigatewayv2_integration" "fn" {

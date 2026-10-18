@@ -1,6 +1,7 @@
-# Un rol por funcion que toca llaves, secretos o el LLM. Las cinco rutas de ordenes comparten el rol orders_api,
-# que no tiene S3 ni KMS y solo lee la URL de RPC y el token del directorio. Solo agent y monitor
-# tienen permisos de KMS y de llaves en SSM, cada uno sobre las suyas.
+# Un rol por funcion que toca llaves, secretos o el LLM. Las rutas de ordenes se reparten en tres roles:
+# orders_read (solo lectura), orders_write (propuestas, firmas y atestaciones, con la URL de RPC) y
+# directory (el unico que escribe partes, con el token de operador). Solo agent y monitor tienen
+# permisos de KMS y de llaves en SSM, cada uno sobre las suyas.
 
 resource "aws_iam_role" "fn" {
   for_each = local.role_statements

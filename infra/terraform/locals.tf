@@ -3,8 +3,8 @@ locals {
   cfg_prefix     = "/keel/${var.chain_id}"
   secrets_prefix = "/keel-secrets/${var.chain_id}/"
 
-  # Cada secreto es un SecureString que se carga a mano (aws ssm put-parameter --overwrite).
-  # Cada funcion solo puede leer los suyos (role_statements, abajo).
+  # Cada secreto es un SecureString que se crea a mano (aws ssm put-parameter, README.md): Terraform
+  # no los gestiona para que su valor nunca quede en el estado. Cada funcion lee solo los suyos.
   secret_names = [
     "rpc_url",                   # URL completa del proveedor de RPC: agente, monitor, indexador y API de ordenes (ERC-1271)
     "relayer_private_key",       # solo si key_source_relayer = "ssm"
@@ -13,12 +13,12 @@ locals {
     "telegram_bot_token",
     "bot_inbound_token",     # POST /notices y /ingest/outcomes
     "bot_admin_token",       # GET y PUT /bot/recipients
-    "directory_admin_token", # POST /suppliers
+    "directory_admin_token", # POST /suppliers, POST y GET /importers
     "ingest_webhook_token",  # POST /inbound (reenviador de correo)
     "ingest_admin_token",    # GET y PUT /admin/settings
     "llm_keys",              # JSON {anthropic?, openai?, gemini?, compat?}
   ]
-  secret_arn = { for n in local.secret_names : n => aws_ssm_parameter.secret[n].arn }
+  secret_arn = { for n in local.secret_names : n => "arn:aws:ssm:${var.region}:${data.aws_caller_identity.me.account_id}:parameter${local.secrets_prefix}${n}" }
 
   # ---------- Tablas (las formas de cada item estan en aws/src/tables.ts) ----------
   tables = {
@@ -79,12 +79,14 @@ locals {
   # en DynamoDB ya evita vueltas simultaneas; la reserva es una segunda barrera opcional).
   # El agente retiene su candado 110 s: su timeout tiene que ser menor. Monitor e indexador, 55 s.
   # El extractor puede tardar 3 intentos de 60 s del LLM (LLM_TIMEOUT_MS); la cola le da 720 s de visibilidad.
+  # Proforma e inbound llaman al LLM dentro de la peticion (API Gateway corta a los 29 s): su
+  # LLM_TIMEOUT_MS es 20 s, para que el SDK falle antes que la funcion y se registre la transferencia.
   functions = {
-    proposals  = { role = "orders_api", timeout = 28, memory = 512, reserve = false }
-    orders     = { role = "orders_api", timeout = 28, memory = 512, reserve = false }
-    signatures = { role = "orders_api", timeout = 28, memory = 512, reserve = false }
-    directory  = { role = "orders_api", timeout = 28, memory = 512, reserve = false }
-    attest     = { role = "orders_api", timeout = 28, memory = 512, reserve = false }
+    proposals  = { role = "orders_write", timeout = 28, memory = 512, reserve = false }
+    orders     = { role = "orders_read", timeout = 28, memory = 512, reserve = false }
+    signatures = { role = "orders_write", timeout = 28, memory = 512, reserve = false }
+    directory  = { role = "directory", timeout = 28, memory = 512, reserve = false }
+    attest     = { role = "orders_write", timeout = 28, memory = 512, reserve = false }
     registrar  = { role = "registrar", timeout = 28, memory = 512, reserve = false }
     upload     = { role = "upload", timeout = 28, memory = 512, reserve = false }
     inbound    = { role = "inbound", timeout = 28, memory = 512, reserve = false }
@@ -123,15 +125,14 @@ locals {
     directory  = local.orders_api_env
     attest     = local.orders_api_env
     registrar = {
-      PROPOSALS_TABLE   = local.t["proposals"]
-      ORDERS_TABLE      = local.t["orders"]
-      PARTIES_TABLE     = local.t["parties"]
-      INGEST_TABLE      = local.t["ingest"]
-      NOTICES_QUEUE_URL = aws_sqs_queue.notices.url
+      PROPOSALS_TABLE = local.t["proposals"]
+      ORDERS_TABLE    = local.t["orders"]
+      PARTIES_TABLE   = local.t["parties"]
+      INGEST_TABLE    = local.t["ingest"]
     }
-    upload    = { INGEST_TABLE = local.t["ingest"], ORDERS_TABLE = local.t["orders"], DOCS_BUCKET = aws_s3_bucket.docs.bucket }
-    inbound   = { INGEST_TABLE = local.t["ingest"], DOCS_BUCKET = aws_s3_bucket.docs.bucket, NOTICES_QUEUE_URL = aws_sqs_queue.notices.url }
-    proforma  = { INGEST_TABLE = local.t["ingest"], PARTIES_TABLE = local.t["parties"] }
+    upload    = { INGEST_TABLE = local.t["ingest"], DOCS_BUCKET = aws_s3_bucket.docs.bucket }
+    inbound   = { INGEST_TABLE = local.t["ingest"], DOCS_BUCKET = aws_s3_bucket.docs.bucket, NOTICES_QUEUE_URL = aws_sqs_queue.notices.url, LLM_TIMEOUT_MS = "20000" }
+    proforma  = { INGEST_TABLE = local.t["ingest"], PARTIES_TABLE = local.t["parties"], LLM_TIMEOUT_MS = "20000" }
     admin     = { INGEST_TABLE = local.t["ingest"] }
     extractor = { INGEST_TABLE = local.t["ingest"], ORDERS_TABLE = local.t["orders"], DOCS_BUCKET = aws_s3_bucket.docs.bucket, NOTICES_QUEUE_URL = aws_sqs_queue.notices.url }
     digest    = { INGEST_TABLE = local.t["ingest"], NOTICES_QUEUE_URL = aws_sqs_queue.notices.url }
@@ -150,12 +151,16 @@ locals {
     indexer = { ORDERS_TABLE = local.t["orders"], AGENT_STATE_TABLE = local.t["agent_state"] }
     # Sin KEY_SOURCE_PAUSER el monitor solo alerta: no carga ninguna llave de pausa
     monitor = merge(
-      { AGENT_STATE_TABLE = local.t["agent_state"], EVIDENCE_BUCKET = aws_s3_bucket.evidence.bucket, NOTICES_QUEUE_URL = aws_sqs_queue.notices.url },
+      { AGENT_STATE_TABLE = local.t["agent_state"], PARTIES_TABLE = local.t["parties"], EVIDENCE_BUCKET = aws_s3_bucket.evidence.bucket, NOTICES_QUEUE_URL = aws_sqs_queue.notices.url },
       var.key_source_pauser == "" ? {} : { KEY_SOURCE_PAUSER = var.key_source_pauser, PAUSER_KEY_ID = aws_kms_key.pauser.key_id },
     )
     noticesIn = { NOTICES_QUEUE_URL = aws_sqs_queue.notices.url }
-    botNotify = { BOT_TABLE = local.t["bot"], APP_BASE_URL = var.app_origin }
-    botAdmin  = { BOT_TABLE = local.t["bot"] }
+    # Sin cuenta personal, los resultados de ingesta de Keel Personal (correo, resumen diario) no se envian
+    botNotify = merge(
+      { BOT_TABLE = local.t["bot"], APP_BASE_URL = var.app_origin },
+      var.bot_personal_account_id == "" ? {} : { BOT_PERSONAL_ACCOUNT_ID = var.bot_personal_account_id },
+    )
+    botAdmin = { BOT_TABLE = local.t["bot"] }
   }
 
   # ---------- Rutas de la API HTTP ----------
@@ -170,7 +175,7 @@ locals {
     ]
     orders     = ["GET /orders", "GET /orders/{orderId}", "GET /needs-you", "GET /wallet"]
     signatures = ["POST /orders/{orderId}/approve-balance", "POST /orders/{orderId}/cancel-signature", "POST /disputes/{orderId}/resolution"]
-    directory  = ["GET /suppliers", "GET /trade-setup", "POST /suppliers"]
+    directory  = ["GET /suppliers", "GET /trade-setup", "POST /suppliers", "POST /importers", "GET /importers/{safe}"]
     attest     = ["POST /shipments"]
     upload     = ["POST /trade/uploads", "POST /trade/documents"]
     inbound    = ["POST /inbound"]
@@ -190,8 +195,10 @@ locals {
   }
 
   # ---------- Permisos: un rol por funcion que toca llaves, secretos o el LLM ----------
-  ddb_rw      = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:BatchGetItem", "dynamodb:ConditionCheckItem"]
-  ddb_read    = ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:BatchGetItem"]
+  ddb_rw   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:BatchGetItem", "dynamodb:ConditionCheckItem"]
+  ddb_read = ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:BatchGetItem"]
+  # Escritura sin borrar ni recorrer la tabla, para las tablas que una funcion solo crea o actualiza
+  ddb_write   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:Query", "dynamodb:BatchGetItem", "dynamodb:ConditionCheckItem"]
   sqs_consume = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes", "sqs:ChangeMessageVisibility"]
 
   # Todas las funciones leen la configuracion publica del despliegue (aws/src/config.ts)
@@ -202,29 +209,41 @@ locals {
   secrets = { for n in local.secret_names : n => { actions = ["ssm:GetParameter"], resources = [local.secret_arn[n]] } }
 
   role_statements = {
-    orders_api = [
-      {
-        actions   = local.ddb_rw
-        resources = [local.tbl["proposals"], local.tbl_idx["proposals"], local.tbl["orders"], local.tbl_idx["orders"], local.tbl["parties"]]
-      },
+    # Consultas de ordenes: solo lectura, sin secretos
+    orders_read = [
+      { actions = local.ddb_read, resources = [local.tbl["proposals"], local.tbl_idx["proposals"], local.tbl["orders"], local.tbl_idx["orders"], local.tbl["parties"]] },
+      local.ssm_read,
+    ]
+    # Propuestas, firmas de cierre y atestaciones: escriben propuestas y ordenes, leen partes, y
+    # consultan la cadena para ERC-1271 y cancelNonceOf
+    orders_write = [
+      { actions = local.ddb_write, resources = [local.tbl["proposals"], local.tbl_idx["proposals"], local.tbl["orders"], local.tbl_idx["orders"]] },
+      { actions = local.ddb_read, resources = [local.tbl["parties"]] },
       local.ssm_read,
       local.secrets["rpc_url"],
+    ]
+    # Directorio: el unico que escribe partes (proveedores, Safes y representantes), con token de operador
+    directory = [
+      { actions = local.ddb_rw, resources = [local.tbl["parties"]] },
+      local.ssm_read,
       local.secrets["directory_admin_token"],
     ]
     registrar = [
       { actions = ["dynamodb:GetRecords", "dynamodb:GetShardIterator", "dynamodb:DescribeStream", "dynamodb:ListStreams"], resources = [aws_dynamodb_table.t["proposals"].stream_arn] },
-      { actions = local.ddb_rw, resources = [local.tbl["proposals"], local.tbl["orders"], local.tbl["parties"], local.tbl["ingest"]] },
-      { actions = ["sqs:SendMessage"], resources = [aws_sqs_queue.notices.arn] },
+      { actions = local.ddb_read, resources = [local.tbl["proposals"]] },
+      { actions = local.ddb_write, resources = [local.tbl["orders"], local.tbl["parties"], local.tbl["ingest"]] },
+      # Destino de los registros del Stream que fallan tras los reintentos (lambda.tf)
+      { actions = ["sqs:SendMessage"], resources = [aws_sqs_queue.registrar_dlq.arn] },
       local.ssm_read,
     ]
     upload = [
-      { actions = local.ddb_rw, resources = [local.tbl["ingest"], local.tbl["orders"]] },
-      { actions = ["s3:PutObject"], resources = ["${aws_s3_bucket.docs.arn}/*"] },
+      { actions = local.ddb_rw, resources = [local.tbl["ingest"]] },
+      { actions = ["s3:PutObject"], resources = ["${aws_s3_bucket.docs.arn}/orders/*"] },
       local.ssm_read,
     ]
     inbound = [
       { actions = local.ddb_rw, resources = [local.tbl["ingest"]] },
-      { actions = ["s3:PutObject"], resources = ["${aws_s3_bucket.docs.arn}/*"] },
+      { actions = ["s3:PutObject"], resources = ["${aws_s3_bucket.docs.arn}/inbound/*"] },
       { actions = ["sqs:SendMessage"], resources = [aws_sqs_queue.notices.arn] },
       local.ssm_read,
       local.secrets["ingest_webhook_token"],
@@ -240,10 +259,14 @@ locals {
       { actions = local.ddb_rw, resources = [local.tbl["ingest"]] },
       local.ssm_read,
       local.secrets["ingest_admin_token"],
+      # Los ajustes validan el proveedor contra las llaves disponibles (availableProviders); nunca las devuelven
+      local.secrets["llm_keys"],
     ]
     extractor = [
       { actions = local.sqs_consume, resources = [aws_sqs_queue.extraction.arn] },
       { actions = ["s3:GetObject", "s3:DeleteObject"], resources = ["${aws_s3_bucket.docs.arn}/orders/*"] },
+      # Sin ListBucket, S3 responde 403 en vez de NoSuchKey a un objeto ausente
+      { actions = ["s3:ListBucket"], resources = [aws_s3_bucket.docs.arn] },
       { actions = local.ddb_rw, resources = [local.tbl["ingest"], local.tbl["orders"]] },
       { actions = ["sqs:SendMessage"], resources = [aws_sqs_queue.notices.arn] },
       local.ssm_read,
@@ -262,7 +285,9 @@ locals {
     agent = [
       { actions = ["kms:Sign", "kms:GetPublicKey"], resources = [aws_kms_key.relayer.arn, aws_kms_key.policy.arn] },
       { actions = local.sqs_consume, resources = [aws_sqs_queue.agent.arn] },
-      { actions = local.ddb_rw, resources = [local.tbl["orders"], local.tbl_idx["orders"], local.tbl["parties"], local.tbl["agent_state"]] },
+      # El agente solo lee ordenes y partes; escribe solo su candado y sus avisos ya enviados
+      { actions = local.ddb_read, resources = [local.tbl["orders"], local.tbl_idx["orders"], local.tbl["parties"]] },
+      { actions = local.ddb_rw, resources = [local.tbl["agent_state"]] },
       { actions = ["s3:PutObject"], resources = ["${aws_s3_bucket.evidence.arn}/*"] },
       { actions = ["sqs:SendMessage"], resources = [aws_sqs_queue.notices.arn] },
       local.ssm_read,
@@ -271,7 +296,8 @@ locals {
       local.secrets["policy_signer_private_key"],
     ]
     indexer = [
-      { actions = local.ddb_rw, resources = [local.tbl["orders"], local.tbl["agent_state"]] },
+      { actions = local.ddb_write, resources = [local.tbl["orders"]] },
+      { actions = local.ddb_rw, resources = [local.tbl["agent_state"]] },
       local.ssm_read,
       local.secrets["rpc_url"],
     ]
@@ -279,6 +305,8 @@ locals {
       { actions = ["kms:Sign", "kms:GetPublicKey"], resources = [aws_kms_key.pauser.arn] },
       { actions = ["s3:GetObject", "s3:ListBucket"], resources = [aws_s3_bucket.evidence.arn, "${aws_s3_bucket.evidence.arn}/*"] },
       { actions = local.ddb_rw, resources = [local.tbl["agent_state"]] },
+      # La cuenta del bot de la Safe, para avisar un incidente
+      { actions = ["dynamodb:GetItem"], resources = [local.tbl["parties"]] },
       { actions = ["sqs:SendMessage"], resources = [aws_sqs_queue.notices.arn] },
       local.ssm_read,
       local.secrets["rpc_url"],

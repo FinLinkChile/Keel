@@ -29,6 +29,6 @@ output "queues" {
 }
 
 output "secrets_to_load" {
-  description = "Secretos creados vacios: hay que cargar su valor real, que nunca va en git"
-  value       = [for s in aws_ssm_parameter.secret : s.name]
+  description = "Secretos que hay que crear a mano como SecureString (README.md); Terraform no los gestiona"
+  value       = [for n in local.secret_names : "${local.secrets_prefix}${n}"]
 }

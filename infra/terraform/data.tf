@@ -146,6 +146,17 @@ resource "aws_s3_bucket_lifecycle_configuration" "docs" {
     expiration { days = 90 }
     noncurrent_version_expiration { noncurrent_days = 1 }
   }
+
+  # Los documentos de una orden se guardan para revisar una disputa, no para siempre (datos
+  # personales, docs/arquitectura/datos-personales.md). Un objeto borrado o reemplazado (archivo que
+  # no coincide con su hash) deja una version no vigente: tambien se elimina.
+  rule {
+    id     = "orders-retention"
+    status = "Enabled"
+    filter { prefix = "orders/" }
+    expiration { days = var.document_retention_days }
+    noncurrent_version_expiration { noncurrent_days = 1 }
+  }
 }
 
 resource "aws_s3_bucket" "evidence" {
@@ -211,7 +222,10 @@ resource "aws_sqs_queue_policy" "extraction" {
       Principal = { Service = "s3.amazonaws.com" }
       Action    = "sqs:SendMessage"
       Resource  = aws_sqs_queue.extraction.arn
-      Condition = { ArnLike = { "aws:SourceArn" = "arn:aws:s3:::${local.name}-docs-${data.aws_caller_identity.me.account_id}" } }
+      Condition = {
+        ArnLike      = { "aws:SourceArn" = "arn:aws:s3:::${local.name}-docs-${data.aws_caller_identity.me.account_id}" }
+        StringEquals = { "aws:SourceAccount" = data.aws_caller_identity.me.account_id }
+      }
     }]
   })
 }
@@ -226,12 +240,21 @@ resource "aws_sqs_queue" "agent" {
   name                        = "${local.name}-agent.fifo"
   fifo_queue                  = true
   content_based_deduplication = true
-  visibility_timeout_seconds  = 720
-  sqs_managed_sse_enabled     = true
+  # 3 veces el timeout del agente (100 s): un pase que muere retiene el carril de esa Safe 5 minutos,
+  # no 12. El handler no lanza por errores de la vuelta: el pase siguiente es completo.
+  visibility_timeout_seconds = 300
+  sqs_managed_sse_enabled    = true
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.agent_dlq.arn
     maxReceiveCount     = 3
   })
+}
+
+# Destino de los registros del Stream de propuestas que el alta de orden no pudo procesar tras sus
+# reintentos: sin el, un registro que siempre falla bloquea el fragmento hasta 24 horas.
+resource "aws_sqs_queue" "registrar_dlq" {
+  name                    = "${local.name}-registrar-dlq"
+  sqs_managed_sse_enabled = true
 }
 
 resource "aws_sqs_queue" "notices_dlq" {
@@ -241,7 +264,7 @@ resource "aws_sqs_queue" "notices_dlq" {
 
 resource "aws_sqs_queue" "notices" {
   name                       = "${local.name}-notices"
-  visibility_timeout_seconds = 180
+  visibility_timeout_seconds = 360 # 6 veces el timeout de botNotify (60 s), como recomienda AWS
   sqs_managed_sse_enabled    = true
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.notices_dlq.arn
@@ -249,20 +272,12 @@ resource "aws_sqs_queue" "notices" {
   })
 }
 
-# ===== Secretos: se crean vacios y se cargan aparte, para que su valor nunca quede en git ni en el estado =====
+# ===== Secretos: Terraform no los crea ni los lee =====
 
-# SecureString de Systems Manager, sin costo. El codigo (aws/src/secrets.ts) rechaza el valor
-# "CAMBIAR", asi que una funcion que lee un secreto no cargado falla en vez de usarlo.
-resource "aws_ssm_parameter" "secret" {
-  for_each = toset(local.secret_names)
-
-  name        = "${local.secrets_prefix}${each.key}"
-  type        = "SecureString"
-  value       = "CAMBIAR"
-  description = "Secreto de Keel. Cargar el valor real con: aws ssm put-parameter --overwrite"
-
-  lifecycle { ignore_changes = [value] }
-}
+# Un aws_ssm_parameter guarda su valor descifrado en el estado de Terraform al refrescarlo, aunque
+# tenga ignore_changes. Para que ninguna llave privada ni token quede en terraform.tfstate, los
+# secretos se crean a mano con `aws ssm put-parameter --type SecureString` (README.md) y aqui solo
+# se arman sus ARN para dar a cada funcion permiso de leer los suyos (locals.tf, secret_arn).
 
 # ===== Configuracion que no es secreta (la lee el agente, el monitor y el indexador) =====
 

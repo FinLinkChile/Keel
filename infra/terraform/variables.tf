@@ -107,11 +107,6 @@ variable "key_source_pauser" {
   }
 }
 
-variable "telegram_bot_username" {
-  description = "Usuario del bot sin @, para los enlaces t.me/<bot>?start=<codigo>"
-  type        = string
-  default     = "keel_demo_bot"
-}
 
 variable "dynamodb_billing_mode" {
   description = "PAY_PER_REQUEST o PROVISIONED. Con PROVISIONED cada tabla e indice usa 1 unidad de lectura y 1 de escritura, dentro de las 25 siempre gratuitas"
@@ -160,4 +155,27 @@ variable "evidence_lock_mode" {
 variable "evidence_lock_days" {
   type    = number
   default = 30
+}
+
+variable "bot_personal_account_id" {
+  description = "Cuenta del bot (AccountId) que recibe los avisos de Keel Personal: correo y resumen diario de cambios de cuenta. Vacio: esos avisos no se envian"
+  type        = string
+  default     = ""
+}
+
+variable "document_retention_days" {
+  description = "Dias que se guardan los documentos de una orden en S3 (orders/) para revisar una disputa. [PROPUESTA], ver docs/arquitectura/datos-personales.md"
+  type        = number
+  default     = 180
+}
+
+variable "proforma_throttle_rate" {
+  description = "Solicitudes por segundo de POST /trade/proforma, la ruta que llama al LLM: el tope mas bajo"
+  type        = number
+  default     = 2
+}
+
+variable "proforma_throttle_burst" {
+  type    = number
+  default = 5
 }

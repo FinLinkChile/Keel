@@ -1,4 +1,4 @@
-# Alarmas y presupuesto. Cuatro alarmas caben en las diez que son gratuitas.
+# Alarmas y presupuesto. Ocho alarmas caben en las diez que son gratuitas.
 
 resource "aws_sns_topic" "alerts" {
   name = "${local.name}-alerts"
@@ -17,6 +17,7 @@ resource "aws_cloudwatch_metric_alarm" "dlq" {
     extraction = { queue = aws_sqs_queue.extraction_dlq.name, text = "Hay documentos que no se pudieron leer" }
     agent      = { queue = aws_sqs_queue.agent_dlq.name, text = "Una vuelta del agente fallo tres veces" }
     notices    = { queue = aws_sqs_queue.notices_dlq.name, text = "Hay avisos que no se pudieron enviar" }
+    registrar  = { queue = aws_sqs_queue.registrar_dlq.name, text = "Una propuesta firmada no paso a orden tras sus reintentos" }
   } : {}
 
   alarm_name          = "${local.name}-${each.key}-dlq"
@@ -53,6 +54,57 @@ resource "aws_cloudwatch_metric_alarm" "agent_error" {
   alarm_description   = "El agente registro AGENT_ERROR"
   namespace           = "Keel"
   metric_name         = "AgentError"
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = 0
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+}
+
+# El monitor y el indexador corren por programador: un error repetido (configuracion, permisos, RPC)
+# los deja sin vigilar ni indexar y no pasa por ninguna cola. Esta alarma lo hace visible.
+resource "aws_cloudwatch_metric_alarm" "scheduled_errors" {
+  for_each = var.enable_alarms ? toset(["monitor", "indexer"]) : toset([])
+
+  alarm_name          = "${local.name}-${each.key}-errors"
+  alarm_description   = "La funcion ${each.key} fallo en tres minutos seguidos"
+  namespace           = "AWS/Lambda"
+  metric_name         = "Errors"
+  dimensions          = { FunctionName = aws_lambda_function.fn[each.key].function_name }
+  statistic           = "Sum"
+  period              = 60
+  evaluation_periods  = 3
+  threshold           = 0
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+}
+
+# El envio de avisos descarta sin reintentar un mensaje que no tiene la forma esperada (queue_invalid,
+# aws/src/handlers/botNotify.ts): un desajuste entre productor y bot perderia avisos en silencio.
+resource "aws_cloudwatch_log_metric_filter" "queue_invalid" {
+  count = var.enable_alarms ? 1 : 0
+
+  name           = "${local.name}-queue-invalid"
+  log_group_name = aws_cloudwatch_log_group.fn["botNotify"].name
+  pattern        = "{ $.event = \"queue_invalid\" }"
+
+  metric_transformation {
+    name      = "QueueInvalid"
+    namespace = "Keel"
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "queue_invalid" {
+  count = var.enable_alarms ? 1 : 0
+
+  alarm_name          = "${local.name}-queue-invalid"
+  alarm_description   = "El envio de avisos descarto un mensaje con forma invalida"
+  namespace           = "Keel"
+  metric_name         = "QueueInvalid"
   statistic           = "Sum"
   period              = 300
   evaluation_periods  = 1

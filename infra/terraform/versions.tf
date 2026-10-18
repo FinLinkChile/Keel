@@ -1,5 +1,5 @@
-# Keel Trade en AWS: Terraform de la arquitectura ampliada (borrador de viabilidad, no desplegado).
-# Equivale al serverless.yml ampliado. Los handlers de dist/ son de relleno hasta que haya codigo real.
+# Keel Trade en AWS: Terraform de la arquitectura ampliada (docs/arquitectura/despliegue-aws.md).
+# Las funciones salen de aws/src/handlers, empaquetadas en dist/ con npm run build -w aws.
 
 terraform {
   required_version = ">= 1.6"

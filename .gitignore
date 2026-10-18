@@ -32,3 +32,8 @@ infra/terraform/.build/
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
+
+# Terraform plans and crash logs can hold account details
+infra/terraform/plan.bin
+*.tfplan
+crash.log

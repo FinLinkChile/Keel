@@ -63,7 +63,18 @@ resource "aws_lambda_event_source_mapping" "proposals_stream" {
   starting_position = "LATEST"
   batch_size        = 1
 
-  # Solo las propuestas firmadas por las dos partes. El nombre del atributo es de ejemplo.
+  # Un registro que siempre falla no bloquea el fragmento: se reintenta pocas veces, se parte el lote
+  # y, al final, va a la cola de fallidos del alta de orden, que tiene alarma (alarms.tf).
+  maximum_retry_attempts         = 5
+  maximum_record_age_in_seconds  = 3600
+  bisect_batch_on_function_error = true
+  destination_config {
+    on_failure {
+      destination_arn = aws_sqs_queue.registrar_dlq.arn
+    }
+  }
+
+  # Solo las propuestas firmadas por las dos partes (ProposalItem.status, aws/src/tables.ts).
   filter_criteria {
     filter {
       pattern = jsonencode({ dynamodb = { NewImage = { status = { S = ["fully_signed"] } } } })
