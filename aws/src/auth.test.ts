@@ -37,7 +37,7 @@ describe("authenticate", () => {
   });
 
   it("rejects an old signature", async () => {
-    expect(await authenticate(await signed("GET", "/orders", "", { issuedAt: T - 301 }), CHAIN, NOW)).toEqual({ ok: false, reason: "stale_signature" });
+    expect(await authenticate(await signed("GET", "/orders", "", { issuedAt: T - 601 }), CHAIN, NOW)).toEqual({ ok: false, reason: "stale_signature" });
   });
 
   it("rejects a signer that claims to be someone else", async () => {

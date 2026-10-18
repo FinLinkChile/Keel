@@ -1,11 +1,13 @@
 // Signed requests to the Keel API on AWS (docs/interfaces/autenticacion-api.md).
 // Each call to an authenticated route carries an EIP-712 signature of the wallet of the person
 // making it, over the method, the path, the hash of the body and the time. It authenticates who
-// asks; it moves nothing on chain. Its own domain name, so it can never be replayed as one of the
-// structs the contracts verify (domain "Keel") or as an upload (domain "Keel Ingest").
+// asks; it moves nothing on chain. Same pattern as the document upload (ingest/src/trade/upload.ts),
+// as Area 2's docs/arquitectura/aws-api-y-datos.md proposes: the off-chain domain "Keel Ingest"
+// and a 10-minute window. The domain is never "Keel", so a request can never be replayed as one
+// of the structs the contracts verify, and its own primary type keeps it apart from an upload.
 import type { Hex } from "./index";
 
-export const apiDomain = (chainId: number) => ({ name: "Keel API", version: "1", chainId }) as const;
+export const apiDomain = (chainId: number) => ({ name: "Keel Ingest", version: "1", chainId }) as const;
 
 export const API_EIP712_TYPES = {
   ApiRequest: [
@@ -27,7 +29,7 @@ export interface ApiRequest {
   issuedAt: bigint;
 }
 
-export const API_MAX_SKEW_SECONDS = 5 * 60;
+export const API_MAX_SKEW_SECONDS = 10 * 60;
 
 // Headers that carry the signature
 export const API_HEADERS = {
