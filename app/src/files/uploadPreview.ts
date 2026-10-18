@@ -1,6 +1,7 @@
 import type { RequiredDocType } from '@keel/schemas';
 
 import { MAX_UPLOAD_BYTES } from '../ingest/client';
+import { t } from '../i18n/translate';
 
 // What the exporter sees before signing an upload: the file as the phone has it, read locally.
 // Nothing here comes from ingest.
@@ -46,9 +47,9 @@ export type UploadPreview = {
 export function uploadPreview(docType: RequiredDocType, orderLabel: string, file: { name: string; bytes: Uint8Array }): UploadPreview {
   const pages = countPdfPages(file.bytes);
   const parts = [formatSize(file.bytes.byteLength)];
-  if (pages !== undefined) parts.push(pages === 1 ? '1 page' : `${pages} pages`);
+  if (pages !== undefined) parts.push(pages === 1 ? t('1 page') : t('{n} pages', { n: pages }));
   return {
-    title: `${DOC_NAMES[docType]} for ${orderLabel}`,
+    title: t('{doc} for {label}', { doc: t(DOC_NAMES[docType]), label: orderLabel }),
     fileName: file.name,
     details: parts.join(', '),
     tooLarge: file.bytes.byteLength > MAX_UPLOAD_BYTES,

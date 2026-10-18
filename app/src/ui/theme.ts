@@ -1,5 +1,5 @@
 // Design tokens of "Keel Dark Screens" (claude.ai/design). Screens use these names,
-// never a hex value, so a light theme only has to provide another `Colors`.
+// never a hex value, so the light theme only has to provide another `Colors`.
 
 export const dark = {
   // Screen ground and the outer canvas of the web build
@@ -39,6 +39,8 @@ export const dark = {
   moneyPanel: '#1B1F3A',
   moneyPanelTop: '#2A3160',
   moneyPanelLine: '#353D70',
+  // Main figures on the panel, which is dark in both themes
+  moneyPanelInk: '#F5F5F7',
   moneyPanelText: '#B4BBDD',
   moneyPanelIcon: '#8C94C2',
   // Funds still locked, in charts and legends
@@ -49,10 +51,55 @@ export const dark = {
   onAvatar: '#000000',
 } as const;
 
-export type Colors = typeof dark;
+export type Colors = { [K in keyof typeof dark]: K extends 'avatar' ? readonly string[] : string };
 
-// Only the dark theme exists today.
-export const colors: Colors = dark;
+// Light counterpart of every token. The navy money panel keeps its own look in both themes.
+export const light: Colors = {
+  bg: '#F2F2F7',
+  canvas: '#E5E5EA',
+  surface: '#FFFFFF',
+  surfaceRaised: '#E9E9EE',
+  line: '#C7C7CC',
+  divider: '#E1E1E6',
+  dividerOnSurface: '#E9E9EE',
+
+  text: '#111113',
+  textSoft: '#3A3A3E',
+  textMuted: '#55555C',
+  textFaint: '#6E6E75',
+  control: '#A8A8AE',
+
+  accent: '#4A5BD4',
+  accentHalo: 'rgba(74,91,212,0.16)',
+  onAccent: '#FFFFFF',
+
+  yourTurn: '#C78500',
+  money: '#0E8F63',
+  moneyMuted: '#DDF3EA',
+  danger: '#D93025',
+  dangerMuted: '#FBE4E1',
+
+  moneyPanel: dark.moneyPanel,
+  moneyPanelTop: dark.moneyPanelTop,
+  moneyPanelLine: dark.moneyPanelLine,
+  moneyPanelInk: dark.moneyPanelInk,
+  moneyPanelText: dark.moneyPanelText,
+  moneyPanelIcon: dark.moneyPanelIcon,
+  locked: '#8A90B4',
+
+  avatar: dark.avatar,
+  onAvatar: '#000000',
+};
+
+export type ThemeMode = 'dark' | 'light';
+
+// The palette in use. It is one object that applyTheme rewrites, so every screen that reads
+// `colors` while rendering gets the new values; ThemeProvider remounts the screens when it changes.
+export const colors: Colors = { ...dark };
+
+export function applyTheme(mode: ThemeMode) {
+  Object.assign(colors, mode === 'light' ? light : dark);
+}
 
 // Every weight is its own font face (expo-google-fonts), so text picks a family and
 // never sets fontWeight.

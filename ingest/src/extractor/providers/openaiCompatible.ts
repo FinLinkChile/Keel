@@ -12,8 +12,9 @@ export class OpenAICompatibleProvider implements ExtractorProvider {
     apiKey: string,
     readonly model: string,
     baseURL: string,
+    timeoutMs?: number,
   ) {
-    this.client = new OpenAI({ apiKey, baseURL });
+    this.client = new OpenAI({ apiKey, baseURL, ...(timeoutMs ? { timeout: timeoutMs } : {}) });
   }
 
   async complete(request: ExtractionRequest): Promise<string> {

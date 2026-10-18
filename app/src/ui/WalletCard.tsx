@@ -2,13 +2,15 @@ import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
+import { useT } from '@/i18n';
+
 import type { Wallet } from '@/data';
 
 import { Amount } from './Amount';
 import { formatCompact, formatMinor } from './format';
 import { Icon } from './Icon';
 import { Text } from './Text';
-import { colors } from './theme';
+import { colors, dark } from './theme';
 
 type Props = {
   wallet: Wallet;
@@ -21,6 +23,7 @@ type Props = {
 // The navy money panel of 02 Home: what is available, what is locked in orders and how
 // much of the monthly limit the agent has used.
 export function WalletCard({ wallet, lockedLabel, onLocked, onAgent }: Props) {
+  const t = useT();
   const { agent } = wallet;
 
   return (
@@ -38,13 +41,14 @@ export function WalletCard({ wallet, lockedLabel, onLocked, onAgent }: Props) {
 
       <View style={{ paddingTop: 20, paddingHorizontal: 20, paddingBottom: 18, gap: 2 }}>
         <Text size={15} color="moneyPanelText">
-          Available
+          {t('Available')}
         </Text>
         <Amount
           minor={wallet.availableMinor}
           currency={wallet.currency}
           size={38}
           tracking={-1.5}
+          color="moneyPanelInk"
           currencyColor="moneyPanelText"
         />
       </View>
@@ -54,7 +58,7 @@ export function WalletCard({ wallet, lockedLabel, onLocked, onAgent }: Props) {
         <Text size={15} color="moneyPanelText" style={{ flex: 1 }}>
           {lockedLabel}
         </Text>
-        <Amount minor={wallet.lockedMinor} size={14} weight={500} />
+        <Amount minor={wallet.lockedMinor} size={14} weight={500} color="moneyPanelInk" />
       </Row>
 
       {agent ? <AgentRow agent={agent} onPress={onAgent} /> : null}
@@ -63,29 +67,30 @@ export function WalletCard({ wallet, lockedLabel, onLocked, onAgent }: Props) {
 }
 
 function AgentRow({ agent, onPress }: { agent: NonNullable<Wallet['agent']>; onPress?: () => void }) {
+  const t = useT();
   const used = agent.monthlyLimitMinor > 0n ? Number((agent.usedMinor * 1000n) / agent.monthlyLimitMinor) / 10 : 0;
-  const limitLabel = `${formatCompact(agent.usedMinor)} of ${formatCompact(agent.monthlyLimitMinor)}`;
+  const limitLabel = t('{used} of {limit}', { used: formatCompact(agent.usedMinor), limit: formatCompact(agent.monthlyLimitMinor) });
   return (
-    <Row onPress={onPress} last label={`Agent ${agent.on ? 'on' : 'off'}, ${limitLabel} monthly limit used`}>
+    <Row onPress={onPress} last label={t(agent.on ? 'Agent on, {limit} monthly limit used' : 'Agent off, {limit} monthly limit used', { limit: limitLabel })}>
       <View style={{ width: 16, alignItems: 'center' }}>
         <View
           style={{
             width: 16,
             height: 16,
             borderRadius: 8,
-            backgroundColor: agent.on ? colors.accentHalo : 'transparent',
+            backgroundColor: agent.on ? dark.accentHalo : 'transparent',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: agent.on ? colors.accent : colors.control }} />
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: agent.on ? dark.accent : dark.control }} />
         </View>
       </View>
-      <Text size={15} weight={700}>
-        {agent.on ? 'Agent on' : 'Agent off'}
+      <Text size={15} weight={700} color="moneyPanelInk">
+        {agent.on ? t('Agent on') : t('Agent off')}
       </Text>
       <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: colors.moneyPanelLine, overflow: 'hidden' }}>
-        <View style={{ width: `${Math.min(used, 100)}%`, height: 6, borderRadius: 3, backgroundColor: colors.accent }} />
+        <View style={{ width: `${Math.min(used, 100)}%`, height: 6, borderRadius: 3, backgroundColor: dark.accent }} />
       </View>
       <Text mono size={13} color="moneyPanelText">
         {limitLabel}

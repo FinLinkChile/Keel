@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { useT } from '@/i18n';
+
 import { Icon } from './Icon';
 import { Text } from './Text';
 import { colors, radius } from './theme';
@@ -32,6 +34,7 @@ type StackProps<T> = {
 
 // Pending items shown one at a time, paged with the arrows next to "1/2".
 export function SheetStack<T>({ title, items, keyOf, render }: StackProps<T>) {
+  const t = useT();
   const [index, setIndex] = useState(0);
   const current = Math.min(index, Math.max(items.length - 1, 0));
   const item = items[current];
@@ -44,12 +47,12 @@ export function SheetStack<T>({ title, items, keyOf, render }: StackProps<T>) {
         </Text>
         {items.length > 1 ? (
           <>
-            <Text mono size={13} weight={600} color="textMuted" accessibilityLabel={`${current + 1} of ${items.length}`}>
+            <Text mono size={13} weight={600} color="textMuted" accessibilityLabel={t('{n} of {total}', { n: current + 1, total: items.length })}>
               {current + 1}/{items.length}
             </Text>
-            <Arrow label="Previous" icon="back" disabled={current === 0} onPress={() => setIndex(current - 1)} />
+            <Arrow label={t('Previous')} icon="back" disabled={current === 0} onPress={() => setIndex(current - 1)} />
             <Arrow
-              label="Next"
+              label={t('Next')}
               icon="chevron"
               disabled={current === items.length - 1}
               onPress={() => setIndex(current + 1)}

@@ -44,7 +44,7 @@ export type InvoiceReading =
 
 export interface ReadOptions {
   // Checked after the parser and before the model, so a resent invoice costs no LLM call
-  isDuplicate?: (invoiceKey: Hex) => boolean;
+  isDuplicate?: (invoiceKey: Hex) => boolean | Promise<boolean>;
 }
 
 export function compareReadings(
@@ -87,7 +87,7 @@ export async function readInvoice(
   }
 
   const key = invoiceKey(parsed.extraction);
-  if (options.isDuplicate?.(key)) return { status: "duplicate", invoiceKey: key };
+  if (await options.isDuplicate?.(key)) return { status: "duplicate", invoiceKey: key };
 
   let llm: InvoiceExtraction;
   try {

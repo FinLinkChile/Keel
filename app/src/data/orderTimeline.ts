@@ -1,4 +1,5 @@
 import { formatDay, formatLocalDay, formatMinor } from '../ui/format';
+import { t } from '../i18n/translate';
 
 import { tokenToCents } from './amounts';
 import type { Proposal } from './proposals';
@@ -24,7 +25,7 @@ const DAY = 24 * 3600;
 
 const days = (seconds: number) => {
   const n = Math.max(0, Math.ceil(seconds / DAY));
-  return n === 0 ? 'today' : n === 1 ? 'in 1 day' : `in ${n} days`;
+  return n === 0 ? t('today') : n === 1 ? t('in 1 day') : t('in {n} days', { n });
 };
 
 const join = (...parts: (string | undefined)[]) => parts.filter(Boolean).join(', ');
@@ -42,7 +43,7 @@ export function importerTimeline(order: Order, supplier: Party, carrier: Party, 
   const who = supplier.short;
   const { total, advance, balance } = split(order);
   const deadline = formatDay(order.po.shipmentDeadline);
-  const day = (t?: number) => (t === undefined ? undefined : formatDay(t));
+  const day = (at?: number) => (at === undefined ? undefined : formatDay(at));
   const funded = FUNDED.includes(order.stage) || order.advancePaidAt !== undefined;
   const items: TimelineItem[] = [];
 
@@ -50,31 +51,31 @@ export function importerTimeline(order: Order, supplier: Party, carrier: Party, 
   if (order.stage === 'awaiting_signature') {
     items.push({
       key: 'signed',
-      title: order.waitingOn === 'importer' ? 'Waiting for your signature' : `Waiting for ${who} to sign`,
-      detail: order.waitingOn === 'importer' ? `${who} signed. Yours is the last one.` : 'You sign last, after them.',
+      title: order.waitingOn === 'importer' ? t('Waiting for your signature') : t('Waiting for {name} to sign', { name: who }),
+      detail: order.waitingOn === 'importer' ? t('{name} signed. Yours is the last one.', { name: who }) : t('You sign last, after them.'),
       state: 'current',
     });
   } else {
-    items.push({ key: 'signed', title: 'Signed by both', detail: day(order.signedAt), state: 'done' });
+    items.push({ key: 'signed', title: t('Signed by both'), detail: day(order.signedAt), state: 'done' });
   }
 
   // 2. The deposit
   items.push({
     key: 'locked',
-    title: 'Locked in escrow',
+    title: t('Locked in escrow'),
     detail: funded
-      ? join(day(order.advancePaidAt), 'by the agent')
+      ? join(day(order.advancePaidAt), t('by the agent'))
       : order.stage === 'signed'
         ? order.blockedBy === 'supplier_check'
-          ? 'Waiting for the supplier check'
-          : 'Waiting to be opened in the escrow'
-        : 'After both of you sign',
+          ? t('Waiting for the supplier check')
+          : t('Waiting to be opened in the escrow')
+        : t('After both of you sign'),
     state: funded ? 'done' : order.stage === 'signed' ? 'current' : 'todo',
     trailing: { text: formatMinor(total), tone: 'muted' },
   });
 
   if (order.stage === 'cancelled') {
-    items.push({ key: 'cancelled', title: 'Cancelled together', detail: day(order.closedAt), state: 'done' });
+    items.push({ key: 'cancelled', title: t('Cancelled together'), detail: day(order.closedAt), state: 'done' });
     return items;
   }
 
@@ -82,8 +83,8 @@ export function importerTimeline(order: Order, supplier: Party, carrier: Party, 
   if (order.po.advanceBps > 0) {
     items.push({
       key: 'advance',
-      title: `Advance paid to ${who}`,
-      detail: funded ? join(day(order.advancePaidAt), 'by the contract') : 'When the order is opened',
+      title: t('Advance paid to {name}', { name: who }),
+      detail: funded ? join(day(order.advancePaidAt), t('by the contract')) : t('When the order is opened'),
       state: funded ? 'done' : 'todo',
       trailing: { text: formatMinor(advance), tone: funded ? 'money' : 'muted' },
     });
@@ -94,35 +95,35 @@ export function importerTimeline(order: Order, supplier: Party, carrier: Party, 
     const left = Math.max(0, Math.ceil((Number(order.po.shipmentDeadline) - now) / DAY));
     items.push({
       key: 'shipment',
-      title: 'Waiting for the shipment',
-      detail: `${carrier.short} has to confirm the goods are on board by ${deadline}. ${who} uploads the bill of lading and invoice. Nothing for you to do.`,
+      title: t('Waiting for the shipment'),
+      detail: t('{carrier} has to confirm the goods are on board by {date}. {name} uploads the bill of lading and invoice. Nothing for you to do.', { carrier: carrier.short, date: deadline, name: who }),
       state: 'current',
-      trailing: { text: left === 1 ? '1 day left' : `${left} days left`, tone: 'plain' },
+      trailing: { text: left === 1 ? t('1 day left') : t('{n} days left', { n: left }), tone: 'plain' },
     });
   } else if (order.stage === 'shipped' || order.stage === 'settled') {
-    items.push({ key: 'shipment', title: `Shipment proven by ${carrier.short}`, detail: day(order.shippedAt), state: 'done' });
+    items.push({ key: 'shipment', title: t('Shipment proven by {name}', { name: carrier.short }), detail: day(order.shippedAt), state: 'done' });
   } else if (order.stage === 'refunded') {
-    items.push({ key: 'shipment', title: 'No proof of shipment', detail: join(`by ${deadline}`, day(order.closedAt)), state: 'done' });
+    items.push({ key: 'shipment', title: t('No proof of shipment'), detail: join(t('by {date}', { date: deadline }), day(order.closedAt)), state: 'done' });
   } else {
-    items.push({ key: 'shipment', title: 'Shipment', detail: `On board by ${deadline}`, state: 'todo' });
+    items.push({ key: 'shipment', title: t('Shipment'), detail: t('On board by {date}', { date: deadline }), state: 'todo' });
   }
 
   // 5. The balance
   if (order.stage === 'settled') {
-    items.push({ key: 'balance', title: `Balance paid to ${who}`, detail: day(order.closedAt), state: 'done', trailing: { text: formatMinor(balance), tone: 'money' } });
+    items.push({ key: 'balance', title: t('Balance paid to {name}', { name: who }), detail: day(order.closedAt), state: 'done', trailing: { text: formatMinor(balance), tone: 'money' } });
   } else if (order.stage === 'shipped') {
     const releaseAt = Number((order.shippedAt ?? 0) + Number(order.po.disputeWindow));
     items.push({
       key: 'balance',
-      title: `Balance to ${who}`,
-      detail: `Paid ${days(releaseAt - now)}, after the dispute window`,
+      title: t('Balance to {name}', { name: who }),
+      detail: t('Paid {when}, after the dispute window', { when: days(releaseAt - now) }),
       state: 'current',
       trailing: { text: formatMinor(balance), tone: 'plain' },
     });
   } else if (order.stage === 'refunded') {
-    items.push({ key: 'balance', title: 'Balance returned to you', detail: day(order.closedAt), state: 'done', trailing: { text: formatMinor(balance), tone: 'money' } });
+    items.push({ key: 'balance', title: t('Balance returned to you'), detail: day(order.closedAt), state: 'done', trailing: { text: formatMinor(balance), tone: 'money' } });
   } else {
-    items.push({ key: 'balance', title: `Balance paid to ${who}`, detail: 'After the shipment is proven', state: 'todo', trailing: { text: formatMinor(balance), tone: 'muted' } });
+    items.push({ key: 'balance', title: t('Balance paid to {name}', { name: who }), detail: t('After the shipment is proven'), state: 'todo', trailing: { text: formatMinor(balance), tone: 'muted' } });
   }
   return items;
 }
@@ -166,41 +167,41 @@ export function proposalTimeline(proposal: Proposal, supplier: Party): TimelineI
   const { balance } = split({ po } as Order);
   const deadline = formatDay(po.shipmentDeadline);
   const status = proposal.status;
-  const items: TimelineItem[] = [{ key: 'sent', title: 'Order sent', detail: formatLocalDay(proposal.sentAt), state: 'done' }];
+  const items: TimelineItem[] = [{ key: 'sent', title: t('Order sent'), detail: formatLocalDay(proposal.sentAt), state: 'done' }];
 
   const exporterSigned = status === 'awaiting_importer' || status === 'signed' || (status === 'rejected' && !!proposal.exporterSignature);
   items.push({
     key: 'exporter',
-    title: `${who} signs`,
-    detail: exporterSigned ? (proposal.exporterSignedAt ? formatLocalDay(proposal.exporterSignedAt) : 'Signed') : 'They check the terms and sign first.',
+    title: t('{name} signs', { name: who }),
+    detail: exporterSigned ? (proposal.exporterSignedAt ? formatLocalDay(proposal.exporterSignedAt) : t('Signed')) : t('They check the terms and sign first.'),
     state: exporterSigned ? 'done' : status === 'rejected' ? 'todo' : 'current',
   });
 
   if (status === 'rejected') {
-    items.push({ key: 'rejected', title: 'Rejected', detail: 'The order was not signed by both. Nothing was paid.', state: 'stopped' });
+    items.push({ key: 'rejected', title: t('Rejected'), detail: t('The order was not signed by both. Nothing was paid.'), state: 'stopped' });
     return items;
   }
 
   items.push({
     key: 'importer',
-    title: 'You sign',
+    title: t('You sign'),
     detail:
       status === 'signed'
         ? proposal.signedAt
           ? formatLocalDay(proposal.signedAt)
-          : 'Signed'
+          : t('Signed')
         : status === 'awaiting_importer'
-          ? `${who} signed. Yours is the last signature.`
-          : 'After them, and that is when the agent deposits.',
+          ? t('{name} signed. Yours is the last signature.', { name: who })
+          : t('After them, and that is when the agent deposits.'),
     state: status === 'signed' ? 'done' : status === 'awaiting_importer' ? 'current' : 'todo',
     action: status === 'awaiting_importer' ? 'review' : undefined,
   });
-  items.push({ key: 'open', title: 'Opened in the escrow, advance paid', detail: 'Waits for the escrow to be opened', state: 'todo' });
-  items.push({ key: 'shipment', title: `Shipment and documents by ${deadline}`, state: 'todo' });
+  items.push({ key: 'open', title: t('Opened in the escrow, advance paid'), detail: t('Waits for the escrow to be opened'), state: 'todo' });
+  items.push({ key: 'shipment', title: t('Shipment and documents by {date}', { date: deadline }), state: 'todo' });
   items.push({
     key: 'balance',
-    title: `Balance paid to ${who}`,
-    detail: 'After the shipment is proven',
+    title: t('Balance paid to {name}', { name: who }),
+    detail: t('After the shipment is proven'),
     state: 'todo',
     trailing: { text: formatMinor(balance), tone: 'muted' },
   });

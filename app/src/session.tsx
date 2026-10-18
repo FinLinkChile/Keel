@@ -2,7 +2,7 @@ import type { Hex } from '@keel/schemas';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { config } from '@/config';
-import { bindCompany, bindWallets, type Role } from '@/data';
+import { api, bindApiSigners, bindCompany, bindWallets, refreshData, type Role } from '@/data';
 import { toOnboarding, type Draft, type Onboarding } from '@/data/onboarding';
 import { onboardingStore } from '@/data/onboardingStore';
 import { wallets, type Signer, type Signers } from '@/wallet';
@@ -43,6 +43,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // which run before this provider's, and must already see the wallets.
   bindWallets(addresses, config.importerSafe);
   bindCompany(onboarding?.company);
+  // The Keel API signs each request with these wallets (when EXPO_PUBLIC_API_URL is set)
+  bindApiSigners(signers);
+
+  // Screens that loaded before the wallets were known read again with them
+  useEffect(() => {
+    if (api && signers !== undefined) refreshData();
+  }, [signers]);
 
   const use = useCallback(async (s: Signers | null) => {
     const found: Partial<Record<Role, Hex>> = {};

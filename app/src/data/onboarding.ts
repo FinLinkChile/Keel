@@ -1,5 +1,6 @@
 import type { TextFile } from './proposals';
 import { cleanRut, isCompanyRut, isPersonRut } from './rut';
+import { t } from '../i18n/translate';
 
 // Sign-up: the country, the company and the person who represents it, the way a Chilean bank asks
 // for them. The identity check is SIMULATED: the person ticks that it was done, and nothing is
@@ -67,16 +68,16 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export function checkStep(step: Step, d: Draft): Problems {
   const problems: Problems = {};
   if (step === 'company') {
-    if (!isCompanyRut(d.companyRut)) problems.companyRut = 'Check the RUT of the company. It has to be valid and start at 50.000.000.';
-    if (d.legalName.trim().length < 3) problems.legalName = 'Write the legal name of the company.';
-    if (!EMAIL.test(d.email.trim())) problems.email = 'Write an email like name@company.cl.';
-    if (!normalizePhone(d.phone)) problems.phone = 'Write a Chilean mobile, like +56 9 1234 5678.';
+    if (!isCompanyRut(d.companyRut)) problems.companyRut = t('Check the RUT of the company. It has to be valid and start at 50.000.000.');
+    if (d.legalName.trim().length < 3) problems.legalName = t('Write the legal name of the company.');
+    if (!EMAIL.test(d.email.trim())) problems.email = t('Write an email like name@company.cl.');
+    if (!normalizePhone(d.phone)) problems.phone = t('Write a Chilean mobile, like +56 9 1234 5678.');
   }
   if (step === 'representative') {
-    if (d.repName.trim().split(/\s+/).length < 2) problems.repName = 'Write first name and surname.';
-    if (!isPersonRut(d.repRut)) problems.repRut = 'Check the RUT. It has to be valid.';
+    if (d.repName.trim().split(/\s+/).length < 2) problems.repName = t('Write first name and surname.');
+    if (!isPersonRut(d.repRut)) problems.repRut = t('Check the RUT. It has to be valid.');
   }
-  if (step === 'identity' && !d.identityChecked) problems.identityChecked = 'Tick the box once you have validated your identity.';
+  if (step === 'identity' && !d.identityChecked) problems.identityChecked = t('Tick the box once you have validated your identity.');
   return problems;
 }
 
