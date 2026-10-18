@@ -1,5 +1,9 @@
 # Historial de la documentación
 
+## 2026-10-18
+
+* **Actualización (interfaz) [PROPUESTA]**: T3.11 implementada. `POST /trade/orders` recibe de la app la orden firmada por ambas partes (el `order.json` del agente) y la acepta solo si los términos calzan con `termsHash`, el `orderId` es el de las partes y el nonce, el importador está registrado y las dos firmas valen; la del importador, que es una Safe, la verifica la propia Safe por ERC-1271 cuando hay un nodo configurado, y sin nodo exige que la llave que firmó esté registrada (más débil, para la demo). Luego registra al exportador y al dueño de la Safe como quienes pueden subir documentos y escribe el `order.json` del agente. Responde a la decisión 17 (Área 2) y al PR #85 (Área 4); toca la decisión abierta 15. Área 3 (Daniela). Concepto: [orden firmada](interfaces/orden-firmada.md).
+
 ## 2026-10-17
 
 * **Actualización (app) [PROPUESTA]**: análisis de negociación y puntaje enriquecido. Al enviar una orden, la app guarda con ella lo que pidió la proforma (monto, anticipo, fechas), sin firmarlo, y compara con lo firmado: puntos de anticipo y porcentaje de total negociados, por proveedor y en el panel. El puntaje del proveedor suma los días promedio entre el embarque y la fecha límite, los documentos aceptados y cuánto tarda en firmar. Todo sale de datos que ya existen (la orden, sus marcas de tiempo y la lectura de la proforma, que se puede unir a la orden porque `documentHash` es el hash de la proforma). Área 3 (Daniela), como aporte al Área 4.

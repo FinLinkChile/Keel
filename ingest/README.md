@@ -81,6 +81,10 @@ Measured on 2026-10-14 with `claude-opus-5-5` through the team's LiteLLM proxy: 
 
 A PDF with text is read like the other documents, from redacted text, and the parser's hidden text check is added to the model's. A photo or a scanned PDF has no text to redact, so the file goes to the model and the transfer is logged as unredacted (`extraccion_proforma`). The answer is typed fields only (number, date, currency, amount, incoterm, HS codes, latest shipment date, ports, advance in basis points, and two warnings), with the fields the proforma does not print listed in `missing`. It never returns the payout address, names or free text. One reader is enough because the reading decides nothing: the people review every field before both sign the order. 20 proformas per importer and day; the same file returns the same reading without a second call to the model. Contract: [docs/interfaces/lectura-de-proforma.md](../docs/interfaces/lectura-de-proforma.md).
 
+## Signed orders from the app (T3.11)
+
+`POST /trade/orders` takes an order signed by both parties: the agent's `order.json` (`order`, `terms`, `label`, `sigImporter`, `sigExporter`) in canonical JSON. It exists with `INGEST_ESCROW_ADDRESS`. Ingest accepts it only if the terms hash to `termsHash`, the `orderId` is the one of the parties and nonce, the importer is registered and both EIP-712 signatures are valid. The importer is a Safe, so its signature is an owner's over the `SafeMessage`: with `INGEST_RPC_URL` the Safe checks it (ERC-1271); without it, the owner key must be in `INGEST_IMPORTERS_FILE`. Then the exporter and that owner key may upload the order's documents, and with `INGEST_AGENT_DIR` the agent's `orders/<orderId>/order.json` is written. Contract in [docs/interfaces/orden-firmada.md](../docs/interfaces/orden-firmada.md).
+
 ## Demo documents of PO-0142
 
 The bill of lading, the commercial invoice and the carrier's attestation of the order of act 1 of

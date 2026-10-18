@@ -6,6 +6,7 @@ import type { AliasId, Hex, RequiredDocType } from "@keel/schemas";
 import { docsHash } from "@keel/schemas/hash";
 import type { ChangeRequest } from "./beneficiaryChange";
 import type { AccountAlert } from "./trade/accountAlert";
+import type { TradeOrderEntry } from "./trade/upload";
 
 export const MAX_EMAILS_PER_SENDER_PER_DAY = 20;
 // Keel Trade: authorized uploads per order in 24 hours. A legitimate order needs two or three.
@@ -100,6 +101,14 @@ export class IngestStore {
         received_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS proforma_uploads_by_importer ON proforma_uploads (importer, received_at);
+      -- Orders signed by both parties and sent from the app (T3.11): who may upload documents to
+      -- them, and the agent's order.json exactly as accepted
+      CREATE TABLE IF NOT EXISTS signed_orders (
+        order_id    TEXT PRIMARY KEY,
+        entry       TEXT NOT NULL,
+        body        TEXT NOT NULL,
+        received_at INTEGER NOT NULL
+      );
     `);
   }
 
@@ -201,6 +210,19 @@ export class IngestStore {
       .prepare("SELECT count(*) AS n FROM proforma_uploads WHERE importer = ? AND received_at > ?")
       .get(importer.toLowerCase(), this.now().getTime() - DAY_MS) as { n: number };
     return row.n;
+  }
+
+  saveSignedOrder(orderId: Hex, entry: TradeOrderEntry, body: string): void {
+    this.db
+      .prepare("INSERT INTO signed_orders (order_id, entry, body, received_at) VALUES (?, ?, ?, ?)")
+      .run(orderId.toLowerCase(), JSON.stringify(entry), body, this.now().getTime());
+  }
+
+  signedOrder(orderId: Hex): { entry: TradeOrderEntry; body: string } | undefined {
+    const row = this.db.prepare("SELECT entry, body FROM signed_orders WHERE order_id = ?").get(orderId.toLowerCase()) as
+      | { entry: string; body: string }
+      | undefined;
+    return row ? { entry: JSON.parse(row.entry) as TradeOrderEntry, body: row.body } : undefined;
   }
 
   proformaReading<T>(importer: Hex, fileHash: Hex): T | undefined {

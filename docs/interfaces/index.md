@@ -3,6 +3,7 @@
 * [Avisos al bot de Telegram](avisos-al-bot.md) - Cómo le entregan el motor, la ingesta y otros productores los avisos al bot: dos rutas HTTP, sus tokens, cuerpos y respuestas, y cómo se traduce la salida de ingesta a avisos.
 * [Eventos y errores tipados](eventos-y-errores.md) - Nombres fijos de los eventos y errores de PDRGate, del gate de Trade (FundingGate) y de TradeEscrow, por modo.
 * [Carga de documentos de una orden (Keel Trade)](carga-de-documentos.md) - Cómo sube la app el BL, la guía aérea o la factura de una orden a ingesta: mensaje EIP-712 que firma el representante, ruta HTTP, respuestas y registro de órdenes.
+* [Orden firmada desde la app (Keel Trade)](orden-firmada.md) - Cómo entrega la app a ingesta una orden firmada por ambas partes: cuerpo, qué verifica ingesta antes de aceptarla, qué registra, qué archivo escribe para el agente y qué responde.
 * [Lectura de la proforma (Keel Trade)](lectura-de-proforma.md) - Cómo sube la app la proforma del exportador para prellenar la orden: mensaje EIP-712 que firma el importador, ruta HTTP, archivos aceptados, campos que devuelve y qué nunca devuelve.
 * [Esquemas de extracción de documentos](extraccion-de-documentos.md) - Salida del extractor en cuarentena, sin texto libre: factura de cuenta recurrente (Personal), documento de transporte y factura comercial (Trade).
 * [Intenciones: PaymentIntent y FundIntent](intenciones.md) - Structs de la intención de pago (Personal) y de la intención de depósito (Trade) que firma el motor dentro del PDR.

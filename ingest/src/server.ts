@@ -4,6 +4,7 @@
 //   PUT  /admin/settings  change them (audited)                  Bearer INGEST_ADMIN_TOKEN
 //   POST /trade/documents a Keel Trade document from the app       EIP-712 signature of a party
 //   POST /trade/proforma  a proforma to prefill an order (T3.9)    EIP-712 signature of an importer
+//   POST /trade/orders    an order signed by both parties (T3.11)  both EIP-712 signatures of the order
 // Without a webhook token the server does not start; without an admin token the admin
 // routes do not exist. The two tokens must differ: the forwarder cannot administer.
 // Without an orders file the trade routes do not exist. With INGEST_APP_ORIGIN, the trade routes
@@ -22,12 +23,14 @@ import { MAX_PDF_BYTES } from "./pdf/text";
 import { receiveTradeDocument, type TradeOutcome } from "./trade/receive";
 import { receiveProforma, staticImporters, type ImporterRegistry, type ProformaOutcome } from "./trade/proforma";
 import { staticOrders, type OrderRegistry, type TradeOrderEntry } from "./trade/upload";
+import { chainSignatures, offlineSignatures, receiveSignedOrder, withSignedOrders, type SignatureCheck, type SignedOrderOutcome } from "./trade/signedOrder";
 import { baseUrlsFromEnv, initialSettings, keysFromEnv, SettingsError, SettingsStore, type SettingsAudit } from "./settings";
 import { IngestStore } from "./store";
 
 const MIN_TOKEN_LENGTH = 32;
 const MAX_ADMIN_BODY_BYTES = 16 * 1024;
 // A base64 PDF of MAX_PDF_BYTES plus the JSON envelope
+const MAX_SIGNED_ORDER_BYTES = 32 * 1024;
 const MAX_TRADE_BODY_BYTES = Math.ceil((MAX_PDF_BYTES * 4) / 3) + 16 * 1024;
 const ACTOR_RE = /^[\w.@+-]{1,64}$/;
 
@@ -147,6 +150,14 @@ export interface ProformaLogEntry {
   reason?: string;
 }
 
+export interface SignedOrderLogEntry {
+  at: string;
+  kind: "trade_signed_order";
+  orderId?: string;
+  status: SignedOrderOutcome["status"];
+  reason?: string;
+}
+
 export interface ServerDeps {
   webhookToken: string;
   adminToken?: string;
@@ -155,13 +166,19 @@ export interface ServerDeps {
   store: IngestStore;
   resolver?: DNSResolver;
   // Keel Trade uploads. Without it the routes do not exist.
-  trade?: { orders: OrderRegistry; chainId: number; importers?: ImporterRegistry };
+  trade?: {
+    orders: OrderRegistry;
+    chainId: number;
+    importers?: ImporterRegistry;
+    // Signed orders from the app (POST /trade/orders): only with the escrow the signatures name
+    signed?: { escrow: `0x${string}`; signatures: SignatureCheck; agentDir?: string };
+  };
   // The Telegram bot (Area 4). Told after every outcome, without waiting for it.
   bot?: BotNotifier;
   // The app's origin (Area 4), e.g. https://app.keel.example. Only the trade routes answer CORS.
   appOrigin?: string;
   // The activity log. Receives typed fields only, never message content.
-  log?: (entry: LogEntry | SettingsAudit | TradeLogEntry | ProformaLogEntry) => void;
+  log?: (entry: LogEntry | SettingsAudit | TradeLogEntry | ProformaLogEntry | SignedOrderLogEntry) => void;
 }
 
 const digest = (s: string) => createHash("sha256").update(s).digest();
@@ -267,6 +284,32 @@ export function createHandler(deps: ServerDeps): RequestListener {
     reply(res, 200, outcome);
   };
 
+  // An order signed by both: the signatures are the authentication. Nothing is paid here.
+  const signedOrder = async (req: IncomingMessage, res: ServerResponse, trade: NonNullable<ServerDeps["trade"]>, signed: NonNullable<NonNullable<ServerDeps["trade"]>["signed"]>) => {
+    const raw = await readBody(req, MAX_SIGNED_ORDER_BYTES);
+    if (raw === null) return reply(res, 413, { error: "too_large" });
+    let body: unknown;
+    try {
+      body = JSON.parse(raw.toString("utf8"));
+    } catch {
+      return reply(res, 400, { error: "invalid_request" });
+    }
+    const outcome = await receiveSignedOrder(body, {
+      store: deps.store,
+      chainId: trade.chainId,
+      escrow: signed.escrow,
+      importers: trade.importers ?? staticImporters([]),
+      signatures: signed.signatures,
+      agentDir: signed.agentDir,
+    });
+    log({ at: new Date().toISOString(), kind: "trade_signed_order", orderId: "orderId" in outcome ? outcome.orderId : undefined, status: outcome.status, reason: "reason" in outcome ? outcome.reason : undefined });
+    if (outcome.status === "rejected") {
+      const code = { invalid_request: 400, terms_mismatch: 422, bad_order_id: 422, unknown_importer: 403, bad_exporter_signature: 401, bad_importer_signature: 401, conflict: 409 }[outcome.reason];
+      return reply(res, code, outcome);
+    }
+    reply(res, outcome.already ? 200 : 201, outcome);
+  };
+
   // The reading only prefills the order on the importer's screen; nothing is decided here
   const proformaUpload = async (req: IncomingMessage, res: ServerResponse, trade: NonNullable<ServerDeps["trade"]>) => {
     const raw = await readBody(req, MAX_TRADE_BODY_BYTES);
@@ -331,7 +374,7 @@ export function createHandler(deps: ServerDeps): RequestListener {
     try {
       if (req.url === "/inbound" && req.method === "POST") return await inbound(req, res);
       if (req.url === "/admin/settings" && deps.adminToken) return await admin(req, res, deps.adminToken);
-      if ((req.url === "/trade/documents" || req.url === "/trade/proforma") && deps.trade) {
+      if ((req.url === "/trade/documents" || req.url === "/trade/proforma" || (req.url === "/trade/orders" && deps.trade?.signed)) && deps.trade) {
         cors(req, res);
         if (req.method === "OPTIONS" && deps.appOrigin) {
           res.writeHead(204, {
@@ -342,6 +385,7 @@ export function createHandler(deps: ServerDeps): RequestListener {
           return res.end();
         }
         if (req.method === "POST" && req.url === "/trade/documents") return await tradeUpload(req, res, deps.trade);
+        if (req.method === "POST" && req.url === "/trade/orders" && deps.trade.signed) return await signedOrder(req, res, deps.trade, deps.trade.signed);
         if (req.method === "POST") return await proformaUpload(req, res, deps.trade);
       }
       reply(res, 404, { error: "not_found" });
@@ -356,6 +400,7 @@ export function createHandler(deps: ServerDeps): RequestListener {
 // INGEST_ORDERS_FILE and INGEST_CHAIN_ID (Keel Trade), INGEST_IMPORTERS_FILE (optional, more
 // importers who may upload a proforma), INGEST_DB_FILE (default ingest.db),
 // INGEST_SETTINGS_FILE (optional), INGEST_HOST (default 127.0.0.1), INGEST_PORT (default 8788),
+// INGEST_ESCROW_ADDRESS, INGEST_RPC_URL and INGEST_AGENT_DIR (optional, signed orders from the app),
 // INGEST_APP_ORIGIN (optional, CORS for the trade route), BOT_URL and BOT_INGEST_TOKEN (optional),
 // the per-provider API keys and the initial LLM_* settings.
 export async function startServer(env: Record<string, string | undefined> = process.env): Promise<Server> {
@@ -365,6 +410,7 @@ export async function startServer(env: Record<string, string | undefined> = proc
   const aliases = env.INGEST_ALIASES_FILE
     ? AliasTableSchema.parse(JSON.parse(await readFile(env.INGEST_ALIASES_FILE, "utf8")))
     : [];
+  const store = new IngestStore(env.INGEST_DB_FILE || "ingest.db");
   let trade: ServerDeps["trade"];
   if (env.INGEST_ORDERS_FILE) {
     const chainId = Number(env.INGEST_CHAIN_ID);
@@ -373,9 +419,24 @@ export async function startServer(env: Record<string, string | undefined> = proc
     // A proforma comes before its order: the importers of the orders file, plus any listed apart
     const extra = env.INGEST_IMPORTERS_FILE ? ImportersSchema.parse(JSON.parse(await readFile(env.INGEST_IMPORTERS_FILE, "utf8"))) : [];
     const importers = [...orders.flatMap((o) => o.uploaders.filter((u) => u.party === "importer").map((u) => u.address)), ...extra];
-    trade = { orders: staticOrders(orders), chainId, importers: staticImporters(importers) };
+    // POST /trade/orders needs the escrow the signatures name. With an RPC, the importer's Safe
+    // checks its own signature (ERC-1271); without it, the owner key has to be registered.
+    const escrow = env.INGEST_ESCROW_ADDRESS?.trim();
+    if (escrow && !/^0x[0-9a-fA-F]{40}$/.test(escrow)) throw new ServerConfigError("INGEST_ESCROW_ADDRESS is not an address");
+    trade = {
+      orders: withSignedOrders(staticOrders(orders), store),
+      chainId,
+      importers: staticImporters(importers),
+      ...(escrow && {
+        signed: {
+          escrow: escrow as `0x${string}`,
+          signatures: env.INGEST_RPC_URL ? chainSignatures(env.INGEST_RPC_URL) : offlineSignatures,
+          agentDir: env.INGEST_AGENT_DIR || undefined,
+        },
+      }),
+    };
   }
-  const log = (entry: LogEntry | SettingsAudit | TradeLogEntry | ProformaLogEntry | BotLogEntry) => console.log(JSON.stringify(entry));
+  const log = (entry: LogEntry | SettingsAudit | TradeLogEntry | ProformaLogEntry | SignedOrderLogEntry | BotLogEntry) => console.log(JSON.stringify(entry));
   const bot = botNotifierFromEnv(env, log);
   const settings = await SettingsStore.open({
     fallback: initialSettings(env),
@@ -384,7 +445,6 @@ export async function startServer(env: Record<string, string | undefined> = proc
     file: env.INGEST_SETTINGS_FILE || undefined,
     audit: log,
   });
-  const store = new IngestStore(env.INGEST_DB_FILE || "ingest.db");
   const handler = createHandler({
     webhookToken: env.INGEST_WEBHOOK_TOKEN ?? "",
     adminToken: env.INGEST_ADMIN_TOKEN || undefined,
