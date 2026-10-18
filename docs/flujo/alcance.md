@@ -4,7 +4,7 @@ title: "Alcance: dentro, fuera y lo que no prometemos"
 description: "Qué entra en la entrega, qué se declara como trabajo futuro, qué no se promete y la hoja de ruta por fases."
 tags: [alcance, trabajo-futuro, hoja-de-ruta]
 modo: ambos
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-10-18T17:00:00Z }
 ---
 
 # Dentro
@@ -31,6 +31,9 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
 - Pago del flete a la naviera.
 - Certificados por tipo de producto (origen, análisis, salud, Sernapesca, Seremi de Salud).
 - Otros corredores y la exportación desde Chile.
+- Seguridad de borde reforzada: CloudFront con AWS WAF delante de la API. **[PROPUESTA]**
+- Autenticación de las personas con proveedores terceros reconocidos legalmente en cada país. **[PROPUESTA]**
+- Ampliar el sistema de seguridad a medida que Keel entra a cada país, según su legislación y sus obligaciones: hoy es un MVP ([MVP y seguridad por país](mvp-y-seguridad-por-pais.md)). **[PROPUESTA]**
 
 # Lo que no prometemos
 
