@@ -1,4 +1,4 @@
-// Bundles each handler in aws/src/handlers/ into infra/terraform/dist/<name>.mjs, the file
+﻿// Bundles each handler in aws/src/handlers/ into infra/terraform/dist/<name>.mjs, the file
 // Terraform zips (infra/terraform/lambda.tf). ESM for Node 24 on arm64; the AWS SDK v3 is
 // bundled too, so the code does not depend on the version the runtime ships.
 import { build } from "esbuild";
@@ -23,7 +23,8 @@ await Promise.all(
       format: "esm",
       target: "node24",
       minify: true,
-      sourcemap: "inline",
+      // No source maps: inline maps doubled the bundles (pdfjs in ingest). Stack traces name minified code.
+      sourcemap: false,
       legalComments: "none",
       // Some CommonJS dependencies call require at run time
       banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" },
