@@ -53,6 +53,18 @@ describe("agent notices for the bot (T2.6)", () => {
     expect(sent("refundAfterDeadline", "ADVANCE_PAID")).toEqual([{ ...header("refunded"), kind: "refunded", amountMinor: 3_360_000, currency: "USD" }]);
   });
 
+  it("relayed signatures notify what moved: the importer's approval, a cancel after the deposit", () => {
+    const sent = (action: AgentEvent["action"], state: AgentEvent["state"]) => notices(event({ outcome: "sent", status: "success", action, state }));
+    // Same id as the engine's own release: the bot shows one balance_released per order
+    expect(sent("approveBalance", "SHIPPED")).toEqual([{ ...header("balance_released"), kind: "balance_released", amountMinor: 3_360_000, currency: "USD" }]);
+    expect(sent("cancel", "ADVANCE_PAID")).toEqual([{ ...header("refunded"), kind: "refunded", amountMinor: 3_360_000, currency: "USD" }]);
+    expect(sent("cancel", "DISPUTED")).toEqual([{ ...header("refunded"), kind: "refunded", amountMinor: 3_360_000, currency: "USD" }]);
+    // Nothing moves when an unfunded order is cancelled; open and resolve have no bot notice yet
+    expect(sent("cancel", "OPEN")).toBe("NOTHING_TO_NOTIFY");
+    expect(sent("open", "NONE")).toBe("NOTHING_TO_NOTIFY");
+    expect(sent("resolve", "DISPUTED")).toBe("NOTHING_TO_NOTIFY");
+  });
+
   it("a hold carries the reason, the amount and, before shipment, the deadline (D8)", () => {
     expect(notices(event({ hold: "cambio_en_cola", reason: "SUPPLIER_NEW" }))).toEqual([
       { ...header("held:1:new_supplier_wait"), kind: "operation_held", reason: "new_supplier_wait", amountMinor: 4_800_000, currency: "USD", deadline: Number(DEADLINE) },

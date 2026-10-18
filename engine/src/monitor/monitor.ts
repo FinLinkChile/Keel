@@ -65,12 +65,18 @@ export interface MonitorConfig {
   fromBlock: bigint;
   // Most blocks read in one request, for RPC providers that limit the range
   maxRange?: bigint;
+  // Whether an earlier run of this monitor already paused the gate (and no GateUnpaused followed).
+  // A process that restarts between ticks, such as a Lambda, persists it with `cursor`.
+  pausedHere?: boolean;
 }
 
 export interface MonitorDeps {
   chain: MonitorChain;
   pauser?: Pauser;
   notify?: (event: MonitorEvent) => void;
+  // Whether the engine issued a PDR with this hash, that is, whether its evidence exists.
+  // Default: a file in `evidenceDir`. A deployment that keeps evidence elsewhere (S3) reads it here.
+  isIssued?: (hash: Hex) => Promise<boolean>;
 }
 
 export type IncidentReason = "UNKNOWN_FUNDING_PDR" | "UNKNOWN_DOCUMENT_DECISION";
@@ -116,6 +122,16 @@ export class Monitor {
     private readonly deps: MonitorDeps,
   ) {
     this.next = config.fromBlock;
+    this.pausedHere = config.pausedHere ?? false;
+  }
+
+  // The next block to read: where a later process resumes (fromBlock of its config)
+  get cursor(): bigint {
+    return this.next;
+  }
+
+  get paused(): boolean {
+    return this.pausedHere;
   }
 
   // Reads every new block once. Never throws for one bad log: it is reported and skipped.
@@ -153,14 +169,14 @@ export class Monitor {
       case "FundingExecuted": {
         if (!fromGate) return null;
         const pdrHash = a.pdrHash as Hex;
-        if (this.issuedByEngine(pdrHash)) return null;
+        if (await this.issuedByEngine(pdrHash)) return null;
         return this.incident({ ...at, kind: "incident", reason: "UNKNOWN_FUNDING_PDR", orderId: a.orderId as Hex, pdrHash });
       }
       case "BalanceReleased": {
         if (!fromEscrow) return null;
         const digest = a.authorizationDigest as Hex;
         const orderId = a.orderId as Hex;
-        if (this.issuedByEngine(digest) || (await this.importerApproved(orderId, digest))) return null;
+        if ((await this.issuedByEngine(digest)) || (await this.importerApproved(orderId, digest))) return null;
         return this.incident({ ...at, kind: "incident", reason: "UNKNOWN_DOCUMENT_DECISION", orderId, pdrHash: digest });
       }
       case "ChangeQueued":
@@ -195,7 +211,8 @@ export class Monitor {
   }
 
   // The engine keeps every PDR it issues in evidence/pdr/, by hash (T2.4)
-  private issuedByEngine(hash: Hex): boolean {
+  private async issuedByEngine(hash: Hex): Promise<boolean> {
+    if (this.deps.isIssued) return this.deps.isIssued(hash);
     return loadEvidence(this.config.evidenceDir, hash) !== null;
   }
 

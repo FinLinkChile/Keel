@@ -2,11 +2,12 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EIP712_TYPES, type Hex, keelDomain, type OrderTerms, type PurchaseOrder, type ShipmentAttestation } from "@keel/schemas";
-import { blNumberHash, bytes32Text, docsHash, requiredDocsHash, termsHash } from "@keel/schemas/hash";
+import { blNumberHash, bytes32Text, docsHash, requiredDocsHash, structHash, termsHash } from "@keel/schemas/hash";
 import { encodeAbiParameters, encodeFunctionData, erc20Abi, keccak256, parseSignature, toBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { DocumentExtractions } from "../documents";
+import type { PdrEvidence } from "../pdr";
 import { tradePolicy, tradePolicyHash } from "../policy";
 import { compile, createChain, RevertError } from "../testing/chain";
 import { type ChainFacts, type ChainLog, loadEvidence, verdict, verifyEvidence } from "../verify";
@@ -158,6 +159,38 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
   const stateOf = async (orderId: Hex) => (await recordOf(orderId)).state;
   const balanceOf = (who: Hex) => chain.read<bigint>("MockUSDC", usdc, "balanceOf", [who]);
   const asSafe = (to: Hex, data: Hex) => chain.send("MockModuleSafe1271", safe, "exec", [to, data], importerOwner.address);
+
+  // What the importer Safe signs, through its owner's key and ERC-1271
+  async function safeSign(typed: object): Promise<Hex> {
+    const { r, s, v } = parseSignature(await importerOwner.signTypedData(typed as never));
+    return encodeAbiParameters([{ type: "bytes32" }, { type: "bytes32" }, { type: "uint8" }], [r, s, Number(v)]);
+  }
+
+  // Both parties sign the order, nobody opens it yet
+  async function signOrder(over: Partial<PurchaseOrder> = {}) {
+    const nonce = 7n;
+    const order: PurchaseOrder = {
+      orderId: keccak256(encodeAbiParameters([{ type: "address" }, { type: "address" }, { type: "uint256" }], [safe, exporter.address, nonce])),
+      importer: safe,
+      exporter: exporter.address,
+      payoutAddress: PAYOUT,
+      token: usdc,
+      totalAmount: TOTAL,
+      advanceBps: 5000,
+      shipmentDeadline: DEADLINE,
+      disputeWindow: 0n,
+      carrier: carrier.address,
+      arbiter: ARBITER,
+      documentVerifier: policySigner.address,
+      incoterm: bytes32Text("CIF"),
+      termsHash: termsHash(terms),
+      requiredDocsHash: requiredDocsHash(["BILL_OF_LADING", "COMMERCIAL_INVOICE"]),
+      nonce,
+      ...over,
+    };
+    const typed = { domain: domain(), types: { PurchaseOrder: EIP712_TYPES.PurchaseOrder }, primaryType: "PurchaseOrder" as const, message: order };
+    return { order, sigImporter: await safeSign(typed), sigExporter: await exporter.signTypedData(typed) };
+  }
 
   // Both parties sign and open the order; the Safe signs with ERC-1271
   async function openOrder(over: Partial<PurchaseOrder> = {}): Promise<PurchaseOrder> {
@@ -393,6 +426,181 @@ describe("agent service against the real TradeEscrow (T2.11)", () => {
     await keel.tick();
     writeFileSync(join(dir, "orders", order.orderId, "documents.json"), "{ not json");
     expect((await keel.tick())[0]).toMatchObject({ outcome: "failed", reason: "AGENT_ERROR" });
+  });
+
+  describe("signatures people stored for the order (open, BalanceApproval, cancel, resolution)", () => {
+    const writeOrder = (order: PurchaseOrder, extra: Record<string, unknown> = {}) =>
+      writeStoreFile(dir, ["orders", order.orderId, "order.json"], { order, terms, ...extra });
+    const cancelNonce = (orderId: Hex) => chain.read<bigint>("TradeEscrow", escrow, "cancelNonceOf", [orderId]);
+    async function cancelSigs(orderId: Hex, nonce: bigint) {
+      const typed = { domain: domain(), types: { CancelOrder: EIP712_TYPES.CancelOrder }, primaryType: "CancelOrder" as const, message: { orderId, nonce } };
+      return { sigImporter: await safeSign(typed), sigExporter: await exporter.signTypedData(typed) };
+    }
+
+    it("opens a stored order once both parties signed it, and only once", async () => {
+      const { order, sigImporter, sigExporter } = await signOrder();
+      writeOrder(order);
+      const keel = agent();
+      // Without the signatures someone else opens it: nothing to report
+      expect(await keel.tick()).toEqual([]);
+
+      writeOrder(order, { sigImporter, sigExporter });
+      const [opened] = await keel.tick();
+      expect(opened).toMatchObject({ state: "NONE", outcome: "sent", action: "open", status: "success" });
+      expect(await stateOf(order.orderId)).toBe("OPEN");
+      // The next pass takes the next step (no gate here) and never opens again
+      expect((await keel.tick())[0]).toMatchObject({ state: "OPEN", outcome: "waiting", reason: "GATE_NOT_DEPLOYED" });
+      expect(sent).toHaveLength(1);
+    });
+
+    it("a signature that does not fit the order is held at simulation, and orders of another Safe are not opened", async () => {
+      const { order, sigImporter } = await signOrder();
+      writeOrder(order, { sigImporter, sigExporter: await forger.signTypedData({ domain: domain(), types: { PurchaseOrder: EIP712_TYPES.PurchaseOrder }, primaryType: "PurchaseOrder", message: order }) });
+      expect(await agent({ safe: address(0x5afe) }).tick()).toEqual([]);
+      const [held] = await agent().tick();
+      expect(held).toMatchObject({ state: "NONE", outcome: "held", reason: "SIMULATION_REVERTED", action: "open", revert: "BadExporterSignature" });
+      expect(sent).toHaveLength(0);
+      expect(await stateOf(order.orderId)).toBe("NONE");
+    });
+
+    it("the importer's BalanceApproval releases the balance before the dispute window ends, with no documents", async () => {
+      const order = await openOrder({ disputeWindow: 7n * DAY });
+      await fundOrder(order);
+      const { attestation } = await storeShipment(order);
+      chain.setTime(ON_BOARD + DAY);
+      const keel = agent();
+      await keel.tick();
+      expect((await keel.tick())[0]).toMatchObject({ outcome: "waiting", reason: "DISPUTE_WINDOW" });
+
+      const attestationHash = structHash("ShipmentAttestation", attestation);
+      const typed = { domain: domain(), types: { BalanceApproval: EIP712_TYPES.BalanceApproval }, primaryType: "BalanceApproval" as const, message: { orderId: order.orderId, attestationHash } };
+      // Signed by the exporter instead: the escrow rejects it, held with its revert name
+      writeOrder(order, { closing: { balanceApproval: { sigImporter: await exporter.signTypedData(typed), attestationHash } } });
+      expect((await keel.tick())[0]).toMatchObject({ outcome: "held", reason: "SIMULATION_REVERTED", action: "approveBalance", revert: "BadImporterSignature" });
+
+      writeOrder(order, { closing: { balanceApproval: { sigImporter: await safeSign(typed), attestationHash } } });
+      const [released] = await keel.tick();
+      expect(released).toMatchObject({ state: "SHIPPED", outcome: "sent", action: "approveBalance", status: "success" });
+      expect(await stateOf(order.orderId)).toBe("SETTLED");
+      expect(await balanceOf(PAYOUT)).toBe(TOTAL);
+      expect(sent).toHaveLength(2);
+    });
+
+    it("an approval of another attestation never wins over the agent's own release", async () => {
+      const order = await openOrder();
+      await fundOrder(order);
+      await storeShipment(order);
+      storeDocuments(order);
+      chain.setTime(ON_BOARD + DAY);
+      const keel = agent();
+      await keel.tick();
+      const attestationHash = word("another attestation");
+      const typed = { domain: domain(), types: { BalanceApproval: EIP712_TYPES.BalanceApproval }, primaryType: "BalanceApproval" as const, message: { orderId: order.orderId, attestationHash } };
+      writeOrder(order, { closing: { balanceApproval: { sigImporter: await safeSign(typed), attestationHash } } });
+      expect((await keel.tick())[0]).toMatchObject({ outcome: "sent", action: "releaseBalance", status: "success" });
+    });
+
+    it("relays a cancel both parties signed for the current cancelNonceOf, and ignores a stale one", async () => {
+      const order = await openOrder();
+      const stale = await cancelNonce(order.orderId);
+      await fundOrder(order);
+      chain.setTime(DEADLINE - 6n * DAY);
+      writeOrder(order, { closing: { cancel: { cancelNonce: stale, ...(await cancelSigs(order.orderId, stale)) } } });
+      const keel = agent();
+      // Signed while OPEN: it can never pass now, the order goes on with its normal step
+      expect((await keel.tick())[0]).toMatchObject({ state: "ADVANCE_PAID", outcome: "waiting", reason: "AWAITING_SHIPMENT" });
+      expect(sent).toHaveLength(0);
+
+      const current = await cancelNonce(order.orderId);
+      expect(current).not.toBe(stale);
+      writeOrder(order, { closing: { cancel: { cancelNonce: current, ...(await cancelSigs(order.orderId, current)) } } });
+      const [cancelled] = await keel.tick();
+      expect(cancelled).toMatchObject({ state: "ADVANCE_PAID", outcome: "sent", action: "cancel", status: "success" });
+      expect(await stateOf(order.orderId)).toBe("CANCELLED");
+      expect(await balanceOf(safe)).toBe(TOTAL / 2n);
+    });
+
+    it("does not fund an OPEN order while the importer's cancel waits for the exporter", async () => {
+      const order = await openOrder();
+      const nonce = await cancelNonce(order.orderId);
+      const { sigImporter } = await cancelSigs(order.orderId, nonce);
+      writeOrder(order, { closing: { cancel: { cancelNonce: nonce, sigImporter } } });
+      expect((await agent().tick())[0]).toMatchObject({ state: "OPEN", outcome: "waiting", reason: "CANCEL_PENDING" });
+      expect(sent).toHaveLength(0);
+    });
+
+    it("relays the arbiter's resolution of a dispute", async () => {
+      const arbiter = privateKeyToAccount(word("arbiter"));
+      const order = await openOrder({ arbiter: arbiter.address });
+      await fundOrder(order);
+      await storeShipment(order);
+      chain.setTime(ON_BOARD + DAY);
+      const keel = agent();
+      await keel.tick();
+      await chain.send("TradeEscrow", escrow, "raiseDispute", [order.orderId], exporter.address);
+      expect((await keel.tick())[0]).toMatchObject({ state: "DISPUTED", outcome: "waiting", reason: "NOTHING_TO_DO" });
+
+      const sign = (toImporter: bigint, toExporter: bigint) =>
+        arbiter.signTypedData({
+          domain: domain(),
+          types: { DisputeResolution: EIP712_TYPES.DisputeResolution },
+          primaryType: "DisputeResolution",
+          message: { orderId: order.orderId, toImporter, toExporter },
+        });
+      // A split that does not add up to the remaining balance is held
+      writeOrder(order, { closing: { resolution: { toImporter: TOTAL, toExporter: 0n, sigArbiter: await sign(TOTAL, 0n) } } });
+      expect((await keel.tick())[0]).toMatchObject({ outcome: "held", reason: "SIMULATION_REVERTED", action: "resolve", revert: "BadResolution" });
+
+      const toImporter = TOTAL / 8n;
+      const toExporter = TOTAL / 2n - toImporter;
+      writeOrder(order, { closing: { resolution: { toImporter, toExporter, sigArbiter: await sign(toImporter, toExporter) } } });
+      const [resolved] = await keel.tick();
+      expect(resolved).toMatchObject({ state: "DISPUTED", outcome: "sent", action: "resolve", status: "success" });
+      expect(await stateOf(order.orderId)).toBe("RESOLVED");
+      expect(await balanceOf(safe)).toBe(toImporter);
+      expect(await balanceOf(PAYOUT)).toBe(TOTAL / 2n + toExporter);
+    });
+
+    it("awaits the evidence hook before sending the call that carries the PDR, and sends nothing when it fails", async () => {
+      const order = await openOrder();
+      await fundOrder(order);
+      await storeShipment(order);
+      storeDocuments(order);
+      chain.setTime(ON_BOARD + DAY);
+      const steps: string[] = [];
+      const base = agentChain();
+      const tracking: AgentChain = {
+        ...base,
+        send: async (c) => {
+          steps.push("send");
+          return base.send(c);
+        },
+      };
+      const config: AgentConfig = { chainId: 1, escrow, safe, policy: tradePolicy(word("roles-config-v1")), decisionTtlSeconds: 3600, evidenceDir: join(dir, "evidence") };
+      const withHook = (saveEvidence: (e: PdrEvidence) => Promise<void>) => new Agent(config, { chain: tracking, store: new FileStore(dir), signer: policySigner, saveEvidence });
+      const later = () => new Promise((r) => setTimeout(r, 5));
+      await withHook(async () => {}).tick();
+      steps.length = 0;
+
+      const failing = withHook(async () => {
+        await later();
+        throw new Error("evidence store unreachable");
+      });
+      expect((await failing.tick())[0]).toMatchObject({ outcome: "failed", reason: "AGENT_ERROR", detail: "evidence store unreachable" });
+      expect(steps).toEqual([]);
+
+      const saved: PdrEvidence[] = [];
+      const [released] = await withHook(async (e) => {
+        await later();
+        steps.push("saved");
+        saved.push(e);
+      }).tick();
+      expect(released).toMatchObject({ outcome: "sent", action: "releaseBalance", status: "success" });
+      expect(steps).toEqual(["saved", "send"]);
+      expect(saved[0]!.pdrHash).toBe(released!.pdrHash);
+      // The hook replaces the file writer
+      expect(loadEvidence(join(dir, "evidence"), released!.pdrHash!)).toBeNull();
+    });
   });
 
   describe("funding through the FundingGate of Area 1", () => {
