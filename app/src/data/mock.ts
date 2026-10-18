@@ -4,7 +4,7 @@ import { getAddress, keccak256, stringToBytes } from 'viem';
 
 import { centsToToken } from './amounts';
 import { orderIdOf } from './orderRules';
-import type { Account, KeelData, NeedsYou, Order, OrderStage, Party, PartyId, Role, SupplierRecord, Wallet } from './types';
+import type { Account, KeelData, NeedsYou, Order, OrderStage, Party, PartyId, Quote, Role, SupplierRecord, Wallet } from './types';
 
 // Test data for the screens and the single source of the demo data files (scripts/demo-data.ts).
 // Order ids, labels and party slugs match bot/examples so the app, the bot, ingest and the agent
@@ -80,6 +80,8 @@ type Seed = {
   closedAt?: number;
   blockedBy?: Order['blockedBy'];
   documents?: Order['documents'];
+  // What the example proforma asked for
+  quote?: Quote;
 };
 
 const REQUIRED_DOCS: RequiredDocType[] = ['BILL_OF_LADING', 'COMMERCIAL_INVOICE'];
@@ -108,6 +110,7 @@ function order(s: Seed): Order {
     blockedBy: s.blockedBy,
     transportDoc: 'BILL_OF_LADING',
     documents: s.documents ?? [],
+    quote: s.quote,
     po: {
       // As TradeEscrow.open requires; the fixed nonce is the order number, so the label
       // stays the same and the id follows the wallets bound to the parties
@@ -135,11 +138,11 @@ function order(s: Seed): Order {
 // PO-0131, PO-0142 and PO-0150 are the orders of bot/examples. The label is the nonce in hex.
 const ORDERS = (): Order[] => [
   order({ n: 0x157, goods: 'Agar powder', goodsShort: 'Agar', quantity: '6,000 kg', exporter: 'lingnan', totalMinor: 4_800_000, stage: 'awaiting_signature', waitingOn: 'importer', deadline: day(11, 20), hsCode: '130231' }),
-  order({ n: 0x142, goods: 'Agar powder', goodsShort: 'Agar', quantity: '6,000 kg', exporter: 'lingnan', totalMinor: 4_800_000, stage: 'advance_paid', waitingOn: 'exporter', deadline: day(11, 20), hsCode: '130231', signedAt: day(10, 2), advancePaidAt: day(10, 2) }),
+  order({ n: 0x142, goods: 'Agar powder', goodsShort: 'Agar', quantity: '6,000 kg', exporter: 'lingnan', totalMinor: 4_800_000, stage: 'advance_paid', waitingOn: 'exporter', deadline: day(11, 20), hsCode: '130231', signedAt: day(10, 2), advancePaidAt: day(10, 2), quote: { amountCents: 4_800_000, advanceBps: 6000, issueDate: day(9, 28), latestShipmentDate: day(11, 20) } }),
   order({ n: 0x150, goods: 'Agar powder', goodsShort: 'Agar', quantity: '2,500 kg', exporter: 'lingnan', totalMinor: 2_000_000, stage: 'advance_paid', waitingOn: 'exporter', deadline: day(11, 20), hsCode: '130231', signedAt: day(10, 5), advancePaidAt: day(10, 5) }),
   order({ n: 0x139, goods: 'Carrageenan', quantity: '3,000 kg', exporter: 'pearl-delta', totalMinor: 2_150_000, stage: 'shipped', deadline: day(10, 30), hsCode: '130239', signedAt: day(9, 20), advancePaidAt: day(9, 20), shippedAt: day(10, 14) }),
   order({ n: 0x151, goods: 'Gelatin', quantity: '1,200 kg', exporter: 'kowloon', totalMinor: 1_325_000, stage: 'signed', deadline: day(12, 5), hsCode: '350300', signedAt: day(10, 13), blockedBy: 'supplier_check' }),
-  order({ n: 0x131, goods: 'Agar powder', goodsShort: 'Agar', quantity: '6,000 kg', exporter: 'lingnan', totalMinor: 4_800_000, stage: 'settled', deadline: day(11, 20), hsCode: '130231', signedAt: day(9, 1), advancePaidAt: day(9, 1), shippedAt: day(10, 8), closedAt: day(10, 13) }),
+  order({ n: 0x131, goods: 'Agar powder', goodsShort: 'Agar', quantity: '6,000 kg', exporter: 'lingnan', totalMinor: 4_800_000, stage: 'settled', deadline: day(11, 20), hsCode: '130231', signedAt: day(9, 1), advancePaidAt: day(9, 1), shippedAt: day(10, 8), closedAt: day(10, 13), quote: { amountCents: 5_000_000, advanceBps: 5000, issueDate: day(8, 27), latestShipmentDate: day(11, 20) } }),
   order({ n: 0x128, goods: 'Locust bean gum', quantity: '1,000 kg', exporter: 'pearl-delta', totalMinor: 1_960_000, stage: 'refunded', deadline: day(10, 1), hsCode: '130232', signedAt: day(8, 25), advancePaidAt: day(8, 25), closedAt: day(10, 2) }),
   order({ n: 0x119, goods: 'Pectin', quantity: '800 kg', exporter: 'pearl-delta', totalMinor: 1_120_000, stage: 'cancelled', deadline: day(10, 10), hsCode: '130220', signedAt: day(9, 10), advancePaidAt: day(9, 10), closedAt: day(9, 28) }),
 ];

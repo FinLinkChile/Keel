@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, View } from 'react-native';
 
 import { useData, type Order } from '@/data';
+import { negotiation } from '@/data/negotiation';
 import { supplierScore } from '@/data/supplierScore';
 import { Frame, Row } from '@/orders/parts';
 import { Avatar } from '@/ui/Avatar';
@@ -34,6 +35,7 @@ export default function Supplier() {
       return {
         party: record.party,
         score: supplierScore(orders, record.party.address),
+        deal: negotiation(orders, record.party.address),
         orders: orders.filter((o) => o.po.exporter.toLowerCase() === address),
       };
     },
@@ -48,7 +50,8 @@ export default function Supplier() {
       </Frame>
     );
   }
-  const { party, score, orders } = view;
+  const { party, score, deal, orders } = view;
+  const days = (n: number) => `${Math.abs(n)} ${Math.abs(n) === 1 ? 'day' : 'days'}`;
 
   return (
     <Frame label="Supplier">
@@ -97,7 +100,32 @@ export default function Supplier() {
         <Row label="Balance released" value={String(score.completed)} />
         <Row label="Refunded, no shipment in time" value={String(score.refunded)} />
         <Row label="Cancelled by both" value={String(score.cancelled)} />
+        {score.marginDays !== null ? (
+          <Row label="Ships, on average" value={score.marginDays >= 0 ? `${days(score.marginDays)} before the deadline` : `${days(score.marginDays)} late`} />
+        ) : null}
+        {score.documents.uploaded > 0 ? <Row label="Documents accepted" value={`${score.documents.accepted} of ${score.documents.uploaded} orders`} /> : null}
+        {score.signDays !== null ? <Row label="Signs your orders in" value={score.signDays < 1 ? 'Under a day' : days(score.signDays)} /> : null}
       </View>
+
+      {deal.orders.length > 0 ? (
+        <View style={{ gap: 4 }}>
+          <Text size={18} weight={800}>
+            What you negotiated
+          </Text>
+          {deal.withAdvance > 0 ? (
+            <Row
+              label="Advance vs. the proforma"
+              value={deal.advancePointsSaved === 0 ? 'As asked' : `${Math.abs(deal.advancePointsSaved!)} points ${deal.advancePointsSaved! > 0 ? 'lower' : 'higher'}`}
+            />
+          ) : null}
+          {deal.amountChangePct !== null ? (
+            <Row label="Total vs. the proforma" value={deal.amountChangePct === 0 ? 'As quoted' : `${Math.abs(deal.amountChangePct)}% ${deal.amountChangePct < 0 ? 'lower' : 'higher'}`} />
+          ) : null}
+          <Text size={12} color="textFaint">
+            From the {deal.orders.length} {deal.orders.length === 1 ? 'order' : 'orders'} whose proforma the agent read.
+          </Text>
+        </View>
+      ) : null}
 
       {orders.length > 0 ? (
         <View style={{ gap: 4 }}>

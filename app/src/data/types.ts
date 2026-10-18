@@ -51,6 +51,16 @@ export type OrderDocument = {
   status: 'accepted' | 'under_review';
 };
 
+// What the proforma asked for, kept with the order to compare with what was signed. Not part of
+// the signed terms.
+export type Quote = {
+  amountCents: number | null;
+  advanceBps: number | null;
+  // Unix seconds
+  issueDate: number | null;
+  latestShipmentDate: number | null;
+};
+
 export type Order = {
   label: string; // "PO-0142", as in bot/examples/orders.json
   goods: string; // "Agar powder"
@@ -60,7 +70,10 @@ export type Order = {
   stage: OrderStage;
   // Who has to act next, if anyone
   waitingOn?: Role;
-  // Unix seconds of each step that happened
+  // Unix seconds of each step that happened. sentAt and exporterSignedAt exist for orders
+  // proposed on this phone.
+  sentAt?: number;
+  exporterSignedAt?: number;
   signedAt?: number;
   advancePaidAt?: number;
   shippedAt?: number;
@@ -72,6 +85,7 @@ export type Order = {
   documents: OrderDocument[];
   po: PurchaseOrder;
   terms: OrderTerms;
+  quote?: Quote;
 };
 
 export type Wallet = {
