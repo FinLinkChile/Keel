@@ -8,6 +8,7 @@ import { insights, type Period } from '@/data/insights';
 import { negotiation } from '@/data/negotiation';
 import { supplierScore } from '@/data/supplierScore';
 import { useT } from '@/i18n';
+import { AgentAnalysis } from '@/orders/AgentAnalysis';
 import { useSession } from '@/session';
 import { BarList } from '@/ui/BarList';
 import { formatCompact, formatDay, formatMinor } from '@/ui/format';
@@ -65,7 +66,17 @@ export default function Agent() {
           {t('Agent')}
         </Text>
         <Text size={15} leading={1.5} color="textMuted">
-          {role === 'importer' ? t('What your company bought, what is at stake and how your suppliers delivered.') : t('What your company sold, what you were paid and how you delivered.')}
+          {role === 'importer' ? t('Your purchasing analyst: how your buying changes, where you depend on one supplier, and the cash coming up.') : t('What your company sold, what you were paid and how you delivered.')}
+        </Text>
+      </View>
+      {role === 'importer' ? <AgentAnalysis /> : null}
+
+      <View style={{ gap: 4 }}>
+        <Text size={18} weight={800}>
+          {t('The numbers behind it')}
+        </Text>
+        <Text size={14} color="textMuted">
+          {t('Sums over your orders, the same the agent reads.')}
         </Text>
       </View>
       <Segmented options={PERIODS} value={period} onChange={setPeriod} accessibilityLabel={t('Period')} />

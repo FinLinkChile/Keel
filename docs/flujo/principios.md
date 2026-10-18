@@ -18,7 +18,7 @@ Si un componente nuevo rompe alguno, está mal diseñado. Valen para los dos mod
 
 # Reglas operativas
 
-- No hay LLM operativo. El único LLM es el extractor en cuarentena, sin herramientas y con esquema sin texto libre.
+- No hay LLM operativo. El único LLM es el extractor en cuarentena, sin herramientas y con esquema sin texto libre. **[PROPUESTA, por confirmar por el equipo]:** fuera del flujo de pago, un analista de nivel 0 puede leer métricas calculadas de las órdenes (sin documentos ni nombres) y aconsejar; no firma, no decide ni mueve dinero (`docs/arquitectura/analista.md`).
 - Ninguna llave de servidor es dueña ni módulo directo de una Safe. La llave del dueño nunca vive en un servidor.
 - Fallar cerrado siempre avisa: motivo, fecha de vencimiento y alternativa manual.
 - Sin sobreafirmaciones: cada afirmación de seguridad dice para quién vale, dónde se hace cumplir y qué prueba la demuestra.

@@ -125,6 +125,12 @@ export interface IngestRepo {
   proformaUploadsToday(importer: Hex): Promise<number>;
   proformaReading<T>(importer: Hex, fileHash: Hex): Promise<T | undefined>;
   saveProformaReading(importer: Hex, fileHash: Hex, reading: unknown): Promise<void>;
+
+  // Keel Trade, purchase analysis ---------------------------------------------------------
+
+  recordInsights(importer: Hex): Promise<void>;
+  // Authorized analysis requests of this importer in the current window
+  insightsToday(importer: Hex): Promise<number>;
 }
 
 // Shared by both implementations, so the package rule cannot drift between them.
