@@ -71,7 +71,7 @@ export default function Profile() {
           <Row label="Holder RUT" value={formatRut(onboarding.representative.rut)} mono />
           <Row label="Email" value={onboarding.company.email} />
           <Row label="Mobile" value={onboarding.company.phone} mono />
-          <Row label="Identity" value="Validated (simulated)" />
+          <Row label="Identity" value="Validated with TOC (simulated)" />
         </View>
       ) : null}
 

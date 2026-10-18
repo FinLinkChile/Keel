@@ -18,16 +18,14 @@ import { colors, gutter, radius } from '@/ui/theme';
 
 const COUNTRIES = [
   { code: 'CL', name: 'Chile', available: true },
-  { code: 'AR', name: 'Argentina', available: false },
-  { code: 'PE', name: 'Peru', available: false },
-  { code: 'CO', name: 'Colombia', available: false },
+  { code: 'CN', name: 'China', available: false },
 ];
 
 const TITLES: Record<Step, { title: string; body: string }> = {
-  country: { title: 'Where is your company?', body: 'Keel opens first in Chile. More countries come later.' },
+  country: { title: 'Where is your company?', body: 'Keel opens first in Chile. China comes next.' },
   company: { title: 'Your company', body: 'The data a bank asks to open an account for a company.' },
   representative: { title: 'Who represents it', body: 'The person who signs for the company, with the RUT on their ID card.' },
-  identity: { title: 'Validate your identity', body: 'Banks ask for your ID card and a selfie before you can use the account.' },
+  identity: { title: 'Validate your identity', body: 'TOC checks that you are the person on your ID card: it compares a live selfie with the photo on the card.' },
 };
 
 export default function Onboarding() {
@@ -122,7 +120,7 @@ export default function Onboarding() {
                 </Text>
                 {c.available ? null : (
                   <Text size={13} color="textFaint">
-                    Not available yet
+                    Coming soon
                   </Text>
                 )}
               </View>
@@ -174,7 +172,7 @@ export default function Onboarding() {
           <View style={{ gap: 16 }}>
             <View style={{ backgroundColor: colors.surface, borderRadius: radius.card, paddingVertical: 8 }}>
               <Requirement icon="orders" title="Photo of your ID card" detail="Front and back" />
-              <Requirement icon="camera" title="A selfie" detail="Compared with the photo of the card" />
+              <Requirement icon="camera" title="A live selfie" detail="TOC checks it is you and compares it with the photo on the card" />
             </View>
             <Pressable
               accessibilityRole="checkbox"
@@ -208,10 +206,10 @@ export default function Onboarding() {
               </View>
               <View style={{ flex: 1, gap: 4 }}>
                 <Text size={16} weight={700}>
-                  I validated my identity
+                  My identity was validated with TOC
                 </Text>
                 <Text size={14} leading={1.45} color="textMuted">
-                  Simulated in this version: nothing is captured or checked here. In production, a provider does it.
+                  Simulated in this version: nothing is captured or sent to TOC. Tick it to continue.
                 </Text>
               </View>
             </Pressable>

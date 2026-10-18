@@ -1,5 +1,9 @@
 # Historial de la documentación
 
+## 2026-10-18
+
+* **Actualización (app) [PROPUESTA]**: en el registro, la lista de países queda en Chile (disponible) y China (próximamente), y la validación de identidad simulada dice cómo será en producción: TOC (de Sovos) compara una selfie con prueba de vida contra la foto de la cédula. Sigue simulada: no se captura ni se envía nada a TOC. La integración con TOC queda en la hoja de ruta del piloto; el KYC sigue fuera del alcance de la competencia. Área 3 (Daniela).
+
 ## 2026-10-17
 
 * **Actualización (app) [PROPUESTA]**: análisis de negociación y puntaje enriquecido. Al enviar una orden, la app guarda con ella lo que pidió la proforma (monto, anticipo, fechas), sin firmarlo, y compara con lo firmado: puntos de anticipo y porcentaje de total negociados, por proveedor y en el panel. El puntaje del proveedor suma los días promedio entre el embarque y la fecha límite, los documentos aceptados y cuánto tarda en firmar. Todo sale de datos que ya existen (la orden, sus marcas de tiempo y la lectura de la proforma, que se puede unir a la orden porque `documentHash` es el hash de la proforma). Área 3 (Daniela), como aporte al Área 4.
