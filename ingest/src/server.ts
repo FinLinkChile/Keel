@@ -22,7 +22,7 @@ import type { AliasTable } from "./parser";
 import { MAX_PDF_BYTES } from "./pdf/text";
 import { receiveTradeDocument, type TradeOutcome } from "./trade/receive";
 import { receiveProforma, staticImporters, type ImporterRegistry, type ProformaOutcome, type ProformaRejection } from "./trade/proforma";
-import { MAX_INPUT_BYTES, receiveInsights, type InsightsOutcome } from "./trade/insights";
+import { INSIGHTS_REJECTION_STATUS, InsightsBody, MAX_INPUT_BYTES, receiveInsights, type InsightsOutcome } from "./trade/insights";
 import { staticOrders, type OrderRegistry, type TradeOrderEntry, type UploadRejection } from "./trade/upload";
 import { chainSignatures, offlineSignatures, receiveSignedOrder, withSignedOrders, type SignatureCheck, type SignedOrderOutcome, type SignedOrderStore } from "./trade/signedOrder";
 import { baseUrlsFromEnv, initialSettings, keysFromEnv, SettingsError, SettingsStore, type SettingsAudit } from "./settings";
@@ -71,15 +71,6 @@ export const TradeUploadBody = z
     signature: z.string().regex(/^0x[0-9a-fA-F]{130}$/),
     // The PDF, base64
     file: z.string().max(MAX_TRADE_BODY_BYTES),
-  })
-  .strict();
-
-const InsightsBody = z
-  .object({
-    issuedAt: z.number().int().positive(),
-    signature: z.string().regex(/^0x[0-9a-fA-F]{130}$/),
-    // The metrics as JSON text, exactly as signed
-    input: z.string().max(MAX_INPUT_BYTES),
   })
   .strict();
 
@@ -391,8 +382,7 @@ export function createHandler(deps: ServerDeps): RequestListener {
     );
     log({ at: new Date().toISOString(), kind: "trade_insights", status: outcome.status, reason: "reason" in outcome ? String(outcome.reason) : undefined });
     if (outcome.status === "rejected") {
-      const code = { too_large: 413, invalid_request: 400, bad_signature: 401, stale_signature: 401, not_an_importer: 403, rate_limited: 429 }[outcome.reason];
-      return reply(res, code, outcome);
+      return reply(res, INSIGHTS_REJECTION_STATUS[outcome.reason], outcome);
     }
     reply(res, 200, outcome);
   };

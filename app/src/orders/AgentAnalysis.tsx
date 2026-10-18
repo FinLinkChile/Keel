@@ -55,7 +55,7 @@ export function AgentAnalysis() {
   async function analyze() {
     if (!data || !signer) return;
     setBusy(true);
-    const result = await requestInsights({ ingestUrl: config.ingestUrl, chainId: config.chainId, signer, input: data.input }).catch(
+    const result = await requestInsights({ ingestUrl: config.tradeReadUrl, chainId: config.chainId, signer, input: data.input }).catch(
       (): InsightsResult => ({ kind: 'failed', reason: 'server' }),
     );
     const entry = { result, input: data.input };

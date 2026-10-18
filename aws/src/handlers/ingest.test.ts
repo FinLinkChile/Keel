@@ -12,6 +12,8 @@ import {
   MAX_DOCUMENTS_PER_ORDER_PER_DAY,
   SettingsStore,
   staticImporters,
+  INSIGHTS_TYPES,
+  insightsInputHash,
   uploadDomain,
   UPLOAD_TYPES,
   type BotPayload,
@@ -37,6 +39,7 @@ import { createAdminHandler } from "./admin";
 import { runDigest } from "./digest";
 import { createExtractorHandler, EXTRACTOR_MAX_RECEIVE, READ_CLAIM_STALE_MS } from "./extractor";
 import { createInboundHandler } from "./inbound";
+import { createInsightsHandler } from "./insights";
 import { createProformaHandler } from "./proforma";
 import { createUploadHandler } from "./upload";
 
@@ -606,5 +609,69 @@ describe("llm_keys secret", () => {
   it("maps the secret's names to the providers, and ignores placeholders", () => {
     expect(llmKeys('{"anthropic":"ka","compat":"kc","gemini":"CAMBIAR","other":"x"}')).toEqual({ anthropic: "ka", "openai-compatible": "kc" });
     expect(() => llmKeys("not json")).toThrow(/llm_keys/);
+  });
+});
+
+describe("purchase analysis route", () => {
+  const METRICS = JSON.stringify({
+    role: "importer",
+    profile: { industry: "food", salesBracket: "small" },
+    asOf: "2026-10-17",
+    metrics: [{ id: "m2", kind: "top_counterparty_share_pct", value: 71.4, unit: "pct", subject: "S1", period: "last_365d" }],
+  });
+  const analyst = (seen: string[]): ExtractorProvider => ({
+    provider: "anthropic",
+    model: "test",
+    complete: async (r: ExtractionRequest) => {
+      seen.push(r.user);
+      return JSON.stringify({
+        findings: [
+          { kind: "dependency", severity: "attention", metric_ids: ["m2"], title: "S1 carries 71% of your spend", recommendation: "Validate a second supplier." },
+        ],
+      });
+    },
+  });
+  const signed = async (who: string, issuedAt: number, input = METRICS) => ({
+    issuedAt,
+    input,
+    signature: await testAccount(who).signTypedData({
+      domain: uploadDomain(CORPUS_CHAIN_ID),
+      types: INSIGHTS_TYPES,
+      primaryType: "InsightsRequest",
+      message: { inputHash: insightsInputHash(input), issuedAt: BigInt(issuedAt) },
+    }),
+  });
+
+  it("answers a registered importer with findings; the model saw only the signed metrics", async () => {
+    const h = harness();
+    const seen: string[] = [];
+    const handler = createInsightsHandler(() => ({ ...h.rt, extractor: async () => analyst(seen) }));
+    const body = await signed(`${O1.id}:importer`, Math.floor(h.now() / 1000));
+    const res = (await handler(httpEvent("POST /trade/insights", JSON.stringify(body)))) as APIGatewayProxyStructuredResultV2;
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body!)).toMatchObject({ status: "ok", findings: [{ kind: "dependency", metric_ids: ["m2"] }] });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toContain(METRICS);
+  });
+
+  it("refuses a stranger and an unsigned change of the metrics, without calling the model", async () => {
+    const h = harness();
+    const seen: string[] = [];
+    const handler = createInsightsHandler(() => ({ ...h.rt, extractor: async () => analyst(seen) }));
+    const now = Math.floor(h.now() / 1000);
+    const stranger = (await handler(httpEvent("POST /trade/insights", JSON.stringify(await signed("outsider", now))))) as APIGatewayProxyStructuredResultV2;
+    expect(stranger.statusCode).toBe(403);
+    expect(JSON.parse(stranger.body!)).toEqual({ status: "rejected", reason: "not_an_importer" });
+    const tampered = { ...(await signed(`${O1.id}:importer`, now)), input: METRICS.replace("71.4", "99.9") };
+    const changed = (await handler(httpEvent("POST /trade/insights", JSON.stringify(tampered)))) as APIGatewayProxyStructuredResultV2;
+    expect(changed.statusCode).toBe(403);
+    expect(seen).toHaveLength(0);
+  });
+
+  it("answers 400 for a body that is not the documented shape", async () => {
+    const h = harness();
+    const handler = createInsightsHandler(() => h.rt);
+    const res = (await handler(httpEvent("POST /trade/insights", JSON.stringify({ input: METRICS })))) as APIGatewayProxyStructuredResultV2;
+    expect(res.statusCode).toBe(400);
   });
 });

@@ -1,6 +1,6 @@
 # Keel en AWS (Terraform)
 
-Crea la arquitectura de [despliegue en AWS](../../docs/arquitectura/despliegue-aws.md): 19 funciones Lambda, API HTTP con 29 rutas, 6 tablas de DynamoDB, buckets de documentos y de evidencia (Object Lock), colas SQS con cola de fallidos, 3 llaves KMS secp256k1, parámetros de configuración de Systems Manager, programadores, alarmas y presupuesto. **[PROPUESTA]**: nunca se ha aplicado a una cuenta real.
+Crea la arquitectura de [despliegue en AWS](../../docs/arquitectura/despliegue-aws.md): 20 funciones Lambda, API HTTP con 30 rutas, 6 tablas de DynamoDB, buckets de documentos y de evidencia (Object Lock), colas SQS con cola de fallidos, 3 llaves KMS secp256k1, parámetros de configuración de Systems Manager, programadores, alarmas y presupuesto. **[PROPUESTA]**: nunca se ha aplicado a una cuenta real.
 
 La llave de los dueños de la Safe nunca entra aquí. Terraform no crea ni lee los secretos: un parámetro gestionado por Terraform guarda su valor descifrado en `terraform.tfstate`, así que se crean a mano (paso 3) y Terraform solo da permiso a cada función para leer los suyos. El estado queda sin llaves ni tokens, pero igual conviene guardarlo fuera de carpetas sincronizadas (OneDrive) o en el backend S3 comentado en `versions.tf`.
 

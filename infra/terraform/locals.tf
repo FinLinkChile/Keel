@@ -77,6 +77,7 @@ locals {
   # ---------- Funciones: una por archivo de aws/src/handlers ----------
   # role: rol de IAM. reserve: concurrencia reservada de 1 si use_reserved_concurrency (el candado
   # en DynamoDB ya evita vueltas simultaneas; la reserva es una segunda barrera opcional).
+  # Funciones: 20 desde el analisis de compras (insights).
   # El agente retiene su candado 110 s: su timeout tiene que ser menor. Monitor e indexador, 55 s.
   # El extractor puede tardar 3 intentos de 60 s del LLM (LLM_TIMEOUT_MS); la cola le da 720 s de visibilidad.
   # Proforma e inbound llaman al LLM dentro de la peticion (API Gateway corta a los 29 s): su
@@ -91,6 +92,7 @@ locals {
     upload     = { role = "upload", timeout = 28, memory = 512, reserve = false }
     inbound    = { role = "inbound", timeout = 28, memory = 512, reserve = false }
     proforma   = { role = "proforma", timeout = 28, memory = 1024, reserve = false }
+    insights   = { role = "insights", timeout = 28, memory = 512, reserve = false }
     admin      = { role = "admin", timeout = 28, memory = 512, reserve = false }
     extractor  = { role = "extractor", timeout = 300, memory = 1536, reserve = false }
     digest     = { role = "digest", timeout = 60, memory = 512, reserve = true }
@@ -130,9 +132,11 @@ locals {
       PARTIES_TABLE   = local.t["parties"]
       INGEST_TABLE    = local.t["ingest"]
     }
-    upload    = { INGEST_TABLE = local.t["ingest"], DOCS_BUCKET = aws_s3_bucket.docs.bucket }
-    inbound   = { INGEST_TABLE = local.t["ingest"], DOCS_BUCKET = aws_s3_bucket.docs.bucket, NOTICES_QUEUE_URL = aws_sqs_queue.notices.url, LLM_TIMEOUT_MS = "20000" }
-    proforma  = { INGEST_TABLE = local.t["ingest"], PARTIES_TABLE = local.t["parties"], LLM_TIMEOUT_MS = "20000" }
+    upload   = { INGEST_TABLE = local.t["ingest"], DOCS_BUCKET = aws_s3_bucket.docs.bucket }
+    inbound  = { INGEST_TABLE = local.t["ingest"], DOCS_BUCKET = aws_s3_bucket.docs.bucket, NOTICES_QUEUE_URL = aws_sqs_queue.notices.url, LLM_TIMEOUT_MS = "20000" }
+    proforma = { INGEST_TABLE = local.t["ingest"], PARTIES_TABLE = local.t["parties"], LLM_TIMEOUT_MS = "20000" }
+    # El analisis de compras llama al modelo dentro de la peticion, igual que la proforma
+    insights  = { INGEST_TABLE = local.t["ingest"], PARTIES_TABLE = local.t["parties"], LLM_TIMEOUT_MS = "20000" }
     admin     = { INGEST_TABLE = local.t["ingest"] }
     extractor = { INGEST_TABLE = local.t["ingest"], ORDERS_TABLE = local.t["orders"], DOCS_BUCKET = aws_s3_bucket.docs.bucket, NOTICES_QUEUE_URL = aws_sqs_queue.notices.url }
     digest    = { INGEST_TABLE = local.t["ingest"], NOTICES_QUEUE_URL = aws_sqs_queue.notices.url }
@@ -180,6 +184,7 @@ locals {
     upload     = ["POST /trade/uploads", "POST /trade/documents"]
     inbound    = ["POST /inbound"]
     proforma   = ["POST /trade/proforma"]
+    insights   = ["POST /trade/insights"]
     admin      = ["GET /admin/settings", "PUT /admin/settings"]
     noticesIn  = ["POST /notices", "POST /ingest/outcomes"]
     botAdmin   = ["GET /bot/recipients", "PUT /bot/recipients"]
@@ -250,6 +255,14 @@ locals {
       local.secrets["llm_keys"],
     ]
     proforma = [
+      { actions = local.ddb_rw, resources = [local.tbl["ingest"]] },
+      { actions = local.ddb_read, resources = [local.tbl["parties"]] },
+      local.ssm_read,
+      local.secrets["llm_keys"],
+    ]
+    # Analisis de compras: el cupo diario por importador vive en la tabla de ingesta; lee partes
+    # para saber si quien firma es importador; solo ve las metricas que la app firmo
+    insights = [
       { actions = local.ddb_rw, resources = [local.tbl["ingest"]] },
       { actions = local.ddb_read, resources = [local.tbl["parties"]] },
       local.ssm_read,

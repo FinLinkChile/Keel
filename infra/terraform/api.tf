@@ -30,6 +30,13 @@ resource "aws_apigatewayv2_stage" "default" {
     throttling_burst_limit = var.proforma_throttle_burst
   }
 
+  # El analisis de compras tambien llama al modelo: el mismo tope bajo
+  route_settings {
+    route_key              = "POST /trade/insights"
+    throttling_rate_limit  = var.proforma_throttle_rate
+    throttling_burst_limit = var.proforma_throttle_burst
+  }
+
   depends_on = [aws_apigatewayv2_route.r]
 }
 

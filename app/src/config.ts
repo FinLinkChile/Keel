@@ -14,6 +14,10 @@ export const config = {
   // When set, proposals, orders, what needs you, the wallet and document uploads go through it;
   // unset, the app keeps its proposals on this phone and uploads to ingest directly.
   apiUrl: process.env.EXPO_PUBLIC_API_URL || undefined,
+  // Where the proforma reading and the purchase analysis go: ingest's own server when it is set,
+  // otherwise the Keel API, which serves POST /trade/proforma and POST /trade/insights with the same
+  // contract. Undefined when neither is set.
+  tradeReadUrl: process.env.EXPO_PUBLIC_INGEST_URL || process.env.EXPO_PUBLIC_API_URL || undefined,
   // Must equal INGEST_CHAIN_ID of ingest: another chain id recovers another address and the
   // upload is rejected as not_a_party. Undefined when not set.
   chainId: Number.isInteger(chainId) && chainId > 0 ? chainId : undefined,

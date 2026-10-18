@@ -193,3 +193,12 @@ export {
   type TradeOrderEntry,
   type UploadRejection,
 } from "./trade/upload";
+export {
+  INSIGHTS_REJECTION_STATUS,
+  INSIGHTS_TYPES,
+  InsightsBody,
+  inputHash as insightsInputHash,
+  MAX_INPUT_BYTES as MAX_INSIGHTS_INPUT_BYTES,
+  receiveInsights,
+  type InsightsOutcome,
+} from "./trade/insights";

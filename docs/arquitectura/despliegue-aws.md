@@ -67,7 +67,7 @@ Código del 18 de octubre (Área 5 con Claude, sobre esta propuesta del Área 2)
 
 | Pieza | Dónde |
 | --- | --- |
-| Infraestructura (19 funciones, 27 rutas, 6 tablas, 3 llaves KMS, colas, buckets, alarmas) | `infra/terraform/` |
+| Infraestructura (20 funciones, 30 rutas, 6 tablas, 3 llaves KMS, colas, buckets, alarmas) | `infra/terraform/` |
 | Funciones | `aws/src/handlers/`, empaquetadas con `npm run build -w aws` en `infra/terraform/dist/` |
 | Llaves (KMS o SSM por rol), autenticación de peticiones, configuración, avisos, candado | `aws/src/` |
 | Formas de los items de DynamoDB | `aws/src/tables.ts` |
