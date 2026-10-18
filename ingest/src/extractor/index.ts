@@ -2,6 +2,7 @@
 // No tools, fixed prompt, schema-only output, strict validation in contract.ts.
 import type { CommercialInvoiceExtraction, InvoiceExtraction, TransportDocumentExtraction } from "@keel/schemas";
 import { splitByVisibility } from "../pdf/hidden";
+import { withoutTermsPages } from "../pdf/pages";
 import { MAX_PDF_BYTES, PdfReadError, pdfHeaderOffset, readTextRuns, toLines } from "../pdf/text";
 import { logTransfer, redactForLlm, rehydrate, type LlmPurpose } from "../privacy";
 import {
@@ -29,7 +30,12 @@ export interface ExtractorConfig {
   model: string;
   // Required for openai-compatible, e.g. the Qwen DashScope endpoint
   baseURL?: string;
+  // Timeout of each request to the vendor, in milliseconds (default LLM_TIMEOUT_MS). A hung
+  // vendor must not hold a document, or a Lambda, until the platform kills it.
+  timeoutMs?: number;
 }
+
+export const LLM_TIMEOUT_MS = 60_000;
 
 // Only Claude has a default: the model ids of other vendors change too often to pin here.
 const DEFAULT_MODEL: Partial<Record<ProviderName, string>> = { anthropic: "claude-opus-5-5" };
@@ -85,28 +91,29 @@ function validateConfig(config: ExtractorConfig): void {
 // SDKs load lazily: only the selected vendor's SDK is imported.
 export async function createExtractor(config: ExtractorConfig): Promise<ExtractorProvider> {
   validateConfig(config);
+  const timeout = config.timeoutMs ?? LLM_TIMEOUT_MS;
   switch (config.provider) {
     case "anthropic": {
       const { AnthropicProvider } = await import("./providers/anthropic");
-      return new AnthropicProvider(config.apiKey, config.model, config.baseURL);
+      return new AnthropicProvider(config.apiKey, config.model, config.baseURL, timeout);
     }
     case "openai": {
       const { OpenAIProvider } = await import("./providers/openai");
-      return new OpenAIProvider(config.apiKey, config.model);
+      return new OpenAIProvider(config.apiKey, config.model, timeout);
     }
     case "gemini": {
       const { GeminiProvider } = await import("./providers/gemini");
-      return new GeminiProvider(config.apiKey, config.model);
+      return new GeminiProvider(config.apiKey, config.model, timeout);
     }
     case "openai-compatible": {
       const { OpenAICompatibleProvider } = await import("./providers/openaiCompatible");
-      return new OpenAICompatibleProvider(config.apiKey, config.model, config.baseURL!);
+      return new OpenAICompatibleProvider(config.apiKey, config.model, config.baseURL!, timeout);
     }
   }
 }
 
-// An invoice or a bill of lading is a page or two; anything far longer is padding for an
-// injection or a cost attack
+// An invoice or the form pages of a bill of lading are a page or two; anything far longer is
+// padding for an injection or a cost attack. Counted after the terms pages are skipped.
 export const MAX_LLM_INPUT_CHARS = 20_000;
 
 type Restore = (value: string) => string;
@@ -122,7 +129,7 @@ async function extract<T>(
 ): Promise<T> {
   let text: string;
   try {
-    text = toLines(await readTextRuns(pdf)).join("\n");
+    text = toLines(withoutTermsPages(await readTextRuns(pdf))).join("\n");
   } catch (e) {
     throw new ExtractionError("unreadable_input", { cause: e });
   }

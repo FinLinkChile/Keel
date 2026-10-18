@@ -12,7 +12,8 @@ let n = 0;
 const order = (agreedBps: number, agreedCents: number, quote?: Partial<Quote>, stage: Order['stage'] = 'settled', exporter = LINGNAN): Order =>
   ({
     stage,
-    quote: quote && { amountCents: null, advanceBps: null, issueDate: null, latestShipmentDate: null, ...quote },
+    quote: quote && { currency: 'USD', amountCents: null, advanceBps: null, issueDate: null, latestShipmentDate: null, ...quote },
+    terms: { currency: 'USD' },
     po: { orderId: `0x${(++n).toString(16).padStart(64, '0')}` as Hex, exporter, advanceBps: agreedBps, totalAmount: centsToToken(BigInt(agreedCents)) },
   }) as unknown as Order;
 
@@ -38,5 +39,10 @@ describe('negotiation', () => {
       LINGNAN,
     );
     expect(s).toMatchObject({ withAdvance: 0, lowerAdvance: 0, advancePointsSaved: null, amountChangePct: 0 });
+  });
+
+  it('does not compare a total quoted in another currency', () => {
+    const s = negotiation([order(3000, 4_800_000, { currency: 'CNY', amountCents: 35_000_000, advanceBps: 5000 })]);
+    expect(s).toMatchObject({ amountChangePct: null, advancePointsSaved: 20 });
   });
 });

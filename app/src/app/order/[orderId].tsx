@@ -5,11 +5,14 @@ import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { config } from '@/config';
-import { proposals, useData, type Order, type OrderDocument, type Party } from '@/data';
+import { api, proposals, useData, type Order, type OrderDocument, type Party } from '@/data';
+import { uploadViaApi } from '@/ingest/apiUpload';
+import { ClosingActions } from '@/orders/ClosingActions';
 import { tokenToCents } from '@/data/amounts';
 import { pickPdf } from '@/files/pickPdf';
 import type { PickedFile } from '@/files/pickPdf.types';
 import { uploadPreview } from '@/files/uploadPreview';
+import { t, useT } from '@/i18n';
 import { ExporterReview } from '@/orders/ExporterReview';
 import { ImporterOrder } from '@/orders/ImporterOrder';
 import { uploadDocument, type UploadResult } from '@/ingest/client';
@@ -34,7 +37,11 @@ export default function OrderScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: Hex }>();
   const { role } = useSession();
   // An order proposed on this phone is reviewed and signed before it is an order in progress
-  const proposed = useData(async () => !!(await proposals.get(orderId)), [orderId]);
+  // With the Keel API a fully signed proposal is an order in progress: it opens as one
+  const proposed = useData(async () => {
+    const p = await proposals.get(orderId);
+    return !!p && !(api && p.status === 'signed');
+  }, [orderId]);
   if (proposed === undefined) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   // The importer sees the same timeline for every order; the review is a step inside it
   if (role === 'importer') return <ImporterOrder orderId={orderId} />;
@@ -50,6 +57,7 @@ const DOC_NAMES: Record<RequiredDocType, string> = {
 const DAY = 24 * 3600;
 
 function ExporterOrder({ orderId }: { orderId: Hex }) {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const view = useData(async (d) => {
     const order = await d.order(orderId);
@@ -63,7 +71,7 @@ function ExporterOrder({ orderId }: { orderId: Hex }) {
   }, [orderId]);
 
   if (view === undefined) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
-  if (view === null) return <Placeholder title="Order not found" back />;
+  if (view === null) return <Placeholder title={t('Order not found')} back />;
   const { order, me, buyer, carrier } = view;
 
   // Computed in token units, shown in cents
@@ -90,7 +98,7 @@ function ExporterOrder({ orderId }: { orderId: Hex }) {
       <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: -8 }}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Back"
+          accessibilityLabel={t('Back')}
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))}
           style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
         >
@@ -109,7 +117,7 @@ function ExporterOrder({ orderId }: { orderId: Hex }) {
           {order.goods}
         </Text>
         <Text size={15} color="textMuted">
-          For {buyer.name}, {buyer.place}
+          {t('For {name}, {place}', { name: buyer.name, place: buyer.place })}
         </Text>
       </View>
 
@@ -118,7 +126,7 @@ function ExporterOrder({ orderId }: { orderId: Hex }) {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Icon name="check" size={14} strokeWidth={3} color="money" />
             <Text size={15} color="textMuted">
-              Received
+              {t('Received')}
             </Text>
           </View>
           <Amount minor={advance} currency={order.terms.currency} size={36} tracking={-1.4} currencyColor="textMuted" />
@@ -136,12 +144,12 @@ function ExporterOrder({ orderId }: { orderId: Hex }) {
         >
           <Icon name="lock" size={16} color="textMuted" />
           <Text size={15} color="textMuted" style={{ flex: 1 }}>
-            Locked for you
+            {t('Locked for you')}
           </Text>
           <Amount minor={balance} size={14} weight={500} />
         </View>
         <Text size={13} leading={1.45} color="textMuted" style={{ paddingHorizontal: 20, paddingBottom: 18 }}>
-          Paid to you once the shipment is proven. No proof by {deadline} and it goes back to {buyer.short}.
+          {t('Paid to you once the shipment is proven. No proof by {date} and it goes back to {name}.', { date: deadline, name: buyer.short })}
         </Text>
       </View>
 
@@ -161,21 +169,21 @@ function ExporterOrder({ orderId }: { orderId: Hex }) {
             >
               <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.yourTurn }} />
               <Text size={13} weight={700}>
-                Your turn
+                {t('Your turn')}
               </Text>
             </View>
           ) : (
             <View />
           )}
           <Text mono size={13}>
-            {daysLeft === 1 ? '1 day left' : `${daysLeft} days left`}
+            {daysLeft === 1 ? t('1 day left') : t('{n} days left', { n: daysLeft })}
           </Text>
         </View>
         <Text size={18} weight={800}>
-          Ship by {deadline} and send the documents
+          {t('Ship by {date} and send the documents', { date: deadline })}
         </Text>
         <Text size={14} leading={1.45} color="textMuted">
-          {carrier.name} confirms the shipment; you can&apos;t sign that yourself.
+          {t('{name} confirms the shipment; you can\'t sign that yourself.', { name: carrier.name })}
         </Text>
         <View style={{ marginTop: 4 }}>
           {[order.transportDoc, 'COMMERCIAL_INVOICE' as const].map((docType, i) => (
@@ -192,10 +200,12 @@ function ExporterOrder({ orderId }: { orderId: Hex }) {
 
       <View style={{ gap: 8 }}>
         <Text size={20} weight={800} accessibilityRole="header">
-          Steps
+          {t('Steps')}
         </Text>
         <Steps size="compact" steps={steps(order, total, balance, deadline)} />
       </View>
+
+      <ClosingActions orderId={order.po.orderId} role="exporter" />
 
       <PayoutNote payout={order.po.payoutAddress} me={me} />
     </ScrollView>
@@ -203,34 +213,34 @@ function ExporterOrder({ orderId }: { orderId: Hex }) {
 }
 
 function steps(order: Order, total: bigint, balance: bigint, deadline: string): Step[] {
-  const when = (t?: number) => (
+  const when = (at?: number) => (
     <Text size={13} color="textFaint">
-      {t ? formatDay(t) : ''}
+      {at ? formatDay(at) : ''}
     </Text>
   );
   const shipped = order.stage === 'shipped' || order.stage === 'settled';
   return [
-    { key: 'signed', title: 'Signed by both', state: order.signedAt ? 'done' : 'todo', trailing: when(order.signedAt) },
+    { key: 'signed', title: t('Signed by both'), state: order.signedAt ? 'done' : 'todo', trailing: when(order.signedAt) },
     {
       key: 'locked',
-      title: `Buyer locked ${formatMinor(total / 100n, 0)}`,
+      title: t('Buyer locked {amount}', { amount: formatMinor(total / 100n, 0) }),
       state: order.advancePaidAt ? 'done' : 'todo',
       trailing: when(order.advancePaidAt),
     },
-    { key: 'advance', title: 'Advance received', state: order.advancePaidAt ? 'done' : 'todo', trailing: when(order.advancePaidAt) },
+    { key: 'advance', title: t('Advance received'), state: order.advancePaidAt ? 'done' : 'todo', trailing: when(order.advancePaidAt) },
     {
       key: 'shipment',
-      title: 'Shipment and documents',
+      title: t('Shipment and documents'),
       state: shipped ? 'done' : order.stage === 'advance_paid' ? 'current' : 'todo',
       trailing: shipped ? when(order.shippedAt) : (
         <Text size={13} color="textFaint">
-          by {deadline}
+          {t('by {date}', { date: deadline })}
         </Text>
       ),
     },
     {
       key: 'balance',
-      title: 'Balance paid to you',
+      title: t('Balance paid to you'),
       state: order.stage === 'settled' ? 'done' : 'todo',
       trailing: <Amount minor={balance} size={14} weight={400} color={order.stage === 'settled' ? 'text' : 'textFaint'} />,
     },
@@ -242,6 +252,7 @@ type Upload = { phase: 'signing' | 'uploading'; fileName: string } | { phase: 'd
 // One required document: its state, or the Upload action. Shows only the outcome of the
 // upload; nothing ingest read in the file is ever shown here.
 function DocumentRow({ order, docType, existing, last }: { order: Order; docType: RequiredDocType; existing?: OrderDocument; last: boolean }) {
+  const t = useT();
   const { signer } = useSession();
   const [upload, setUpload] = useState<Upload>();
   // The file chosen and waiting for the exporter to confirm it
@@ -271,12 +282,10 @@ function DocumentRow({ order, docType, existing, last }: { order: Order; docType
     if (!signer) return;
     setPending(undefined);
     setUpload({ phase: 'signing', fileName: file.name });
-    const result = await uploadDocument({
-      ingestUrl: config.ingestUrl,
-      chainId: config.chainId,
+    const upload = {
       signer: {
         address: () => signer.address(),
-        signTypedData: async (...args) => {
+        signTypedData: async (...args: Parameters<typeof signer.signTypedData>) => {
           const signature = await signer.signTypedData(...args);
           setUpload({ phase: 'uploading', fileName: file.name });
           return signature;
@@ -285,20 +294,24 @@ function DocumentRow({ order, docType, existing, last }: { order: Order; docType
       orderId: order.po.orderId,
       docType,
       file: file.bytes,
-    }).catch((): UploadResult => ({ kind: 'failed', reason: 'server' }));
-    setUpload({ phase: 'done', fileName: file.name, at: Date.now() / 1000, result });
-  }
+    };
+    // With the Keel API: a presigned upload, read later; without it, straight to ingest
+    const result = await (api
+      ? uploadViaApi({ api, chainId: config.chainId, ...upload })
+      : uploadDocument({ ingestUrl: config.ingestUrl, chainId: config.chainId, ...upload })
+    ).catch((): UploadResult => ({ kind: 'failed', reason: 'server' }));
+    setUpload({ phase: 'done', fileName: file.name, at: Date.now() / 1000, result });  }
 
   const outcome = upload?.phase === 'done' ? uploadStatus(upload.result) : undefined;
   const word =
-    outcome?.word ?? (existing && !upload ? (existing.status === 'accepted' ? 'Accepted' : 'Under review') : undefined);
+    outcome?.word ?? (existing && !upload ? (existing.status === 'accepted' ? t('Accepted') : t('Under review')) : undefined);
   const busy = upload?.phase === 'signing' || upload?.phase === 'uploading';
 
   let detail: string;
-  if (busy) detail = `${upload.fileName}, ${upload.phase === 'signing' ? 'signing' : 'uploading'}`;
-  else if (upload?.phase === 'done') detail = outcome?.problem ?? `${upload.fileName}, ${formatLocalDay(upload.at)}`;
+  if (busy) detail = `${upload.fileName}, ${upload.phase === 'signing' ? t('signing') : t('uploading')}`;
+  else if (upload?.phase === 'done') detail = outcome?.problem ? t(outcome.problem) : `${upload.fileName}, ${formatLocalDay(upload.at)}`;
   else if (existing) detail = `${existing.fileName}, ${formatLocalDay(existing.uploadedAt)}`;
-  else detail = 'Not uploaded yet';
+  else detail = t('Not uploaded yet');
 
   return (
     <View
@@ -314,23 +327,23 @@ function DocumentRow({ order, docType, existing, last }: { order: Order; docType
     >
       <View style={{ flex: 1 }}>
         <Text size={15} weight={700}>
-          {DOC_NAMES[docType]}
+          {t(DOC_NAMES[docType])}
         </Text>
         <Text size={13} color={outcome?.problem ? 'textMuted' : 'textFaint'}>
           {detail}
         </Text>
       </View>
       {word ? (
-        <StatusWord>{word}</StatusWord>
+        <StatusWord>{t(word)}</StatusWord>
       ) : (
         <Button
-          label={busy ? 'Uploading' : upload?.phase === 'done' ? 'Try again' : 'Upload'}
+          label={busy ? t('Uploading') : upload?.phase === 'done' ? t('Try again') : t('Upload')}
           variant="small"
           disabled={busy || !signer}
           onPress={pick}
         />
       )}
-      <BottomSheet visible={!!pending} title="Upload this file?" onClose={() => setPending(undefined)}>
+      <BottomSheet visible={!!pending} title={t('Upload this file?')} onClose={() => setPending(undefined)}>
         {pending ? <UploadConfirm preview={uploadPreview(docType, order.label, pending)} onConfirm={() => confirm(pending)} onAnother={chooseAnother} /> : null}
       </BottomSheet>
     </View>
@@ -339,6 +352,7 @@ function DocumentRow({ order, docType, existing, last }: { order: Order; docType
 
 // What the exporter is about to sign: the document, the order and the file as the phone has it.
 function UploadConfirm({ preview, onConfirm, onAnother }: { preview: ReturnType<typeof uploadPreview>; onConfirm: () => void; onAnother: () => void }) {
+  const t = useT();
   return (
     <View style={{ gap: 14, paddingTop: 6 }}>
       <View style={{ gap: 2 }}>
@@ -353,25 +367,25 @@ function UploadConfirm({ preview, onConfirm, onAnother }: { preview: ReturnType<
         </Text>
       </View>
       <Text size={14} leading={1.45} color="textMuted">
-        You sign these exact bytes for this order. Keel only tells you the outcome.
+        {t('You sign these exact bytes for this order. Keel only tells you the outcome.')}
       </Text>
       <View style={{ gap: 10 }}>
-        <Button label="Confirm and upload" onPress={onConfirm} />
-        <Button label="Choose another file" variant="secondary" onPress={onAnother} />
+        <Button label={t('Confirm and upload')} onPress={onConfirm} />
+        <Button label={t('Choose another file')} variant="secondary" onPress={onAnother} />
       </View>
     </View>
   );
 }
 
 function PayoutNote({ payout, me }: { payout: Hex; me: Party }) {
+  const t = useT();
   return (
-    <View style={{ flexDirection: 'row', gap: 10 }} accessibilityLabel={`Paid to ${me.short}'s signed account`}>
+    <View style={{ flexDirection: 'row', gap: 10 }} accessibilityLabel={t('Paid to {name}\'s signed account', { name: me.short })}>
       <View style={{ marginTop: 2 }}>
         <Icon name="lock" size={16} color="textMuted" />
       </View>
       <Text size={14} leading={1.45} color="textMuted" style={{ flex: 1 }}>
-        Paid to your signed account <Address address={payout} inline size={14} color="text" />. A new bank account in a
-        document is ignored.
+        {t('Paid to your signed account')} <Address address={payout} inline size={14} color="text" />. {t('A new bank account in a document is ignored.')}
       </Text>
     </View>
   );

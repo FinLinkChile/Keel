@@ -5,7 +5,7 @@ description: "Qué datos de personas y empresas guarda Keel, dónde vive cada un
 tags: [privacidad, datos-personales, ley-21719, analisis, cadena]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T07:30:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T12:00:00Z }
 ---
 
 **[PROPUESTA]** del Área 3 (Daniela). Reúne lo que ya hace el código y lo que falta decidir. Los datos de personas (representantes, firmantes, operadores) caen bajo la Ley 21.719, que según el [documento de negocio](../negocio/Keel%20opciones%20de%20negocio%20y%20an%C3%A1lisis%20de%20datos.md) entra en vigencia el 1 de diciembre de 2026, con un proyecto para postergarla. **[ABIERTO: verificar la fecha antes de citarla.]**
@@ -14,7 +14,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T07:30:00Z }
 
 * **Nada personal va a la cadena.** Los contratos guardan direcciones, montos, fechas y hashes, nunca nombres ni RUT.
 * **Nada personal llega al modelo en un texto.** Ingesta reemplaza nombres, direcciones, correos, RUT, teléfonos, cuentas, IBAN, tarjetas y billeteras por tokens antes de enviar el texto de un documento, y solo rehidrata los campos tipados que devuelve el extractor (`ingest/src/privacy.ts`, patrones `PII_PATTERNS`, sobre `privacy-kit-cl`). Cada token usa una sal nueva por llamada, para que un proveedor no pueda recuperar un RUT por fuerza bruta.
-* **Ingesta no guarda archivos.** De cada documento queda su hash, quién lo subió y los campos tipados; de la proforma, el hash y la lectura ([lectura de la proforma](../interfaces/lectura-de-proforma.md)).
+* **Ingesta local no guarda archivos.** De cada documento queda su hash, quién lo subió y los campos tipados; de la proforma, el hash y la lectura ([lectura de la proforma](../interfaces/lectura-de-proforma.md)). En AWS sí se guardan: ver la fila de documentos en S3 abajo.
 * **Las llaves no salen del teléfono** ([custodia de llaves](custodia-de-llaves.md)).
 
 # Qué datos existen y dónde viven
@@ -28,6 +28,8 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T07:30:00Z }
 | Dirección de billetera | Empresa, o persona en Keel Personal | Teléfono, ingesta (quién subió), cadena | Firmar y autorizar | Pública en la cadena |
 | ID de chat de Telegram por rol | Dueño, operador, cosignatario | Directorio del bot | Avisos | Operador del bot |
 | Texto de documentos (BL, factura, proforma) | Puede nombrar personas | No se guarda | Extracción | El modelo, redactado |
+| Archivos de documentos de una orden (BL, factura) **[PROPUESTA]**, solo en AWS | Pueden nombrar personas | Bucket S3 de documentos, `orders/<orderId>/<fileHash>`, cifrado; se borran solos a los 180 días (`document_retention_days` en `infra/terraform`) y las versiones reemplazadas al día siguiente | Leerlos una vez y revisar una disputa | El extractor y quien administre la cuenta de AWS |
+| Correo crudo de Keel Personal **[PROPUESTA]**, solo en AWS | Persona | Bucket S3 de documentos, `inbound/`, cifrado; se borra solo a los 90 días | Revisar un caso de correo rechazado | Quien administre la cuenta de AWS |
 | Foto o escaneo de la proforma | Puede mostrar personas | No se guarda | Extracción | El modelo, **sin redactar** **[PROPUESTA]**: se registra como `documento_sin_redactar` con la finalidad `extraccion_proforma` |
 | Órdenes, marcas de tiempo y lo que pidió la proforma | Empresa | Teléfono y cadena | Firmar, seguir la orden, análisis | La empresa; lo de la cadena, cualquiera |
 | Correos y facturas de Keel Personal | Persona | Ingesta guarda hash del mensaje, dominio del remitente y clave de la factura, no el contenido | Idempotencia y límites | Ingesta |
@@ -53,7 +55,7 @@ Cada envío queda registrado con su destino y finalidad (`logTransfer`, `ingest/
 
 # Lo que falta definir **[ABIERTO]**
 
-* Plazos de conservación de cada dato, en el teléfono, en ingesta y en el registro del agente.
+* Plazos de conservación de cada dato, en el teléfono, en ingesta y en el registro del agente. En AWS hay una propuesta para los archivos (180 días los documentos, 90 el correo crudo) que falta confirmar.
 * Cómo se ejercen los derechos de acceso, rectificación y supresión. Hoy "Sign up again" borra el registro del teléfono; ingesta no guarda datos de personas, salvo direcciones y el directorio del bot.
 * Aviso de privacidad y texto de consentimiento en el registro de la app.
 * Quién es el responsable del tratamiento y su contacto.

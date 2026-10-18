@@ -2,6 +2,7 @@ import type { Currency, Hex, Incoterm } from '@keel/schemas';
 
 import { PROFORMA_FIELDS, type ProformaField, type ProformaReading, type ProformaResult } from '../ingest/proforma';
 import { formatDay, formatMinor } from '../ui/format';
+import { t } from '../i18n/translate';
 
 import {
   prefillFromProforma,
@@ -34,6 +35,13 @@ export type ScreenForm = {
 };
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+// Spanish month names are accepted too, since the app can be used in Spanish
+const MONTHS_ES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const monthIndex = (word: string) => {
+  const key = word.slice(0, 3).toLowerCase();
+  const found = MONTHS.indexOf(key);
+  return found >= 0 ? found : MONTHS_ES.indexOf(key);
+};
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // "PO-0157" is the label of the order with nonce 0x157; the next number is PO0158 (orderNumber
@@ -65,9 +73,9 @@ export function parseDay(text: string): number | null {
   if (match) {
     [y, m, d] = [Number(match[1]), Number(match[2]) - 1, Number(match[3])];
   } else if ((match = /^([A-Za-z]{3,9})\.? (\d{1,2}),? (\d{4})$/.exec(t))) {
-    [y, m, d] = [Number(match[3]), MONTHS.indexOf(match[1].slice(0, 3).toLowerCase()), Number(match[2])];
+    [y, m, d] = [Number(match[3]), monthIndex(match[1]), Number(match[2])];
   } else if ((match = /^(\d{1,2}) ([A-Za-z]{3,9})\.? (\d{4})$/.exec(t))) {
-    [y, m, d] = [Number(match[3]), MONTHS.indexOf(match[2].slice(0, 3).toLowerCase()), Number(match[1])];
+    [y, m, d] = [Number(match[3]), monthIndex(match[2]), Number(match[1])];
   } else {
     return null;
   }
@@ -199,14 +207,15 @@ export function missingOnProforma(missing: readonly ProformaField[]): FormField[
 
 // "Known, 4 orders": how many orders the importer already has with the supplier
 export function knownLine(orders: number): string {
-  if (orders <= 0) return 'Known supplier';
-  return orders === 1 ? 'Known, 1 order' : `Known, ${orders} orders`;
+  if (orders <= 0) return t('Known supplier');
+  return orders === 1 ? t('Known, 1 order') : t('Known, {n} orders', { n: orders });
 }
 
 // "Uploaded. The agent read 9 terms.": the fields of the reading that the proforma printed
 export function termsReadLine(reading: ProformaReading): string {
-  const read = PROFORMA_FIELDS.length - reading.missing.length;
-  return `Uploaded. The agent read ${read} ${read === 1 ? 'term' : 'terms'}.`;
+  // The lines are not a term of the order
+  const read = PROFORMA_FIELDS.filter((f) => f !== 'lines').length - reading.missing.filter((f) => f !== 'lines').length;
+  return t(read === 1 ? 'Uploaded. The agent read {n} term.' : 'Uploaded. The agent read {n} terms.', { n: read });
 }
 
 // "Nov 20, CIF"; either part may be missing

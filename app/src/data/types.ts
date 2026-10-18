@@ -1,4 +1,6 @@
-import type { Hex, OrderTerms, PurchaseOrder, RequiredDocType } from '@keel/schemas';
+import type { Currency, Hex, OrderTerms, PurchaseOrder, RequiredDocType } from '@keel/schemas';
+
+import type { ProformaLine } from '../ingest/proforma';
 
 // Same slugs as bot/examples/recipients.json
 export type PartyId = string;
@@ -54,11 +56,15 @@ export type OrderDocument = {
 // What the proforma asked for, kept with the order to compare with what was signed. Not part of
 // the signed terms.
 export type Quote = {
+  // Prices of quotes in different currencies are never compared
+  currency: Currency | null;
   amountCents: number | null;
   advanceBps: number | null;
   // Unix seconds
   issueDate: number | null;
   latestShipmentDate: number | null;
+  // Quantity, unit and amount of each line, to compare prices per unit
+  lines?: ProformaLine[];
 };
 
 export type Order = {
@@ -86,6 +92,12 @@ export type Order = {
   po: PurchaseOrder;
   terms: OrderTerms;
   quote?: Quote;
+  // Escrow state as the Keel API's indexer mirrors it ("NONE", "OPEN", "SHIPPED", "DISPUTED"…),
+  // only for orders read from the API. DISPUTED shows as stage 'shipped'; RESOLVED as 'settled'.
+  escrowState?: string;
+  // The carrier's attestation of the shipment as the API holds it (attestation fields as strings),
+  // only for orders read from the API once the shipment is attested
+  shipment?: { attestation: Record<string, unknown>; sigCarrier: string };
 };
 
 export type Wallet = {
@@ -99,7 +111,11 @@ export type Wallet = {
 export type NeedsYou =
   | { kind: 'sign_order'; orderId: Hex }
   | { kind: 'verify_supplier'; party: PartyId }
-  | { kind: 'upload_documents'; orderId: Hex };
+  | { kind: 'upload_documents'; orderId: Hex }
+  // From the Keel API (GET /needs-you): the shipment is attested, the importer may release the
+  // balance; and the other side signed a cancellation this side has not signed yet
+  | { kind: 'approve_balance'; orderId: Hex }
+  | { kind: 'sign_cancel'; orderId: Hex; cancelNonce?: string };
 
 // A supplier that went through the supplier check, with the payout account registered then. The
 // payout address is the only place an order takes its payee from.

@@ -8,6 +8,8 @@ import { word } from "./testing/fixtures";
 // The rule files each version was reviewed with. Line endings are normalized for Windows checkouts.
 const REVIEWED: Record<string, string> = {
   "keel-trade/1": "0x257dd920e56629cd135498340a0eb3075b2dd30e7b991b67dcf3b544545f14cf",
+  // independent-roles mirrors the role checks of TradeEscrow.open
+  "keel-trade/2": "0x8df5498c2d10765325f8f6d4e145580610521edd03cb67e074fef144ae4e3eaa",
 };
 
 const rulesSource = () =>
@@ -24,7 +26,7 @@ describe("policy hash (T2.2)", () => {
   it("changes with the rules version, the parameters and the Roles configuration", () => {
     const base = tradePolicyHash(tradePolicy(word("roles-v1")));
     expect(tradePolicyHash(tradePolicy(word("roles-v1")))).toBe(base);
-    expect(tradePolicyHash({ ...tradePolicy(word("roles-v1")), rulesVersion: "keel-trade/2" })).not.toBe(base);
+    expect(tradePolicyHash({ ...tradePolicy(word("roles-v1")), rulesVersion: "keel-trade/99" })).not.toBe(base);
     expect(tradePolicyHash(tradePolicy(word("roles-v1"), { ...DEFAULT_FUNDING_POLICY, intentTtlSeconds: 60 }))).not.toBe(base);
     expect(tradePolicyHash(tradePolicy(word("roles-v2")))).not.toBe(base);
   });

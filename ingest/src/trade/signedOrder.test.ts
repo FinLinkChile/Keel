@@ -90,7 +90,7 @@ describe("signed orders from the app (T3.11)", () => {
 
     // The document upload now knows the order, and accepts its exporter
     const orders = withSignedOrders(staticOrders([]), opts.store);
-    expect(orders.get(order.orderId)?.uploaders).toEqual([
+    expect((await orders.get(order.orderId))?.uploaders).toEqual([
       { address: importer.address, party: "importer" },
       { address: exporter.address, party: "exporter" },
     ]);
@@ -130,7 +130,7 @@ describe("signed orders from the app (T3.11)", () => {
     const opts = setup();
     const { order, raw } = await body({ safe: SAFE });
     expect(await receiveSignedOrder(raw, opts)).toMatchObject({ status: "registered" });
-    expect(opts.store.signedOrder(order.orderId)?.entry.uploaders[0]).toEqual({ address: owner.address, party: "importer" });
+    expect((await opts.store.signedOrder(order.orderId))?.entry.uploaders[0]).toEqual({ address: owner.address, party: "importer" });
     // Without the chain, a key that is not registered cannot sign for the Safe
     const other = await body({ safe: SAFE, imp: stranger, nonce: 0x159n });
     expect(await receiveSignedOrder(other.raw, opts)).toEqual({ status: "rejected", reason: "bad_importer_signature" });
@@ -150,6 +150,14 @@ describe("signed orders from the app (T3.11)", () => {
     expect(await receiveSignedOrder(raw, opts)).toMatchObject({ status: "registered" });
     expect(asked.map((a) => a.toLowerCase())).toContain(SAFE.toLowerCase());
   });
+
+  it("registers one of two identical orders sent at once, and answers the other as registered", async () => {
+    const opts = setup();
+    const { raw } = await body();
+    const [a, b] = await Promise.all([receiveSignedOrder(raw, opts), receiveSignedOrder(raw, opts)]);
+    expect([a, b].map((o) => o.status)).toEqual(["registered", "registered"]);
+    expect([a, b].filter((o) => o.status === "registered" && o.already)).toHaveLength(1);
+  });
 });
 
 describe("POST /trade/orders", () => {
@@ -166,7 +174,7 @@ describe("POST /trade/orders", () => {
           orders: withSignedOrders(staticOrders([]), store),
           chainId: CHAIN_ID,
           importers: staticImporters([importer.address]),
-          ...(signed && { signed: { escrow: ESCROW, signatures: offlineSignatures } }),
+          ...(signed && { signed: { escrow: ESCROW, signatures: offlineSignatures, store } }),
         },
         log: () => {},
       });

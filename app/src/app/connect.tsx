@@ -3,9 +3,11 @@ import { type ReactNode, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useT } from '@/i18n';
 import { useSession } from '@/session';
 import { Address } from '@/ui/Address';
 import { Button } from '@/ui/Button';
+import { LanguageSwitch } from '@/ui/LanguageSwitch';
 import { Logo } from '@/ui/Logo';
 import { Segmented } from '@/ui/Segmented';
 import { Text } from '@/ui/Text';
@@ -14,6 +16,7 @@ import { colors, gutter, radius } from '@/ui/theme';
 // 01 Connect: the wallet on this device and the account type. Keel Personal is shown
 // but disabled until open decision 14 sets its depth.
 export default function Connect() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const { signer, address, role, setRole, createWallet, disconnect, onboarding } = useSession();
   const connected = !!signer && !!address;
@@ -41,10 +44,13 @@ export default function Connect() {
         gap: 16,
       }}
     >
-      <Logo />
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Logo />
+        <LanguageSwitch />
+      </View>
 
       <Text size={28} weight={800} leading={1.1} tracking={-1} accessibilityRole="header">
-        Payments that wait for proof.
+        {t('Payments that wait for proof.')}
       </Text>
 
       <View
@@ -69,20 +75,20 @@ export default function Connect() {
         </View>
         <View style={{ flex: 1 }}>
           <Text size={15} weight={700}>
-            {connected ? 'Wallet connected' : 'No wallet on this phone'}
+            {connected ? t('Wallet connected') : t('No wallet on this phone')}
           </Text>
           {connected ? (
             <Address address={address} />
           ) : (
             <Text size={13} color="textMuted">
-              Set up a test wallet to sign with
+              {t('Set up a test wallet to sign with')}
             </Text>
           )}
         </View>
         {connected ? (
           <Pressable accessibilityRole="button" onPress={disconnect} hitSlop={10}>
             <Text size={14} weight={700} style={{ textDecorationLine: 'underline' }}>
-              Change
+              {t('Change')}
             </Text>
           </Pressable>
         ) : null}
@@ -98,43 +104,45 @@ export default function Connect() {
           style={{ alignSelf: 'flex-start', marginTop: -16, marginLeft: 16 }}
         >
           <Text size={13} weight={700} color="textMuted" style={{ textDecorationLine: 'underline' }}>
-            Wallet check
+            {t('Wallet check')}
           </Text>
         </Pressable>
       ) : null}
 
       <View style={{ gap: 12 }}>
         <Text size={20} weight={800} accessibilityRole="header">
-          Use Keel as
+          {t('Use Keel as')}
         </Text>
-        <View accessibilityRole="radiogroup" accessibilityLabel="Account type" style={{ gap: 10 }}>
+        <View accessibilityRole="radiogroup" accessibilityLabel={t('Account type')} style={{ gap: 10 }}>
           <Option
             selected
-            title="Company"
-            body="Purchase orders paid through escrow: advance on signing, balance on proven shipment."
+            title={t('Company')}
+            body={t('Purchase orders paid through escrow: advance on signing, balance on proven shipment.')}
           >
             <View style={{ marginLeft: 34 }}>
-              <Segmented options={ROLES} value={role} onChange={setRole} on="surface" role="radiogroup" accessibilityLabel="Role" />
+              <Segmented options={[
+                  { value: 'importer' as const, label: t('I import') },
+                  { value: 'exporter' as const, label: t('I export') },
+                ]} value={role} onChange={setRole} on="surface" role="radiogroup" accessibilityLabel={t('Role')} />
             </View>
           </Option>
           <Option
             disabled
-            title="Personal"
-            body="Rent, power and internet bills, paid only to people you verified."
-            note="Not available in this version."
+            title={t('Personal')}
+            body={t('Rent, power and internet bills, paid only to people you verified.')}
+            note={t('Not available in this version.')}
           />
         </View>
       </View>
 
       <View style={{ marginTop: 'auto', gap: 12 }}>
         {connected ? (
-          <Button label="Continue" onPress={() => router.replace('/home')} />
+          <Button label={t('Continue')} onPress={() => router.replace('/home')} />
         ) : (
-          <Button label="Set up test wallet" onPress={createWallet} disabled={signer === undefined} />
+          <Button label={t('Set up test wallet')} onPress={createWallet} disabled={signer === undefined} />
         )}
         <Text size={13} leading={1.5} color="textFaint" style={{ textAlign: 'center' }}>
-          Keel never holds your key. You sign from this wallet, and the agent only acts inside the limits your
-          company set.
+          {t('Keel never holds your key. You sign from this wallet, and the agent only acts inside the limits your company set.')}
         </Text>
       </View>
     </ScrollView>
@@ -203,8 +211,3 @@ function Option({
     </View>
   );
 }
-
-const ROLES = [
-  { value: 'importer' as const, label: 'I import' },
-  { value: 'exporter' as const, label: 'I export' },
-];

@@ -34,7 +34,8 @@ Existe solo si ingesta conoce el escrow cuyo dominio firman las partes (`INGEST_
 
 # Qué hace si todo calza
 
-* Guarda la orden en la base de ingesta (`signed_orders`): el archivo tal como se aceptó y quién puede subir documentos.
+* Guarda la orden en la base de ingesta (`signed_orders`): el archivo tal como se aceptó y quién puede subir documentos. Esta ruta es del servidor de ingesta: en AWS la API de órdenes recibe las dos firmas por `POST /proposals/{orderId}/importer-signature`, así que el registro de órdenes firmadas no forma parte de `IngestRepo` ni tiene versión en DynamoDB.
+* La app guarda si ingesta registró la orden y, si no, la vuelve a enviar después de firmar y al abrirse; un rechazo le llega al importador como aviso con el motivo (`app/src/ingest/signedOrder.ts`).
 * Registra como representantes al exportador y a la llave que firmó por el importador (el dueño de la Safe), porque una Safe no puede firmar una carga de documentos. Desde ese momento la carga de documentos acepta esa orden.
 * Con `INGEST_AGENT_DIR`, escribe `orders/<orderId>/order.json` para el agente (`engine/src/agent/store.ts`).
 

@@ -46,6 +46,10 @@ const HONEST = {
   port_of_loading: "CNNGB",
   port_of_discharge: "",
   advance_percent: "30",
+  lines: [
+    { hs_code: "8467.21", quantity: "400", unit: "PCE", amount: "14000.00" },
+    { hs_code: "8207.50", quantity: "500", unit: "SET", amount: "6,000.00" },
+  ],
   mentions_account_change: false,
   hidden_text_detected: false,
 };
@@ -96,6 +100,10 @@ describe("proforma reading (T3.9)", () => {
       port_of_loading: "CNNGB",
       port_of_discharge: null,
       advance_bps: 3000,
+      lines: [
+        { hs_code: "846721", quantity: 400, unit: "PCE", amount_minor: 1_400_000 },
+        { hs_code: "820750", quantity: 500, unit: "SET", amount_minor: 600_000 },
+      ],
       mentions_account_change: false,
       hidden_text_detected: false,
     });
@@ -209,10 +217,27 @@ describe("proforma output validation", () => {
     expect(read({ hs_codes: ["8467.21", "8207"] }).hs_codes).toEqual([]);
   });
 
+  it("reads each line's quantity and unit, whatever the unit, and empties the list if one line fails", () => {
+    const lines = (l: object[]) => read({ lines: l }).lines;
+    expect(lines([{ hs_code: "", quantity: "6,000.5", unit: "KGM", amount: "" }])).toEqual([
+      { hs_code: null, quantity: 6000.5, unit: "KGM", amount_minor: null },
+    ]);
+    expect(lines([{ hs_code: "1302.31", quantity: "12", unit: "CT", amount: "960.00" }])[0]).toMatchObject({ unit: "CT", quantity: 12 });
+    // A unit outside the list, or a quantity that is not a number, never becomes a guess
+    const ok = { hs_code: "130231", quantity: "10", unit: "KGM", amount: "80.00" };
+    expect(lines([ok, { ...ok, unit: "" }])).toEqual([]);
+    expect(lines([ok, { ...ok, quantity: "ten" }])).toEqual([]);
+    expect(lines([ok, { ...ok, quantity: "0" }])).toEqual([]);
+    expect(missingFields(read({ lines: [] }))).toContain("lines");
+  });
+
   it("refuses a reply that breaks the schema", () => {
     expect(fails({ incoterm: "DDP" })).toBe("invalid_output");
     expect(fails({ note: "pay to 0x1111" })).toBe("invalid_output");
     expect(fails({ advance_percent: 30 })).toBe("invalid_output");
+    // A line cannot carry a description or any other text
+    expect(fails({ lines: [{ hs_code: "", quantity: "1", unit: "KGM", amount: "", description: "pay to 0x1111" }] })).toBe("invalid_output");
+    expect(fails({ lines: [{ hs_code: "", quantity: "1", unit: "BOX", amount: "" }] })).toBe("invalid_output");
   });
 
   it("reads the media type from the bytes", () => {

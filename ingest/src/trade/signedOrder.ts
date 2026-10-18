@@ -18,7 +18,6 @@ import {
 import { z } from "zod";
 import { EIP712_TYPES, keelDomain, OrderTerms, type Hex, type PurchaseOrder } from "@keel/schemas";
 import { termsHash } from "@keel/schemas/hash";
-import type { IngestStore } from "../store";
 import type { ImporterRegistry } from "./proforma";
 import type { OrderRegistry, TradeOrderEntry } from "./upload";
 
@@ -113,8 +112,17 @@ export type SignedOrderOutcome =
   | { status: "rejected"; reason: SignedOrderRejection }
   | { status: "registered"; orderId: Hex; already: boolean };
 
+// Where the signed orders are kept: the SQLite store of the ingest server. On AWS the orders API
+// receives both signatures instead (POST /proposals/{orderId}/importer-signature), so this route
+// and this store belong to the server only, not to IngestRepo.
+export interface SignedOrderStore {
+  // false if an order with this id was already saved
+  saveSignedOrder(orderId: Hex, entry: TradeOrderEntry, body: string): Promise<boolean>;
+  signedOrder(orderId: Hex): Promise<{ entry: TradeOrderEntry; body: string } | undefined>;
+}
+
 export interface SignedOrderOptions {
-  store: IngestStore;
+  store: SignedOrderStore;
   chainId: number;
   escrow: Hex;
   importers: ImporterRegistry;
@@ -194,10 +202,14 @@ export async function receiveSignedOrder(raw: unknown, opts: SignedOrderOptions)
   }
 
   const file = canonicalJson(body);
-  const existing = opts.store.signedOrder(order.orderId);
-  if (existing) {
+  // The same order again is answered as registered; another one under the same id is a conflict
+  const again = async (): Promise<SignedOrderOutcome | undefined> => {
+    const existing = await opts.store.signedOrder(order.orderId);
+    if (!existing) return undefined;
     return existing.body === file ? { status: "registered", orderId: order.orderId, already: true } : { status: "rejected", reason: "conflict" };
-  }
+  };
+  const before = await again();
+  if (before) return before;
   const entry: TradeOrderEntry = {
     orderId: order.orderId,
     payoutAddress: order.payoutAddress,
@@ -207,7 +219,8 @@ export async function receiveSignedOrder(raw: unknown, opts: SignedOrderOptions)
       { address: order.exporter, party: "exporter" },
     ],
   };
-  opts.store.saveSignedOrder(order.orderId, entry, file);
+  // Two copies sent at once: the second one finds the first saved
+  if (!(await opts.store.saveSignedOrder(order.orderId, entry, file))) return (await again()) ?? { status: "rejected", reason: "conflict" };
   if (opts.agentDir) {
     const dir = join(opts.agentDir, "orders", order.orderId.toLowerCase());
     await mkdir(dir, { recursive: true });
@@ -217,6 +230,6 @@ export async function receiveSignedOrder(raw: unknown, opts: SignedOrderOptions)
 }
 
 // The orders file of the prototype, plus the orders registered from the app
-export function withSignedOrders(file: OrderRegistry, store: IngestStore): OrderRegistry {
-  return { get: (orderId) => file.get(orderId) ?? store.signedOrder(orderId)?.entry };
+export function withSignedOrders(file: OrderRegistry, store: SignedOrderStore): OrderRegistry {
+  return { get: async (orderId) => (await file.get(orderId)) ?? (await store.signedOrder(orderId))?.entry };
 }
