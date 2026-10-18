@@ -19,6 +19,7 @@ import {
   signingSetup,
   type OrderCheck,
 } from '@/data/signOrder';
+import { useT } from '@/i18n';
 import { useSession } from '@/session';
 import { AgentNotes } from '@/ui/AgentNotes';
 import { BottomSheet } from '@/ui/BottomSheet';
@@ -36,6 +37,7 @@ import { Bullet, Frame, Row } from './parts';
 // document and gives the last signature. Nothing is signed unless the supplier's signature
 // recovers to the supplier on this very order and the order is the one that was sent.
 export function ImporterReview({ orderId }: { orderId: Hex }) {
+  const t = useT();
   const { signer, address } = useSession();
   const view = useData(async (d) => {
     const proposal = await proposals.get(orderId);
@@ -85,8 +87,8 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
   if (view === undefined) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   if (view === null || !proposal) {
     return (
-      <Frame label="Order">
-        <Text color="textMuted">This order is not on this phone.</Text>
+      <Frame label={t('Order')}>
+        <Text color="textMuted">{t('This order is not on this phone.')}</Text>
       </Frame>
     );
   }
@@ -116,40 +118,40 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
       const move = await importerSigns(proposals, proposal!, { signer, setup, now: Date.now() / 1000 });
       if (!move.ok) setFailed({ checks: move.checks, differences: move.differences ?? [] });
     } catch (e) {
-      setProblem(apiProblem(e) ?? 'The wallet could not sign. Try again.');
+      setProblem(apiProblem(e) ?? t('The wallet could not sign. Try again.'));
     }
     setBusy(false);
   }
 
   const help = !setup
-    ? SIGNING_NOT_SET_UP
+    ? t(SIGNING_NOT_SET_UP)
     : !setup.safe
-      ? SAFE_NOT_SET_UP
+      ? t(SAFE_NOT_SET_UP)
       : !review
-        ? 'Checking the order on this phone.'
+        ? t('Checking the order on this phone.')
         : checks.length > 0
-          ? 'Do not sign this order. Reject it, or ask for a new one.'
+          ? t('Do not sign this order. Reject it, or ask for a new one.')
           : !ticked
-            ? 'Tick the box above to sign with your wallet.'
-            : 'Signs with your wallet. The agent deposits after this.';
+            ? t('Tick the box above to sign with your wallet.')
+            : t('Signs with your wallet. The agent deposits after this.');
 
   const history_ =
     history.different > 0
-      ? { text: `Different from ${history.different === 1 ? 'an earlier order' : `${history.different} earlier orders`} with ${supplier.short}. Check it before you sign.`, tone: 'bad' as const }
+      ? { text: t(history.different === 1 ? 'Different from an earlier order with {name}. Check it before you sign.' : 'Different from {n} earlier orders with {name}. Check it before you sign.', { n: history.different, name: supplier.short }), tone: 'bad' as const }
       : history.same > 0
-        ? { text: `Same account as your last ${history.same === 1 ? 'order' : `${history.same} orders`} with ${supplier.short}`, tone: 'ok' as const }
-        : { text: `First order with ${supplier.short}. Check the account with them.`, tone: 'neutral' as const };
+        ? { text: t(history.same === 1 ? 'Same account as your last order with {name}' : 'Same account as your last {n} orders with {name}', { n: history.same, name: supplier.short }), tone: 'ok' as const }
+        : { text: t('First order with {name}. Check the account with them.', { name: supplier.short }), tone: 'neutral' as const };
 
   return (
     <Frame label={proposal.label}>
       <Text size={28} weight={800} accessibilityRole="header" style={{ marginTop: -8 }}>
-        Review before you sign
+        {t('Review before you sign')}
       </Text>
 
       <View style={{ backgroundColor: colors.surface, borderRadius: radius.card, paddingVertical: 22, paddingHorizontal: 20, gap: 14 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text mono size={12} weight={600} color="textFaint" tracking={1}>
-            PURCHASE ORDER
+            {t('PURCHASE ORDER')}
           </Text>
           <Text mono size={13} color="textMuted">
             {proposal.label}
@@ -157,10 +159,10 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
         </View>
         <View style={{ gap: 4 }}>
           <Text size={22} weight={800} leading={1.2}>
-            {proposal.goods || `Order ${proposal.label}`}
+            {proposal.goods || t('Order {label}', { label: proposal.label })}
           </Text>
           <Text size={14} color="textMuted">
-            From {supplier.name}, {supplier.place}. {incotermText(po.incoterm)}.
+            {t('From {name}, {place}.', { name: supplier.name, place: supplier.place })} {incotermText(po.incoterm)}.
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
@@ -172,11 +174,11 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
           </Text>
         </View>
         <View>
-          {po.advanceBps > 0 ? <Row label="When both sign" value={formatMinor(advance)} mono /> : null}
-          <Row label="When shipment is proven" value={formatMinor(balance)} mono />
-          <Row label="On board by" value={`${deadline}, ${new Date(Number(po.shipmentDeadline) * 1000).getUTCFullYear()}`} />
-          <Row label="Proof of shipment from" value={carrier.name} />
-          <Row label="Disputes settled by" value={arbiter.name} />
+          {po.advanceBps > 0 ? <Row label={t('When both sign')} value={formatMinor(advance)} mono /> : null}
+          <Row label={t('When shipment is proven')} value={formatMinor(balance)} mono />
+          <Row label={t('On board by')} value={`${deadline}, ${new Date(Number(po.shipmentDeadline) * 1000).getUTCFullYear()}`} />
+          <Row label={t('Proof of shipment from')} value={carrier.name} />
+          <Row label={t('Disputes settled by')} value={arbiter.name} />
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.dividerOnSurface }}>
           <View style={{ flex: 1, gap: 2 }}>
@@ -184,14 +186,14 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
               {supplier.short}
             </Text>
             <Text size={13} color="textMuted">
-              {proposal.exporterSignedAt ? `signed ${formatLocalDayTime(proposal.exporterSignedAt)}` : 'signed'}
-              {review && !review.checks.includes('bad_exporter_signature') ? ' (checked)' : ''}
+              {proposal.exporterSignedAt ? t('signed {when}', { when: formatLocalDayTime(proposal.exporterSignedAt) }) : t('signed')}
+              {review && !review.checks.includes('bad_exporter_signature') ? ` ${t('(checked)')}` : ''}
             </Text>
           </View>
           {review && !review.checks.includes('bad_exporter_signature') ? <Icon name="check" size={18} strokeWidth={3} color="money" /> : null}
           <View style={{ width: 80, height: 40, borderRadius: 12, borderWidth: 2, borderStyle: 'dashed', borderColor: colors.control, alignItems: 'center', justifyContent: 'center' }}>
             <Text size={14} weight={800} color="textMuted">
-              You
+              {t('You')}
             </Text>
           </View>
         </View>
@@ -199,37 +201,37 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
 
       <AgentNotes
         notes={view.notes}
-        footer={`${supplier.short} already signed these terms. To change one, reject and send a new order.`}
+        footer={t('{name} already signed these terms. To change one, reject and send a new order.', { name: supplier.short })}
       />
 
       <PayoutPanel
-        heading="Paid only to this account"
+        heading={t('Paid only to this account')}
         holder={supplier.name}
         address={po.payoutAddress}
-        notes={[history_, { text: 'Locked once both sign.', tone: 'neutral' }]}
+        notes={[history_, { text: t('Locked once both sign.'), tone: 'neutral' }]}
       />
 
       <View style={{ gap: 10 }}>
         <Text size={16} weight={800}>
-          Once you sign
+          {t('Once you sign')}
         </Text>
-        <Bullet ok>You sign the terms, you don&apos;t send money. The agent deposits {formatMinor(total)} after both of you sign.</Bullet>
-        <Bullet>The money can only go to the account above, or back to you if there is no proof of shipment by {deadline}.</Bullet>
-        <Bullet>You can&apos;t pull it back on your own. To stop the order, open a dispute or cancel together.</Bullet>
+        <Bullet ok>{t('You sign the terms, you don\'t send money. The agent deposits {amount} after both of you sign.', { amount: formatMinor(total) })}</Bullet>
+        <Bullet>{t('The money can only go to the account above, or back to you if there is no proof of shipment by {date}.', { date: deadline })}</Bullet>
+        <Bullet>{t('You can\'t pull it back on your own. To stop the order, open a dispute or cancel together.')}</Bullet>
       </View>
 
       {checks.length > 0 || failed ? (
         <View style={{ gap: 6 }}>
           {[...new Set([...checks, ...(failed?.checks ?? [])])].map((check) => (
-            <Problem key={check}>{CHECK_WORDS[check]}</Problem>
+            <Problem key={check}>{t(CHECK_WORDS[check])}</Problem>
           ))}
           {[...new Set([...differences, ...(failed?.differences ?? [])])].length > 0 ? (
-            <Problem>Changed since it was sent: {differenceWords([...new Set([...differences, ...(failed?.differences ?? [])])]).join(', ')}</Problem>
+            <Problem>{t('Changed since it was sent: {what}', { what: differenceWords([...new Set([...differences, ...(failed?.differences ?? [])])]).map((w) => t(w)).join(', ') })}</Problem>
           ) : null}
         </View>
       ) : review ? (
         <Text size={13} color="textMuted">
-          Checked on this phone: {supplier.short}&apos;s signature, the terms, the order id and that nothing changed since it was sent.
+          {t('Checked on this phone: {name}\'s signature, the terms, the order id and that nothing changed since it was sent.', { name: supplier.short })}
         </Text>
       ) : null}
       {problem ? (
@@ -239,13 +241,13 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
       ) : null}
 
       <View style={{ gap: 14, paddingTop: 20, borderTopWidth: 1, borderTopColor: colors.divider }}>
-        <Checkbox checked={ticked} onChange={setTicked} label={`These are the terms I agreed with ${supplier.short}.`} />
+        <Checkbox checked={ticked} onChange={setTicked} label={t('These are the terms I agreed with {name}.', { name: supplier.short })} />
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <View style={{ flex: 1 }}>
-            <Button label="Reject" onPress={() => setRejecting(true)} disabled={busy} />
+            <Button label={t('Reject')} onPress={() => setRejecting(true)} disabled={busy} />
           </View>
           <View style={{ flex: 1 }}>
-            <Button label={busy ? 'Signing' : 'Sign'} onPress={sign} disabled={!canSign} />
+            <Button label={busy ? t('Signing') : t('Sign')} onPress={sign} disabled={!canSign} />
           </View>
         </View>
         <Text size={13} color="textFaint" style={{ textAlign: 'center' }}>
@@ -253,19 +255,19 @@ export function ImporterReview({ orderId }: { orderId: Hex }) {
         </Text>
       </View>
 
-      <BottomSheet visible={rejecting} title="Reject this order?" onClose={() => setRejecting(false)}>
+      <BottomSheet visible={rejecting} title={t('Reject this order?')} onClose={() => setRejecting(false)}>
         <View style={{ gap: 12, paddingTop: 6 }}>
           <Text size={14} leading={1.45} color="textMuted">
-            Nothing is signed or paid, and {supplier.short} would need a new order from you.
+            {t('Nothing is signed or paid, and {name} would need a new order from you.', { name: supplier.short })}
           </Text>
           <Button
-            label="Reject the order"
+            label={t('Reject the order')}
             onPress={async () => {
               setRejecting(false);
               await importerRejects(proposals, proposal).catch((e) => setProblem(apiProblem(e) ?? 'The order could not be rejected. Try again.'));
             }}
           />
-          <Button label="Keep reviewing" variant="secondary" onPress={() => setRejecting(false)} />
+          <Button label={t('Keep reviewing')} variant="secondary" onPress={() => setRejecting(false)} />
         </View>
       </BottomSheet>
     </Frame>

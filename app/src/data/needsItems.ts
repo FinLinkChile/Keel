@@ -2,6 +2,7 @@ import type { Hex } from '@keel/schemas';
 import type { Href } from 'expo-router';
 
 import type { KeelData, NeedsYou, Order, Party, Role } from './types';
+import { t } from '../i18n/translate';
 
 // What needs this person, resolved from ids to names, for Home and the notifications. Pure: the
 // data and the check for an order proposed on this phone are passed in.
@@ -45,11 +46,11 @@ export function needsItemHref(item: NeedsItem, role: Role): Href {
 
 export function needsItemText(item: NeedsItem, role: Role): { title: string; detail: string } {
   if (item.kind === 'verify_supplier') {
-    return { title: `Verify ${item.supplier.short}'s account`, detail: 'New supplier, test transfer' };
+    return { title: t('Verify {name}\'s account', { name: item.supplier.short }), detail: t('New supplier, test transfer') };
   }
   const { order, counterparty } = item;
   if (item.kind === 'upload_documents') {
-    return { title: `Upload documents for ${order.label}`, detail: 'Ship, then upload the transport document and the invoice' };
+    return { title: t('Upload documents for {label}', { label: order.label }), detail: t('Ship, then upload the transport document and the invoice') };
   }
   if (item.kind === 'approve_balance') {
     return { title: `Release the balance of ${order.label}`, detail: `${counterparty.short} shipped. You can approve the balance now` };
@@ -58,6 +59,6 @@ export function needsItemText(item: NeedsItem, role: Role): { title: string; det
     return { title: `Cancel ${order.label}?`, detail: `${counterparty.short} signed a cancellation. It takes both signatures` };
   }
   return role === 'importer'
-    ? { title: `Sign ${order.label}`, detail: `${counterparty.short} signed. Yours is the last signature` }
-    : { title: `Review and sign ${order.label}`, detail: `${counterparty.short} sent this order. You sign first` };
+    ? { title: t('Sign {label}', { label: order.label }), detail: t('{name} signed. Yours is the last signature', { name: counterparty.short }) }
+    : { title: t('Review and sign {label}', { label: order.label }), detail: t('{name} sent this order. You sign first', { name: counterparty.short }) };
 }
