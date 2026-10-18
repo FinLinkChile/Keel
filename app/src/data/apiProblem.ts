@@ -31,5 +31,10 @@ const WORDS: Record<string, string> = {
 
 export function apiProblem(e: unknown): string | undefined {
   if (!isApiError(e)) return undefined;
-  return t(WORDS[e.code] ?? 'Something went wrong on our side, try again');
+  return apiProblemFor(e.code);
+}
+
+// The same sentence from an error code alone (the API health notice keeps only the code)
+export function apiProblemFor(code: string): string {
+  return t(WORDS[code] ?? 'Something went wrong on our side, try again');
 }

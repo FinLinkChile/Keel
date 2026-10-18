@@ -5,6 +5,7 @@ import type { Signer, Signers } from '../wallet/signer';
 
 import { tokenToCents } from './amounts';
 import { isApiError, type ApiClient, type Need, type OrderView } from './api';
+import { reportApiFailure, reportApiSuccess } from './apiHealth';
 import { decodeOrder } from './proposals';
 import type { KeelData, NeedsYou, Order, OrderStage, Role } from './types';
 
@@ -67,13 +68,16 @@ export function needFromApi(n: Need): NeedsYou {
 
 const ROLES: readonly Role[] = ['importer', 'exporter'];
 
-// A read that fails (network, server) shows the fallback and says so in the logs, instead of a
-// screen that never finishes loading
+// A read that fails (network, server) shows the fallback instead of a screen that never finishes
+// loading, and reports the failure (apiHealth.ts) so the screens say Keel was not reached
 async function orElse<T>(what: string, read: () => Promise<T>, fallback: () => Promise<T>): Promise<T> {
   try {
-    return await read();
+    const value = await read();
+    reportApiSuccess(what);
+    return value;
   } catch (e) {
     console.warn(`keel api: ${what} failed`, isApiError(e) ? e.code : e);
+    reportApiFailure(what, e);
     return fallback();
   }
 }

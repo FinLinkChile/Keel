@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useData } from '@/data';
 import { LANGUAGES, useLanguage } from '@/i18n';
+import { WalletRegistrations } from '@/orders/WalletRegistrations';
 import { useSession } from '@/session';
 import { Address } from '@/ui/Address';
 import { Avatar } from '@/ui/Avatar';
@@ -91,6 +92,9 @@ export default function Profile() {
           </Text>
         </View>
       ) : null}
+
+      {/* With the Keel API: whether the server knows these wallets, and the address to register */}
+      <WalletRegistrations />
 
       <View style={{ gap: 8 }}>
         <Text size={15} weight={700}>
