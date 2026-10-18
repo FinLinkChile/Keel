@@ -52,6 +52,9 @@ resource "aws_lambda_event_source_mapping" "sqs" {
   event_source_arn = each.value
   function_name    = aws_lambda_function.fn[each.key].arn
   batch_size       = 1
+
+  # botNotify y extractor reportan por mensaje lo que hay que reintentar (envio a Telegram, lectura tomada por otro)
+  function_response_types = contains(["botNotify", "extractor"], each.key) ? ["ReportBatchItemFailures"] : null
 }
 
 resource "aws_lambda_event_source_mapping" "proposals_stream" {

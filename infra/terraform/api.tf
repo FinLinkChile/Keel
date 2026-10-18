@@ -8,7 +8,7 @@ resource "aws_apigatewayv2_api" "http" {
   cors_configuration {
     allow_origins = [var.app_origin]
     allow_methods = ["GET", "POST", "PUT", "OPTIONS"]
-    allow_headers = ["content-type", "x-keel-signer", "x-keel-signature", "x-keel-timestamp"] # nombres de ejemplo
+    allow_headers = ["content-type", "x-keel-signer", "x-keel-signature", "x-keel-timestamp"] # aws/src/auth.ts y schemas API_HEADERS
     max_age       = 600
   }
 }

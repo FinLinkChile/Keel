@@ -1,10 +1,6 @@
 {
   "extends": "../tsconfig.base.json",
-<<<<<<< HEAD
-  // ingest's ambient types: the bot handlers import @keel/bot, whose ingest mappers type-check
-  // against @keel/ingest (same include as bot/tsconfig.json)
-=======
-  // ingest's ambient types, needed because the ingest handlers type-check against @keel/ingest
->>>>>>> worktree-agent-a83ee1e0f8906724e
+  // ingest's ambient types: the ingest handlers and the bot's ingest mappers type-check against
+  // @keel/ingest (same include as bot/tsconfig.json)
   "include": ["src", "scripts", "../ingest/src/types"]
 }

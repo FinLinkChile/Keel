@@ -103,3 +103,13 @@ El mismo servicio firma el PDR del depósito y el `DocumentDecision` del saldo: 
 * **Dónde se limita el depósito:** en la cadena, en el FundingGate: solo órdenes abiertas de esa Safe, con un proveedor conocido (par exportador y cuenta de cobro) y terceros de confianza de sus registros, y dentro del cupo del rol AGENTE en Roles. Sobre el cupo, el nivel 3 exige además la firma del cosignatario.
 * **Dónde se limita el saldo:** en el escrow, que exige además la atestación firmada por la naviera (otra llave) y la ventana de disputa, y paga solo a la `payoutAddress` que ambas partes firmaron en la orden. La llave no puede cambiar a quién se paga.
 * **Camino a producción:** un verificador de documentos con llave y proceso propios, distinto del firmante de política, nombrado en cada orden.
+
+# En AWS **[PROPUESTA]**
+
+En la rama `AWS` el mismo `Agent` corre en una Lambda por Safe ([despliegue en AWS](despliegue-aws.md)), con tres cambios de comportamiento que también valen para `keel agent`:
+
+* **Abre las órdenes.** Una orden guardada con las dos firmas y en estado `NONE` en el escrow se abre con `open(po, sigImporter, sigExporter)`, simulando antes. Sin las dos firmas se ignora, como antes ([decisión abierta 15](../decisiones/abiertas.md)).
+* **Envía las firmas de cierre que recibe la API**, antes de su propio paso: en Embarcado, la aprobación del saldo del importador (solo si su `attestationHash` es el que aceptó el escrow); en Abierto, Anticipo pagado o En disputa, la cancelación firmada por ambas partes si su `cancelNonce` es el actual; en disputa, la resolución del árbitro. Mientras solo el importador firmó la cancelación de una orden Abierta, no la deposita (`CANCEL_PENDING`, sin aviso).
+* **La evidencia se guarda antes de enviar** por un gancho (`AgentDeps.saveEvidence`): en AWS va a S3 con Object Lock; si falla, la orden queda en `AGENT_ERROR` y no se envía nada.
+
+Los datos salen de DynamoDB en lugar de la carpeta `--data` (`aws/src/agent/store.ts`), con el mismo JSON. Pruebas: `engine/src/agent/agent.test.ts` y `aws/src/handlers/*.test.ts`.

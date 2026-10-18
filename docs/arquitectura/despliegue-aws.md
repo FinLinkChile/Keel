@@ -60,3 +60,24 @@ Reglas para las dos etapas:
 * Hoy el bot atiende `/start` y `/status` con textos fijos por polling (`bot/src/main.ts`, `bot/src/adapters/telegram/commands.ts`). Esos dos comandos y el polling se retiran.
 * Quien opera el sistema lo hace desde la app, donde firma la billetera. El bot nunca firma ni decide: sus botones abren la app ([principios](../flujo/principios.md)).
 * Afecta al Área 4, que es dueña del bot y debe confirmarlo. Alta de chats y tope por chat siguen como en [avisos al bot](../interfaces/avisos-al-bot.md).
+
+## Implementación en la rama `AWS` **[PROPUESTA]**
+
+Código del 18 de octubre (Área 5 con Claude, sobre esta propuesta del Área 2). Sin desplegar: todo está probado con DynamoDB, S3, SQS y una cadena simulados, nunca contra una cuenta real.
+
+| Pieza | Dónde |
+| --- | --- |
+| Infraestructura (19 funciones, 27 rutas, 6 tablas, 3 llaves KMS, colas, buckets, alarmas) | `infra/terraform/` |
+| Funciones | `aws/src/handlers/`, empaquetadas con `npm run build -w aws` en `infra/terraform/dist/` |
+| Llaves (KMS o SSM por rol), autenticación de peticiones, configuración, avisos, candado | `aws/src/` |
+| Formas de los items de DynamoDB | `aws/src/tables.ts` |
+| Ganchos del motor para correr fuera del CLI (evidencia antes de enviar, `open`, firmas de cierre, cursor del monitor) | `engine/src/agent/`, `engine/src/monitor/` |
+
+Diferencias con esta propuesta, y por qué:
+
+* **Secretos en Systems Manager, no en Secrets Manager.** SecureString no tiene costo en la cuenta gratuita; Secrets Manager cobra unos 0,40 USD por secreto al mes. Cada función lee solo los suyos (`infra/terraform/locals.tf`).
+* **Llaves por rol en KMS o en SSM.** El código acepta las dos (`KEY_SOURCE_*`). La demo usa SSM porque las direcciones registradas en la cadena son las de las llaves actuales; pasar a KMS exige que el Área 1 registre antes las direcciones de KMS (`setPolicySigner`, `setGuardian`, relayer).
+* **El bot solo envía, y los chats los registra el operador** con `PUT /bot/recipients` (token y auditoría), sin editar archivos. Sin webhook ni ruta desde Telegram.
+* **Un candado por relayer en DynamoDB** además de la cola por Safe: cubre el choque de nonce si un relayer sirve a varias Safes, y no depende de la concurrencia reservada, que una cuenta nueva puede no permitir.
+* **El indexador lee solo los eventos de `TradeEscrow`.** Los de `FundingGate` y `PDRVerifier` quedan pendientes.
+* **La autenticación de peticiones** sigue el patrón de la carga de documentos: [autenticación de la API](../interfaces/autenticacion-api.md).

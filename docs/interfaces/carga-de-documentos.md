@@ -69,3 +69,24 @@ En el prototipo el registro es un archivo. **[ABIERTO]** Quién lo mantiene y si
 # Paquete de documentos
 
 Cuando hay un documento aceptado por cada tipo exigido en la orden, `IngestStore.tradePackage(orderId, requiredDocs)` devuelve el `docsHash` (helper `docsHash` de `@keel/schemas/hash`), el `blNumberHash` y las extracciones. Eso es lo que el motor (Área 2) compara con la orden y con la atestación de la naviera para emitir el `DocumentDecision` del [paso 5](../flujo/paso-5-saldo.md). Si hay dos documentos aceptados del mismo tipo, el paquete queda `ambiguous` y decide una persona.
+
+# En AWS **[PROPUESTA]**
+
+En la rama `AWS` la carga pasa a URL prefirmada de S3 con lectura asíncrona ([despliegue en AWS](../arquitectura/despliegue-aws.md)). La firma `DocumentUpload` y su dominio no cambian; cambian la ruta y la respuesta. Afecta a las Áreas 3 y 4.
+
+`POST /trade/uploads`, sin archivo:
+
+```json
+{ "orderId": "0x…", "docType": "BILL_OF_LADING", "fileHash": "0x…", "size": 482113, "issuedAt": 1791936000, "signature": "0x…" }
+```
+
+* `size` es nuevo: la URL firma el `content-length`, así que se suben exactamente esos bytes (hasta 10 MB).
+* 200 `{ "uploadUrl", "key": "orders/<orderId>/<fileHash>", "expiresIn": 300 }`. La app sube los bytes con `PUT` a `uploadUrl`. Pedir de nuevo una URL para el mismo archivo aún no leído devuelve otra, sin contar para el límite diario.
+* Rechazos: `{ "status": "rejected", "reason" }` con los códigos de arriba; 429 `quarantined` / `rate_limited` al pasar de 10 cargas por orden y día; 409 `duplicate` / `same_file`.
+* El resultado de la lectura llega después como aviso del bot y en `GET /orders/{orderId}` (`documents.fileHashes`), no en esta respuesta.
+
+La lectura la hace una Lambda en cuarentena que recibe el evento de S3. Antes de leer recalcula el keccak256 del archivo: si no es el `fileHash` firmado, borra el objeto y no lee nada. S3 no calcula keccak256, así que ese control vive en el extractor.
+
+`POST /trade/documents` sigue por compatibilidad, con el archivo en base64 (hasta unos 7,5 MB de PDF por el límite de API Gateway), y responde 202 `{ "status": "accepted_for_reading", "orderId", "fileHash" }`.
+
+El registro de órdenes ya no es un archivo: lo escribe la Lambda de alta de orden en la tabla de ingesta (`order#<orderId>` / `entry`) cuando la propuesta tiene las dos firmas. En DynamoDB los límites diarios cuentan por día UTC; en SQLite, las últimas 24 horas.

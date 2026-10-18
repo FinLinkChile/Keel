@@ -130,8 +130,21 @@ resource "aws_s3_bucket_notification" "docs" {
   depends_on = [aws_sqs_queue_policy.extraction]
 
   queue {
-    queue_arn = aws_sqs_queue.extraction.arn
-    events    = ["s3:ObjectCreated:*"]
+    queue_arn     = aws_sqs_queue.extraction.arn
+    events        = ["s3:ObjectCreated:*"]
+    filter_prefix = "orders/" # solo las cargas firmadas; el correo crudo (inbound/) no se lee de nuevo
+  }
+}
+
+# El correo crudo se guarda para revisar un caso, no para siempre (datos personales)
+resource "aws_s3_bucket_lifecycle_configuration" "docs" {
+  bucket = aws_s3_bucket.docs.id
+  rule {
+    id     = "inbound-90-days"
+    status = "Enabled"
+    filter { prefix = "inbound/" }
+    expiration { days = 90 }
+    noncurrent_version_expiration { noncurrent_days = 1 }
   }
 }
 
@@ -260,6 +273,7 @@ resource "aws_ssm_parameter" "config" {
     "safe"         = var.safe_address
     "funding-gate" = var.funding_gate_address
     "escrow"       = var.escrow_address
+    "token"        = var.token_address
   }
 
   name  = "${local.cfg_prefix}/${each.key}"

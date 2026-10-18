@@ -73,3 +73,12 @@ Nunca llegan al chat el dominio del remitente, las cuentas encontradas en un doc
 - **Motor (Área 2):** cómo llegan sus avisos (`payment_held`, `payment_deadline`, `operation_held`, `deadline_approaching`). Cada productor manda su propio código de motivo y un adaptador lo traduce al enum del bot. Esa traducción se acuerda con el Área 2. Para las retenciones de Trade ya hay tres motivos del motor, pedidos por el Área 2 en el PR #50: `FUNDING_BLOCKED` pasa a `funding_blocked`, `SIMULATION_REVERTED` a `simulation_failed`, y `ATTESTATION_UNKNOWN` e `IMPORTER_NOT_REGISTERED` a `agent_data_incomplete`. Llegan solo al dueño y al operador del importador, porque son fallas de su lado, y el mensaje no nombra ningún documento.
 - **Resumen de solicitudes de cambio (Área 3):** alguien en ingesta debe ejecutar `changeDigest` periódicamente (por ejemplo, una vez al día) y mandarlo. Falta acordar si las solicitudes de cambio se avisan además una por una. Hoy el bot acepta las dos cosas, con tope por chat.
 - **Eventos del escrow (Área 1):** el escucha de `OrderOpened`, `OrderFunded`, `AdvanceReleased` y los demás eventos de `TradeEscrow`, cuando exista, entrega por `POST /notices`.
+
+# En AWS **[PROPUESTA]**
+
+En la rama `AWS` los avisos viajan por una cola SQS con el mismo cuerpo de estas dos rutas (`{ kind: "notices", notices }` o `{ kind: "ingest_outcome", payload }`), y la Lambda de envío los manda a Telegram ([despliegue en AWS](../arquitectura/despliegue-aws.md)):
+
+* `POST /notices` y `POST /ingest/outcomes` siguen existiendo para productores externos, con un solo token (`bot_inbound_token`), y solo encolan: responden `202 {"queued":true}`, sin el resultado por aviso.
+* El directorio (cuentas, chats por rol, etiquetas de orden) lo carga el operador con `PUT /bot/recipients` y se lee con `GET /bot/recipients`, con token `bot_admin_token` y la cabecera `x-admin-actor`; cada cambio queda auditado. Si una orden no se registra aquí, los avisos de ingesta de esa orden se descartan (`mapper_failed`) sin avisar a nadie.
+* La deduplicación, el tope por chat (por hora de reloj) y las retenciones quedan en DynamoDB. Un fallo reintentable de Telegram vuelve a la cola solo para los chats pendientes.
+* `open` y `resolve` del agente todavía no tienen aviso: propuesta al Área 4.

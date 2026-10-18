@@ -44,6 +44,12 @@ variable "escrow_address" {
   default     = "0x8346c6F1AfbaFF8140D35116fAF5ec07e4232970"
 }
 
+variable "token_address" {
+  description = "Token de pago del escrow (usdc en el archivo de despliegue: USDC de prueba de Circle)"
+  type        = string
+  default     = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+}
+
 variable "dist_dir" {
   description = "Carpeta con un <funcion>.mjs por funcion, generada por npm run build -w aws"
   type        = string
