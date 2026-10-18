@@ -287,4 +287,47 @@ describe("monitor of use outside the system (T2.8)", () => {
     expect(reasons(await monitor.tick())).toEqual(["GUARDIAN_SET", "SUPPLIER_QUEUED", "THIRD_PARTY_QUEUED", "THIRD_PARTY_QUEUED", "THIRD_PARTY_QUEUED"]);
     expect(await monitor.tick()).toEqual([]);
   });
+
+  it("a process that restarts resumes from the cursor and the pause it persisted", async () => {
+    const [first, second] = [await openOrder(1n), await openOrder(2n)];
+    const start = block + 1n;
+    const before = new Monitor({ chainId: 1, gate, escrow, evidenceDir, fromBlock: start }, { chain: monitorChain(), pauser: pauserFor(guardian.address) });
+    await fund(first, false, ATTACKER);
+    const latest = block;
+    expect(await before.tick()).toMatchObject([{ reason: "UNKNOWN_FUNDING_PDR", action: "paused" }]);
+    // The pause landed after the block it read: the next run sees it
+    expect(before.cursor).toBe(latest + 1n);
+    expect(before.paused).toBe(true);
+
+    // The next run starts where the last one stopped, and does not pause twice
+    await asSafe(gate, chain.calldata("FundingGate", "unpause", []));
+    await fund(second, false, ATTACKER);
+    const after = new Monitor(
+      { chainId: 1, gate, escrow, evidenceDir, fromBlock: before.cursor, pausedHere: before.paused },
+      { chain: monitorChain(), pauser: pauserFor(guardian.address) },
+    );
+    expect(after.paused).toBe(true);
+    const events = await after.tick();
+    // GateUnpaused clears the pause it kept, so the new incident pauses again
+    expect(reasons(events)).toEqual(["GATE_PAUSED", "GATE_UNPAUSED", "UNKNOWN_FUNDING_PDR"]);
+    expect(events[2]).toMatchObject({ action: "paused" });
+  });
+
+  it("asks the evidence hook, not the directory, whether the engine issued a PDR", async () => {
+    const order = await openOrder(1n);
+    await fund(order, false);
+    const asked: Hex[] = [];
+    const monitor = new Monitor(
+      { chainId: 1, gate, escrow, evidenceDir, fromBlock: 1n },
+      {
+        chain: monitorChain(),
+        isIssued: async (hash) => {
+          asked.push(hash);
+          return true;
+        },
+      },
+    );
+    expect(reasons(await monitor.tick())).not.toContain("UNKNOWN_FUNDING_PDR");
+    expect(asked).toHaveLength(1);
+  });
 });

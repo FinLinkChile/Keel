@@ -180,6 +180,11 @@ export function loadDeployment(dir: string, chainId: number): Deployment | null 
     if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw e;
   }
+  return parseDeploymentFile(raw, chainId);
+}
+
+// The same reading for a deployment file already parsed, such as one bundled into a Lambda
+export function parseDeploymentFile(raw: Raw, chainId: number): Deployment {
   // A file copied under another chain's name would anchor to addresses of that other chain
   if (raw.chainId !== chainId) throw new Error(`${chainId}.json says chainId ${raw.chainId ?? "(none)"}, not ${chainId}`);
   const pick = (key: string) => (typeof raw[key] === "string" && isAddress(raw[key], { strict: false }) ? low(raw[key]) : undefined);

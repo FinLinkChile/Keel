@@ -137,10 +137,16 @@ export function toNotices(event: AgentEvent, record: OrderRecord | undefined, st
       if (!shipment) return "ORDER_UNKNOWN";
       return [{ ...base("shipment_accepted"), kind: "shipment_accepted", onBoardDate: Number(shipment.attestation.onBoardDate) }];
     }
+    // Released by the engine's DocumentDecision or by the importer's BalanceApproval: one notice id
     case "releaseBalance":
+    case "approveBalance":
       return [{ ...base("balance_released"), kind: "balance_released", ...amount(total - advance) }];
     case "refundAfterDeadline":
       return total - advance > 0n ? [{ ...base("refunded"), kind: "refunded", ...amount(total - advance) }] : "NOTHING_TO_NOTIFY";
+    // A cancel returns what the escrow still holds: nothing before the deposit, the balance after it
+    case "cancel":
+      return event.state !== "OPEN" && total - advance > 0n ? [{ ...base("refunded"), kind: "refunded", ...amount(total - advance) }] : "NOTHING_TO_NOTIFY";
+    // open and resolve: the bot has no notice for them yet ([PROPUESTA] to Area 4), they are logged
     default:
       return "NOTHING_TO_NOTIFY";
   }
