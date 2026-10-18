@@ -90,6 +90,22 @@ export type ProformaFields = {
   port_of_discharge: string | null;
   // Basis points: 3000 = 30%
   advance_bps: number | null;
+  // Each line of goods, without description: to compare prices per unit. Empty when the
+  // proforma has none, or when one line could not be read.
+  lines: ProformaLine[];
+};
+
+// UN/ECE Recommendation 20 codes, same list as ingest (a test compares both)
+export const PROFORMA_UNITS = ['KGM', 'TNE', 'GRM', 'LBR', 'PCE', 'SET', 'PR', 'DZN', 'CT', 'BG', 'RO', 'LTR', 'MTR', 'MTK', 'MTQ'] as const;
+export type ProformaUnit = (typeof PROFORMA_UNITS)[number];
+
+export type ProformaLine = {
+  hs_code: string | null;
+  // Positive, up to 3 decimals
+  quantity: number;
+  unit: ProformaUnit;
+  // Cents of the proforma currency
+  amount_minor: number | null;
 };
 
 export type ProformaField = keyof ProformaFields;
@@ -106,6 +122,7 @@ export const PROFORMA_FIELDS: readonly ProformaField[] = [
   'port_of_loading',
   'port_of_discharge',
   'advance_bps',
+  'lines',
 ];
 
 // Warnings for the review screen. They never fill a field.
@@ -142,6 +159,16 @@ const REFERENCE = /^[A-Z0-9]{1,20}$/;
 const HS_CODE = /^[0-9]{6,10}$/;
 const LOCODE = /^[A-Z]{2}[A-Z0-9]{3}$/;
 const MAX_HS_CODES = 20;
+const MAX_LINES = 20;
+const isUnit = (v: unknown): v is ProformaUnit => (PROFORMA_UNITS as readonly unknown[]).includes(v);
+const isQuantity = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= 1e12 && Math.round(v * 1000) === v * 1000;
+const isLine = (v: unknown): v is ProformaLine =>
+  isObj(v) &&
+  hasOnly(v, ['hs_code', 'quantity', 'unit', 'amount_minor']) &&
+  nullable(v.hs_code, (c): c is string => isText(c, HS_CODE)) &&
+  isQuantity(v.quantity) &&
+  isUnit(v.unit) &&
+  nullable(v.amount_minor, (a): a is number => isUnix(a) && a > 0);
 
 const isCurrency = (v: unknown): v is Currency => (CURRENCIES as readonly unknown[]).includes(v);
 const isIncoterm = (v: unknown): v is Incoterm => (INCOTERMS as readonly unknown[]).includes(v);
@@ -156,6 +183,8 @@ function readFields(p: unknown): ProformaFields | undefined {
   if (typeof p.mentions_account_change !== 'boolean' || typeof p.hidden_text_detected !== 'boolean') return undefined;
   const hs = p.hs_codes;
   if (!Array.isArray(hs) || hs.length > MAX_HS_CODES || !hs.every((c) => isText(c, HS_CODE))) return undefined;
+  const lines = p.lines;
+  if (!Array.isArray(lines) || lines.length > MAX_LINES || !lines.every(isLine)) return undefined;
   if (
     !nullable(p.proforma_number, isReference) ||
     !nullable(p.issue_date, isUnix) ||
@@ -180,6 +209,7 @@ function readFields(p: unknown): ProformaFields | undefined {
     port_of_loading: p.port_of_loading,
     port_of_discharge: p.port_of_discharge,
     advance_bps: p.advance_bps,
+    lines,
   };
 }
 

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useT } from '@/i18n';
 import { Button } from '@/ui/Button';
 import { Icon } from '@/ui/Icon';
 import { Text } from '@/ui/Text';
@@ -15,13 +16,14 @@ export const goBack = () => (router.canGoBack() ? router.back() : router.replace
 // The screen shell: back, the order label in the middle, content, scroll
 export function Frame({ label, children }: { label: string; children: ReactNode }) {
   const insets = useSafeAreaInsets();
+  const t = useT();
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
       contentContainerStyle={{ paddingTop: Math.max(52, insets.top + 8), paddingBottom: insets.bottom + 32, paddingHorizontal: gutter, gap: 26 }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: -8 }}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={goBack} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('Back')} onPress={goBack} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name="back" size={22} />
         </Pressable>
         <Text mono size={14} color="textMuted" style={{ flex: 1, textAlign: 'center' }}>
@@ -63,6 +65,7 @@ export function Bullet({ ok = false, children }: { ok?: boolean; children: React
 
 // Where an order stands once this person has nothing to sign: signed, waiting, or rejected
 export function StatusView({ label, title, text, goods, tone, onDone }: { label: string; title: string; text: string; goods: string; tone: 'done' | 'wait' | 'no'; onDone: () => void }) {
+  const t = useT();
   return (
     <Frame label={label}>
       <View style={{ alignItems: 'center', gap: 12, paddingVertical: 32 }}>
@@ -79,7 +82,7 @@ export function StatusView({ label, title, text, goods, tone, onDone }: { label:
           {goods}
         </Text>
       </View>
-      <Button label="Done" onPress={onDone} />
+      <Button label={t('Done')} onPress={onDone} />
     </Frame>
   );
 }

@@ -34,7 +34,7 @@ Lo mismo vale para una decisión de negocio, de alcance o de seguridad: consulta
 
 ## Reglas de trabajo
 
-- No hay LLM operativo. El único LLM es el extractor en cuarentena, sin herramientas y con un esquema de salida sin texto libre.
+- No hay LLM operativo. El único LLM es el extractor en cuarentena, sin herramientas y con un esquema de salida sin texto libre. **[PROPUESTA, por confirmar por el equipo]:** fuera del flujo de pago, un analista de nivel 0 puede leer métricas calculadas de las órdenes (sin documentos ni nombres) y aconsejar; no firma, no decide ni mueve dinero (`docs/arquitectura/analista.md`).
 - Las llaves nunca entran al repositorio. La llave del dueño nunca vive en un servidor.
 - Sin sobreafirmaciones: cada afirmación de seguridad dice para quién vale, dónde se hace cumplir y qué prueba la demuestra.
 - Lo que se entrega al jurado va en inglés. El trabajo interno puede ir en español.

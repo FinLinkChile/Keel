@@ -40,7 +40,14 @@ export function withProposals(base: KeelData, store: ProposalStore): KeelData {
     needsYou: async (role) => {
       const mine = (await store.list()).filter((p) => WAITING_ON[p.status] === role);
       const items = mine.map((p): NeedsYou => ({ kind: 'sign_order', orderId: p.orderId }));
-      return [...items, ...(await base.needsYou(role))];
+      // The importer gave the last signature on this phone, so its refusal is told to the importer
+      const refused =
+        role === 'importer'
+          ? (await store.list())
+              .filter((p) => p.status === 'signed' && p.ingestRegisteredAt === undefined && p.ingestRefusal)
+              .map((p): NeedsYou => ({ kind: 'register_order', orderId: p.orderId, reason: p.ingestRefusal?.reason }))
+          : [];
+      return [...items, ...refused, ...(await base.needsYou(role))];
     },
   };
 }

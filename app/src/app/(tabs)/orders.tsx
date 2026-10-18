@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useData, type KeelData, type Order, type Party, type Role } from '@/data';
 import { isClosed, orderLine } from '@/data/orderLine';
+import { useT } from '@/i18n';
 import { useSession } from '@/session';
 import { Avatar } from '@/ui/Avatar';
 import { Icon } from '@/ui/Icon';
@@ -20,6 +21,7 @@ const RECENT = 30 * 24 * 3600;
 
 // 14 Orders: every order of your company, in progress first, with one status word each.
 export default function Orders() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const { role } = useSession();
   const [tab, setTab] = useState<Tab>('open');
@@ -37,13 +39,13 @@ export default function Orders() {
     >
       <View style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Text size={28} weight={800} accessibilityRole="header">
-          Orders
+          {t('Orders')}
         </Text>
         {/* Only the importer opens orders */}
         {role === 'importer' ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="New order"
+            accessibilityLabel={t('New order')}
             onPress={() => router.push('/new-order')}
             style={({ pressed }) => ({
               width: 44,
@@ -61,26 +63,26 @@ export default function Orders() {
       </View>
 
       <Segmented
-        accessibilityLabel="Orders"
+        accessibilityLabel={t('Orders')}
         value={tab}
         onChange={setTab}
         options={[
-          { value: 'open', label: 'In progress', count: open.length },
-          { value: 'closed', label: 'Closed', count: closed.length },
+          { value: 'open', label: t('In progress'), count: open.length },
+          { value: 'closed', label: t('Closed'), count: closed.length },
         ]}
       />
 
       {tab === 'open' ? (
         <>
-          <List rows={open} role={role} now={now} avatars empty="No orders in progress." />
+          <List rows={open} role={role} now={now} avatars empty={t('No orders in progress.')} />
           {recent.length > 0 ? (
             <View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
                 <Text size={18} weight={700} color="textMuted" accessibilityRole="header">
-                  Recently closed
+                  {t('Recently closed')}
                 </Text>
                 <Text size={13} color="textFaint">
-                  last 30 days
+                  {t('last 30 days')}
                 </Text>
               </View>
               <List rows={recent} role={role} now={now} />
@@ -88,7 +90,7 @@ export default function Orders() {
           ) : null}
         </>
       ) : (
-        <List rows={closed} role={role} now={now} empty="No closed orders yet." />
+        <List rows={closed} role={role} now={now} empty={t('No closed orders yet.')} />
       )}
     </ScrollView>
   );

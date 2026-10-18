@@ -15,11 +15,14 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { AppState, View } from 'react-native';
 
+import { syncOrdersWithIngest } from '@/data';
+import { LanguageProvider } from '@/i18n';
 import { SessionProvider } from '@/session';
 import { Splash } from '@/ui/Splash';
 import { colors } from '@/ui/theme';
+import { ThemeProvider, useTheme } from '@/ui/ThemeProvider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -47,19 +50,40 @@ export default function RootLayout() {
   if (!loaded && !error) return null;
 
   return (
-    <SessionProvider>
-      <StatusBar style="light" />
-      <View style={{ flex: 1, backgroundColor: colors.bg }}>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
-        {opening ? (
-          <Splash
-            onDone={() => {
+    <LanguageProvider>
+      <SessionProvider>
+        <ThemeProvider>
+          <Shell
+            opening={opening}
+            onOpened={() => {
               openingPlayed = true;
               setOpening(false);
             }}
           />
-        ) : null}
+        </ThemeProvider>
+      </SessionProvider>
+    </LanguageProvider>
+  );
+}
+
+// Drawn again whenever the theme changes, so it reads the new palette
+function Shell({ opening, onOpened }: { opening: boolean; onOpened: () => void }) {
+  const { mode } = useTheme();
+  // Signed orders ingest has not taken yet go again when the app opens or comes back
+  useEffect(() => {
+    void syncOrdersWithIngest();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void syncOrdersWithIngest();
+    });
+    return () => sub.remove();
+  }, []);
+  return (
+    <>
+      <StatusBar style={mode === 'light' ? 'dark' : 'light'} />
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+        {opening ? <Splash onDone={onOpened} /> : null}
       </View>
-    </SessionProvider>
+    </>
   );
 }

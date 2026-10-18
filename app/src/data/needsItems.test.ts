@@ -59,4 +59,21 @@ describe('notifications', () => {
     expect(items.map((i) => needsItemHref(i, 'exporter'))).toEqual([{ pathname: '/order/[orderId]', params: { orderId: EXAMPLE } }, '/suppliers']);
     expect(needsItemText(items[1]!, 'importer').title).toBe("Verify Kowloon's account");
   });
+
+  it('tells the importer why ingest refused an order, and opens the notifications', async () => {
+    const [known, unknown] = await loadNeedsItems(
+      data([
+        { kind: 'register_order', orderId: PROPOSED, reason: 'unknown_importer' },
+        { kind: 'register_order', orderId: EXAMPLE, reason: 'something_new' },
+      ]),
+      'importer',
+      isProposed,
+    );
+    expect(needsItemHref(known!, 'importer')).toBe('/notifications');
+    expect(needsItemText(known!, 'importer')).toEqual({
+      title: 'PO-0160 is not registered yet',
+      detail: 'Keel does not know your company yet. Ask Keel to register it; the app tries again',
+    });
+    expect(needsItemText(unknown!, 'importer').detail).toBe('Keel could not register it. It tries again when you open the app');
+  });
 });

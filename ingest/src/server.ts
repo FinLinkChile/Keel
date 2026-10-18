@@ -20,16 +20,18 @@ import { receiveEmail, type EmailOutcome } from "./email/receive";
 import type { AliasTable } from "./parser";
 import { MAX_PDF_BYTES } from "./pdf/text";
 import { receiveTradeDocument, type TradeOutcome } from "./trade/receive";
-import { receiveProforma, staticImporters, type ImporterRegistry, type ProformaOutcome } from "./trade/proforma";
-import { staticOrders, type OrderRegistry, type TradeOrderEntry } from "./trade/upload";
+import { receiveProforma, staticImporters, type ImporterRegistry, type ProformaOutcome, type ProformaRejection } from "./trade/proforma";
+import { MAX_INPUT_BYTES, receiveInsights, type InsightsOutcome } from "./trade/insights";
+import { staticOrders, type OrderRegistry, type TradeOrderEntry, type UploadRejection } from "./trade/upload";
 import { baseUrlsFromEnv, initialSettings, keysFromEnv, SettingsError, SettingsStore, type SettingsAudit } from "./settings";
+import type { IngestRepo } from "./repo";
 import { IngestStore } from "./store";
 
-const MIN_TOKEN_LENGTH = 32;
-const MAX_ADMIN_BODY_BYTES = 16 * 1024;
+export const MIN_TOKEN_LENGTH = 32;
+export const MAX_ADMIN_BODY_BYTES = 16 * 1024;
 // A base64 PDF of MAX_PDF_BYTES plus the JSON envelope
-const MAX_TRADE_BODY_BYTES = Math.ceil((MAX_PDF_BYTES * 4) / 3) + 16 * 1024;
-const ACTOR_RE = /^[\w.@+-]{1,64}$/;
+export const MAX_TRADE_BODY_BYTES = Math.ceil((MAX_PDF_BYTES * 4) / 3) + 16 * 1024;
+export const ACTOR_RE = /^[\w.@+-]{1,64}$/;
 
 const hex = (bytes: number) =>
   z
@@ -42,21 +44,23 @@ const destination = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("bank_account"), value: z.string().regex(/^[0-9A-Z]{6,34}$/) }).strict(),
 ]);
 
-const OrdersSchema = z.array(
-  z
-    .object({
-      orderId: hex(32),
-      payoutAddress: hex(20),
-      carrier: hex(20),
-      uploaders: z
-        .array(z.object({ address: hex(20), party: z.enum(["importer", "exporter"]) }).strict())
-        .min(1),
-      knownDestinations: z.array(destination).optional(),
-    })
-    .strict(),
-);
+// One order as ingest knows it (TradeOrderEntry): from the orders file, or from the ingest
+// table on AWS, where the orders API writes it
+export const TradeOrderEntrySchema = z
+  .object({
+    orderId: hex(32),
+    payoutAddress: hex(20),
+    carrier: hex(20),
+    uploaders: z
+      .array(z.object({ address: hex(20), party: z.enum(["importer", "exporter"]) }).strict())
+      .min(1),
+    knownDestinations: z.array(destination).optional(),
+  })
+  .strict();
 
-const TradeUploadBody = z
+const OrdersSchema = z.array(TradeOrderEntrySchema);
+
+export const TradeUploadBody = z
   .object({
     orderId: hex(32),
     docType: z.string().max(32),
@@ -67,7 +71,16 @@ const TradeUploadBody = z
   })
   .strict();
 
-const ProformaUploadBody = z
+const InsightsBody = z
+  .object({
+    issuedAt: z.number().int().positive(),
+    signature: z.string().regex(/^0x[0-9a-fA-F]{130}$/),
+    // The metrics as JSON text, exactly as signed
+    input: z.string().max(MAX_INPUT_BYTES),
+  })
+  .strict();
+
+export const ProformaUploadBody = z
   .object({
     issuedAt: z.number().int().positive(),
     signature: z.string().regex(/^0x[0-9a-fA-F]{130}$/),
@@ -78,7 +91,7 @@ const ProformaUploadBody = z
 
 const ImportersSchema = z.array(hex(20));
 
-const AliasTableSchema = z.array(
+export const AliasTableSchema = z.array(
   z
     .object({
       alias: z.enum(ALIAS_IDS),
@@ -103,6 +116,25 @@ const AliasTableSchema = z.array(
     })
     .strict(),
 );
+
+// HTTP status of each refusal, the same on the local server and on AWS
+export const TRADE_REJECTION_STATUS: Record<UploadRejection, number> = {
+  too_large: 413,
+  unknown_order: 404,
+  unknown_doc_type: 400,
+  bad_signature: 401,
+  stale_signature: 401,
+  not_a_party: 403,
+};
+
+export const PROFORMA_REJECTION_STATUS: Record<ProformaRejection, number> = {
+  too_large: 413,
+  unsupported_media: 415,
+  bad_signature: 401,
+  stale_signature: 401,
+  not_an_importer: 403,
+  rate_limited: 429,
+};
 
 export class ServerConfigError extends Error {
   override name = "ServerConfigError";
@@ -147,12 +179,19 @@ export interface ProformaLogEntry {
   reason?: string;
 }
 
+export interface InsightsLogEntry {
+  at: string;
+  kind: "trade_insights";
+  status: InsightsOutcome["status"];
+  reason?: string;
+}
+
 export interface ServerDeps {
   webhookToken: string;
   adminToken?: string;
   aliases: AliasTable;
   settings: SettingsStore;
-  store: IngestStore;
+  store: IngestRepo;
   resolver?: DNSResolver;
   // Keel Trade uploads. Without it the routes do not exist.
   trade?: { orders: OrderRegistry; chainId: number; importers?: ImporterRegistry };
@@ -161,7 +200,7 @@ export interface ServerDeps {
   // The app's origin (Area 4), e.g. https://app.keel.example. Only the trade routes answer CORS.
   appOrigin?: string;
   // The activity log. Receives typed fields only, never message content.
-  log?: (entry: LogEntry | SettingsAudit | TradeLogEntry | ProformaLogEntry) => void;
+  log?: (entry: LogEntry | SettingsAudit | TradeLogEntry | ProformaLogEntry | InsightsLogEntry) => void;
 }
 
 const digest = (s: string) => createHash("sha256").update(s).digest();
@@ -261,8 +300,7 @@ export function createHandler(deps: ServerDeps): RequestListener {
     log({ at: new Date().toISOString(), kind: "trade_document", orderId: body.orderId, fileHash, status: outcome.status, reason });
     deps.bot?.send({ source: "trade_upload", outcome });
     if (outcome.status === "rejected") {
-      const code = { too_large: 413, unknown_order: 404, unknown_doc_type: 400, bad_signature: 401, stale_signature: 401, not_a_party: 403 }[outcome.reason];
-      return reply(res, code, { status: "rejected", reason: outcome.reason });
+      return reply(res, TRADE_REJECTION_STATUS[outcome.reason], { status: "rejected", reason: outcome.reason });
     }
     reply(res, 200, outcome);
   };
@@ -287,9 +325,30 @@ export function createHandler(deps: ServerDeps): RequestListener {
     const fileHash = "fileHash" in outcome ? outcome.fileHash : undefined;
     log({ at: new Date().toISOString(), kind: "trade_proforma", fileHash, status: outcome.status, reason });
     if (outcome.status === "rejected") {
-      const code = { too_large: 413, unsupported_media: 415, bad_signature: 401, stale_signature: 401, not_an_importer: 403, rate_limited: 429 }[
-        outcome.reason
-      ];
+      return reply(res, PROFORMA_REJECTION_STATUS[outcome.reason], outcome);
+    }
+    reply(res, 200, outcome);
+  };
+
+  // The agent's analysis of the importer's purchases: a report, nothing is decided here
+  const insights = async (req: IncomingMessage, res: ServerResponse, trade: NonNullable<ServerDeps["trade"]>) => {
+    const raw = await readBody(req, MAX_INPUT_BYTES * 2);
+    if (raw === null) return reply(res, 413, { error: "too_large" });
+    let body: z.infer<typeof InsightsBody>;
+    try {
+      body = InsightsBody.parse(JSON.parse(raw.toString("utf8")));
+    } catch {
+      return reply(res, 400, { error: "invalid_request" });
+    }
+    const outcome = await receiveInsights(
+      { issuedAt: body.issuedAt, signature: body.signature as `0x${string}`, input: body.input },
+      trade.importers ?? staticImporters([]),
+      await deps.settings.getExtractor(),
+      { store: deps.store, chainId: trade.chainId },
+    );
+    log({ at: new Date().toISOString(), kind: "trade_insights", status: outcome.status, reason: "reason" in outcome ? String(outcome.reason) : undefined });
+    if (outcome.status === "rejected") {
+      const code = { too_large: 413, invalid_request: 400, bad_signature: 401, stale_signature: 401, not_an_importer: 403, rate_limited: 429 }[outcome.reason];
       return reply(res, code, outcome);
     }
     reply(res, 200, outcome);
@@ -331,7 +390,7 @@ export function createHandler(deps: ServerDeps): RequestListener {
     try {
       if (req.url === "/inbound" && req.method === "POST") return await inbound(req, res);
       if (req.url === "/admin/settings" && deps.adminToken) return await admin(req, res, deps.adminToken);
-      if ((req.url === "/trade/documents" || req.url === "/trade/proforma") && deps.trade) {
+      if ((req.url === "/trade/documents" || req.url === "/trade/proforma" || req.url === "/trade/insights") && deps.trade) {
         cors(req, res);
         if (req.method === "OPTIONS" && deps.appOrigin) {
           res.writeHead(204, {
@@ -342,6 +401,7 @@ export function createHandler(deps: ServerDeps): RequestListener {
           return res.end();
         }
         if (req.method === "POST" && req.url === "/trade/documents") return await tradeUpload(req, res, deps.trade);
+        if (req.method === "POST" && req.url === "/trade/insights") return await insights(req, res, deps.trade);
         if (req.method === "POST") return await proformaUpload(req, res, deps.trade);
       }
       reply(res, 404, { error: "not_found" });
@@ -375,7 +435,7 @@ export async function startServer(env: Record<string, string | undefined> = proc
     const importers = [...orders.flatMap((o) => o.uploaders.filter((u) => u.party === "importer").map((u) => u.address)), ...extra];
     trade = { orders: staticOrders(orders), chainId, importers: staticImporters(importers) };
   }
-  const log = (entry: LogEntry | SettingsAudit | TradeLogEntry | ProformaLogEntry | BotLogEntry) => console.log(JSON.stringify(entry));
+  const log = (entry: LogEntry | SettingsAudit | TradeLogEntry | ProformaLogEntry | InsightsLogEntry | BotLogEntry) => console.log(JSON.stringify(entry));
   const bot = botNotifierFromEnv(env, log);
   const settings = await SettingsStore.open({
     fallback: initialSettings(env),

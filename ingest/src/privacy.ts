@@ -19,7 +19,8 @@ export const PII_PATTERNS: Record<string, string> = {
   tarjeta: String.raw`\b(?:\d[ -]?){13,19}\b`,
 };
 
-export const LLM_PURPOSES = ["extraccion_factura", "extraccion_documento_comercio", "extraccion_proforma"] as const;
+// analisis_compras: the analyst gets aggregated metrics of the company's orders, no document
+export const LLM_PURPOSES = ["extraccion_factura", "extraccion_documento_comercio", "extraccion_proforma", "analisis_compras"] as const;
 export type LlmPurpose = (typeof LLM_PURPOSES)[number];
 
 const kit = PrivacyKit.fromObject({

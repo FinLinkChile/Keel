@@ -43,6 +43,7 @@ const reading = (): ProformaReading => ({
     port_of_loading: 'CNNGB',
     port_of_discharge: 'CLSAI',
     advance_bps: 3000,
+    lines: [],
   },
   missing: [],
   mentionsAccountChange: false,
