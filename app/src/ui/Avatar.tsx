@@ -4,6 +4,8 @@ import { initials } from './format';
 import { Text } from './Text';
 import { colors } from './theme';
 
+import { useT } from '@/i18n';
+
 type Props = {
   name: string;
   // Index into the avatar palette, fixed per party. Omitted for your own company.
@@ -16,10 +18,11 @@ type Props = {
 };
 
 export function Avatar({ name, tint, size = 44, you = false, ringColor }: Props) {
+  const t = useT();
   if (you) {
     return (
       <View
-        accessibilityLabel="You"
+        accessibilityLabel={t('You')}
         style={{
           width: size,
           height: size,
@@ -33,7 +36,7 @@ export function Avatar({ name, tint, size = 44, you = false, ringColor }: Props)
         }}
       >
         <Text size={11} weight={800}>
-          You
+          {t('You')}
         </Text>
       </View>
     );

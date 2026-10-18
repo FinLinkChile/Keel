@@ -30,6 +30,7 @@ import {
   type ScreenForm,
 } from '@/data/newOrderForm';
 import { pickProforma, type ProformaSource } from '@/files/pickProforma';
+import { useT } from '@/i18n';
 import { readProforma, type ProformaReading, type ProformaResult } from '@/ingest/proforma';
 import { useSession } from '@/session';
 import { AgentNotes } from '@/ui/AgentNotes';
@@ -53,12 +54,6 @@ export default function NewOrder() {
 }
 
 const INCOTERMS: Incoterm[] = ['EXW', 'FOB', 'CIF', 'CFR'];
-const ADVANCES: { value: AdvanceChoice; label: string }[] = [
-  { value: '0', label: '0%' },
-  { value: '30', label: '30%' },
-  { value: '50', label: '50%' },
-  { value: 'other', label: 'Other' },
-];
 const CURRENCIES = ['USD', 'EUR', 'CNY', 'HKD'] as const;
 const DOC_WORDS = { BILL_OF_LADING: 'B/L', AIR_WAYBILL: 'AWB', COMMERCIAL_INVOICE: 'invoice' } as const;
 
@@ -68,6 +63,7 @@ type Proforma = { name: string; fileHash: Hex; reading?: ProformaReading };
 type Blocked = { fields: FormField[]; problems: Extract<BuiltOrder, { kind: 'blocked' }>['problems'] };
 
 function NewOrderScreen() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const { signer } = useSession();
   const data = useData(async (d) => {
@@ -112,7 +108,7 @@ function NewOrderScreen() {
     setNotice(undefined);
     const file = await pickProforma(source);
     if (file === null) return;
-    if (file === 'denied') return setNotice(proformaNotice('denied').text);
+    if (file === 'denied') return setNotice(t(proformaNotice('denied').text));
     setStep('signing');
     setPhase('reading');
     const result = await readProforma({
@@ -143,7 +139,7 @@ function NewOrderScreen() {
       setBlocked(undefined);
       setPhase('form');
     } else {
-      setNotice(proformaNotice(result).text);
+      setNotice(t(proformaNotice(result).text));
       // A proforma that was already read stays in use
       setPhase(stored ? 'form' : 'empty');
     }
@@ -202,14 +198,14 @@ function NewOrderScreen() {
       <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: -8 }}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Back"
+          accessibilityLabel={t('Back')}
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))}
           style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
         >
           <Icon name="back" size={22} />
         </Pressable>
         <Text size={20} weight={700} accessibilityRole="header" style={{ flex: 1, textAlign: 'center' }}>
-          New order
+          {t('New order')}
         </Text>
         <View style={{ width: 44 }} />
       </View>
@@ -219,7 +215,7 @@ function NewOrderScreen() {
           suppliers={data.suppliers}
           known={data.known}
           selected={supplier}
-          notice={blocked?.fields.includes('supplier') ? { tone: 'error', text: FIELD_WORDS.supplier } : undefined}
+          notice={blocked?.fields.includes('supplier') ? { tone: 'error', text: t(FIELD_WORDS.supplier) } : undefined}
           onSelect={(supplierId) => patch({ supplierId })}
         />
       ) : null}
@@ -230,7 +226,7 @@ function NewOrderScreen() {
           <View style={{ alignItems: 'center', gap: 14 }}>
             <Pressable accessibilityRole="button" onPress={stored ? () => setPhase('form') : fillByHand} hitSlop={8}>
               <Text size={15} weight={700} style={{ textDecorationLine: 'underline' }}>
-                {stored ? 'Back to the order' : 'No proforma? Fill in by hand'}
+                {stored ? t('Back to the order') : t('No proforma? Fill in by hand')}
               </Text>
             </Pressable>
           </View>
@@ -239,7 +235,7 @@ function NewOrderScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }}>
           <ActivityIndicator color={colors.accent} />
           <Text size={15} color="textMuted">
-            {step === 'signing' ? 'Signing the upload' : 'The agent is reading the proforma'}
+            {step === 'signing' ? t('Signing the upload') : t('The agent is reading the proforma')}
           </Text>
         </View>
       ) : form && data ? (
@@ -265,6 +261,7 @@ function NewOrderScreen() {
 
 // 03a: nothing uploaded yet
 function UploadBlock({ notice, disabled, onPick }: { notice?: string; disabled: boolean; onPick: (s: ProformaSource) => void }) {
+  const t = useT();
   return (
     <View
       style={{
@@ -313,10 +310,10 @@ function UploadBlock({ notice, disabled, onPick }: { notice?: string; disabled: 
         </View>
       </View>
       <Text size={24} weight={800} accessibilityRole="header" style={{ marginTop: 4 }}>
-        Upload the proforma
+        {t('Upload the proforma')}
       </Text>
       <Text size={15} leading={1.5} color="textMuted" style={{ textAlign: 'center', maxWidth: 280 }}>
-        The agent reads the goods, amount, dates and terms. You check them before anyone signs.
+        {t('The agent reads the goods, amount, dates and terms. You check them before anyone signs.')}
       </Text>
       {notice ? (
         <Text size={14} leading={1.45} style={{ color: colors.danger, textAlign: 'center' }}>
@@ -324,11 +321,11 @@ function UploadBlock({ notice, disabled, onPick }: { notice?: string; disabled: 
         </Text>
       ) : null}
       <View style={{ flexDirection: 'row', gap: 10, alignSelf: 'stretch', marginTop: 8 }}>
-        <PillButton label="Choose file" icon="orders" filled disabled={disabled} onPress={() => onPick('file')} />
-        <PillButton label="Scan" icon="camera" disabled={disabled} onPress={() => onPick('camera')} />
+        <PillButton label={t('Choose file')} icon="orders" filled disabled={disabled} onPress={() => onPick('file')} />
+        <PillButton label={t('Scan')} icon="camera" disabled={disabled} onPress={() => onPick('camera')} />
       </View>
       <Text size={13} color="textFaint">
-        PDF up to 10 MB, photo up to 5 MB
+        {t('PDF up to 10 MB, photo up to 5 MB')}
       </Text>
     </View>
   );
@@ -380,6 +377,13 @@ type FormProps = {
 
 // 03: the order from the proforma
 function OrderForm({ proforma, notice, form, patch, carrier, supplierName, blocked, notes, onReplace, onSend }: FormProps) {
+  const t = useT();
+  const ADVANCES: { value: AdvanceChoice; label: string }[] = [
+    { value: '0', label: '0%' },
+    { value: '30', label: '30%' },
+    { value: '50', label: '50%' },
+    { value: 'other', label: t('Other') },
+  ];
   const reading = proforma?.reading;
   const [editing, setEditing] = useState(false);
   const [showMore, setShowMore] = useState(false);
@@ -398,8 +402,8 @@ function OrderForm({ proforma, notice, form, patch, carrier, supplierName, block
   const failed = (field: FormField) => !!blocked?.fields.includes(field);
   // A blocked field says why; one the proforma did not print says so until it is filled in
   const noticeOf = (field: FormField): FieldNotice | undefined => {
-    if (failed(field)) return { tone: 'error', text: FIELD_WORDS[field] };
-    if (marks.includes(field) && blank[field]) return { tone: 'missing', text: NOT_ON_PROFORMA };
+    if (failed(field)) return { tone: 'error', text: t(FIELD_WORDS[field]) };
+    if (marks.includes(field) && blank[field]) return { tone: 'missing', text: t(NOT_ON_PROFORMA) };
     return undefined;
   };
   // A term opens for editing when the importer asked, when it is empty or when it blocked the order
@@ -412,10 +416,10 @@ function OrderForm({ proforma, notice, form, patch, carrier, supplierName, block
   if (split) {
     advanceLine =
       bps === 0
-        ? `Nothing on signing. ${formatMinor(split.onShipment)} when shipment is proven.`
-        : `${formatMinor(split.onSigning)} on signing, ${formatMinor(split.onShipment)} when shipment is proven.`;
+        ? t('Nothing on signing. {amount} when shipment is proven.', { amount: formatMinor(split.onShipment) })
+        : t('{signing} on signing, {shipment} when shipment is proven.', { signing: formatMinor(split.onSigning), shipment: formatMinor(split.onShipment) });
   } else if (form.advance === 'other') {
-    advanceLine = 'Type the percentage you agreed.';
+    advanceLine = t('Type the percentage you agreed.');
   }
 
   const currencyHidden = form.currency === 'USD';
@@ -440,21 +444,21 @@ function OrderForm({ proforma, notice, form, patch, carrier, supplierName, block
           <DocumentMark ok={!!reading} />
           <View style={{ flex: 1, gap: 2 }}>
             <Text size={15} weight={700} numberOfLines={1}>
-              {proforma ? proforma.name : 'No proforma yet'}
+              {proforma ? proforma.name : t('No proforma yet')}
             </Text>
             <Text size={13} color="textMuted">
-              {reading ? termsReadLine(reading) : proforma ? 'Uploaded. The agent could not read it.' : 'Add it before you send'}
+              {reading ? termsReadLine(reading) : proforma ? t('Uploaded. The agent could not read it.') : t('Add it before you send')}
             </Text>
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel={proforma ? 'Replace the proforma' : 'Add the proforma'} hitSlop={8} onPress={onReplace} style={{ flexShrink: 0 }}>
+          <Pressable accessibilityRole="button" accessibilityLabel={proforma ? t('Replace the proforma') : t('Add the proforma')} hitSlop={8} onPress={onReplace} style={{ flexShrink: 0 }}>
             <Text size={14} weight={700} numberOfLines={1} style={{ textDecorationLine: 'underline' }}>
-              {proforma ? 'Replace' : 'Add'}
+              {proforma ? t('Replace') : t('Add')}
             </Text>
           </Pressable>
         </View>
         {failed('documentHash') ? (
           <Text size={13} style={{ color: colors.danger }}>
-            {FIELD_WORDS.documentHash}
+            {t(FIELD_WORDS.documentHash)}
           </Text>
         ) : null}
         {notice ? (
@@ -462,21 +466,21 @@ function OrderForm({ proforma, notice, form, patch, carrier, supplierName, block
             {notice}
           </Text>
         ) : null}
-        {proforma && !reading ? <Warning>The agent could not read this file. Fill in the terms by hand.</Warning> : null}
+        {proforma && !reading ? <Warning>{t('The agent could not read this file. Fill in the terms by hand.')}</Warning> : null}
       </View>
 
       <AgentNotes
         notes={notes}
         onApply={(note) => note.suggestion && patch(advanceFrom(note.suggestion.value))}
-        footer="The agent compares this order with your company's orders. It suggests; you decide and sign."
+        footer={t('The agent compares this order with your company\'s orders. It suggests; you decide and sign.')}
       />
 
       <View style={{ gap: 10 }}>
         <TextInput
-          accessibilityLabel="Goods"
+          accessibilityLabel={t('Goods')}
           value={form.goods}
           onChangeText={(goods) => patch({ goods })}
-          placeholder="What is being bought"
+          placeholder={t('What is being bought')}
           placeholderTextColor={colors.textFaint}
           selectionColor={colors.accent}
           multiline
@@ -484,7 +488,7 @@ function OrderForm({ proforma, notice, form, patch, carrier, supplierName, block
         />
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
           <TextInput
-            accessibilityLabel={form.currency ? `Total, ${form.currency}` : 'Total'}
+            accessibilityLabel={form.currency ? t('Total, {currency}', { currency: form.currency }) : t('Total')}
             value={form.amountText}
             onChangeText={(amountText) => patch({ amountText })}
             placeholder="0.00"
@@ -504,18 +508,18 @@ function OrderForm({ proforma, notice, form, patch, carrier, supplierName, block
 
       <View style={{ gap: 12 }}>
         <Text size={18} weight={800}>
-          Advance when both sign
+          {t('Advance when both sign')}
         </Text>
         <Segmented
           options={ADVANCES}
           value={form.advance ?? ('' as AdvanceChoice)}
           onChange={(advance) => patch({ advance })}
-          accessibilityLabel="Advance"
+          accessibilityLabel={t('Advance')}
           role="radiogroup"
         />
         {form.advance === 'other' ? (
           <Field
-            label="Advance, %"
+            label={t('Advance, %')}
             mono
             keyboardType="decimal-pad"
             value={form.advanceOther}
@@ -534,11 +538,11 @@ function OrderForm({ proforma, notice, form, patch, carrier, supplierName, block
       <View style={{ backgroundColor: colors.surface, borderRadius: radius.card, paddingTop: 6, paddingHorizontal: 20, paddingBottom: 8 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, paddingTop: 12, paddingBottom: 10 }}>
           <Text size={16} weight={800} style={{ flex: 1, flexShrink: 1 }}>
-            Terms from the proforma
+            {t('Terms from the proforma')}
           </Text>
           <Pressable accessibilityRole="button" hitSlop={8} onPress={() => setEditing(!editing)} style={{ flexShrink: 0 }}>
             <Text size={14} weight={700} numberOfLines={1} style={{ textDecorationLine: 'underline' }}>
-              {editing ? 'Done' : 'Correct a term'}
+              {editing ? t('Done') : t('Correct a term')}
             </Text>
           </Pressable>
         </View>
@@ -546,7 +550,7 @@ function OrderForm({ proforma, notice, form, patch, carrier, supplierName, block
         {open('shipmentDeadline') || open('incoterm') ? (
           <TermEdit>
             <Field
-              label="On board by"
+              label={t('On board by')}
               raised
               value={form.dayText}
               onChangeText={(dayText) => patch({ dayText })}
@@ -555,30 +559,30 @@ function OrderForm({ proforma, notice, form, patch, carrier, supplierName, block
             />
             <View style={{ gap: 6 }}>
               <Text size={14} weight={600}>
-                Incoterm
+                {t('Incoterm')}
               </Text>
               <Segmented
                 on="surface"
                 options={INCOTERMS.map((i) => ({ value: i, label: i }))}
                 value={form.incoterm ?? ('' as Incoterm)}
                 onChange={(incoterm) => patch({ incoterm })}
-                accessibilityLabel="Incoterm"
+                accessibilityLabel={t('Incoterm')}
                 role="radiogroup"
               />
               <NoticeLine notice={noticeOf('incoterm')} />
             </View>
           </TermEdit>
         ) : (
-          <Term label="Ship by" value={shipByLine(form)} />
+          <Term label={t('Ship by')} value={shipByLine(form)} />
         )}
-        <Term label="Proof from" value={`${carrier} (test key)`} />
+        <Term label={t('Proof from')} value={t('{name} (test key)', { name: carrier })} />
 
         {moreShown ? (
           <>
             {open('orderNumber') ? (
               <TermEdit>
                 <Field
-                  label="Order number"
+                  label={t('Order number')}
                   raised
                   mono
                   autoCapitalize="characters"
@@ -588,12 +592,12 @@ function OrderForm({ proforma, notice, form, patch, carrier, supplierName, block
                 />
               </TermEdit>
             ) : (
-              <Term label="Order number" value={form.orderNumber} mono />
+              <Term label={t('Order number')} value={form.orderNumber} mono />
             )}
             {open('hsCodes') ? (
               <TermEdit>
                 <Field
-                  label="HS codes"
+                  label={t('HS codes')}
                   raised
                   mono
                   value={form.hsText}
@@ -603,24 +607,24 @@ function OrderForm({ proforma, notice, form, patch, carrier, supplierName, block
                 />
               </TermEdit>
             ) : (
-              <Term label="HS code" value={form.hsText} mono />
+              <Term label={t('HS code')} value={form.hsText} mono />
             )}
-            <Term label="Disputes settled by" value="Arbiter (test key)" />
-            <Term label="Documents for the balance" value={REQUIRED_DOCS.map((d) => DOC_WORDS[d]).join(', ')} />
+            <Term label={t('Disputes settled by')} value={t('Arbiter (test key)')} />
+            <Term label={t('Documents for the balance')} value={REQUIRED_DOCS.map((d) => t(DOC_WORDS[d])).join(', ')} />
             {!currencyHidden ? (
               <TermEdit>
                 <Text size={14} weight={600}>
-                  Currency
+                  {t('Currency')}
                 </Text>
                 <Segmented
                   on="surface"
                   options={CURRENCIES.map((c) => ({ value: c, label: c }))}
                   value={form.currency ?? ('' as 'USD')}
                   onChange={(currency) => patch({ currency })}
-                  accessibilityLabel="Currency"
+                  accessibilityLabel={t('Currency')}
                   role="radiogroup"
                 />
-                <NoticeLine notice={form.currency ? { tone: 'error', text: PROBLEM_WORDS.currency_is_not_the_token } : noticeOf('currency')} />
+                <NoticeLine notice={form.currency ? { tone: 'error', text: t(PROBLEM_WORDS.currency_is_not_the_token) } : noticeOf('currency')} />
               </TermEdit>
             ) : null}
           </>
@@ -641,7 +645,7 @@ function OrderForm({ proforma, notice, form, patch, carrier, supplierName, block
             }}
           >
             <Text size={15} weight={700}>
-              {showMore ? 'Show less' : `Show ${moreCount} more terms`}
+              {showMore ? t('Show less') : t('Show {n} more terms', { n: moreCount })}
             </Text>
             <View style={{ transform: [{ rotate: showMore ? '180deg' : '0deg' }] }}>
               <Icon name="chevronDown" size={14} strokeWidth={2.4} color="textFaint" />
@@ -655,19 +659,19 @@ function OrderForm({ proforma, notice, form, patch, carrier, supplierName, block
           <View style={{ gap: 4 }}>
             {blocked.problems.map((p) => (
               <Text key={p} size={14} leading={1.4} style={{ color: colors.danger }}>
-                {PROBLEM_WORDS[p]}
+                {t(PROBLEM_WORDS[p])}
               </Text>
             ))}
           </View>
         ) : null}
         {blocked && blocked.fields.length > 0 ? (
           <Text size={14} style={{ color: colors.danger }}>
-            Check the marked fields.
+            {t('Check the marked fields.')}
           </Text>
         ) : null}
-        <Button label={supplierName ? `Send to ${supplierName}` : 'Send to the supplier'} onPress={onSend} />
+        <Button label={supplierName ? t('Send to {name}', { name: supplierName }) : t('Send to the supplier')} onPress={onSend} />
         <Text size={13} leading={1.5} color="textFaint" style={{ textAlign: 'center' }}>
-          {supplierName ?? 'The supplier'} checks and signs first. You sign last, and that is when the agent deposits.
+          {t('{name} checks and signs first. You sign last, and that is when the agent deposits.', { name: supplierName ?? t('The supplier') })}
         </Text>
       </View>
     </>
@@ -737,15 +741,16 @@ function SupplierRow({
   notice?: FieldNotice;
   onSelect: (id: string) => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <View style={{ gap: 10 }}>
       <Text size={15} weight={700}>
-        Supplier
+        {t('Supplier')}
       </Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={selected ? `Supplier, ${selected.party.name}. Change` : 'Choose a supplier'}
+        accessibilityLabel={selected ? t('Supplier, {name}. Change', { name: selected.party.name }) : t('Choose a supplier')}
         onPress={() => setOpen(true)}
         style={({ pressed }) => ({
           flexDirection: 'row',
@@ -772,13 +777,13 @@ function SupplierRow({
               </Text>
             </View>
             <Text size={14} weight={700} numberOfLines={1} style={{ flexShrink: 0 }}>
-              Change
+              {t('Change')}
             </Text>
           </>
         ) : (
           <>
             <Text size={16} weight={600} color="textMuted" style={{ flex: 1, paddingVertical: 8 }}>
-              Choose a supplier
+              {t('Choose a supplier')}
             </Text>
             <View style={{ transform: [{ rotate: '90deg' }] }}>
               <Icon name="chevron" size={18} color="textMuted" />
@@ -787,7 +792,7 @@ function SupplierRow({
         )}
       </Pressable>
       <NoticeLine notice={notice} />
-      <BottomSheet visible={open} title="Choose a supplier" onClose={() => setOpen(false)}>
+      <BottomSheet visible={open} title={t('Choose a supplier')} onClose={() => setOpen(false)}>
         {suppliers.map((s) => (
           <SheetOption
             key={s.party.id}

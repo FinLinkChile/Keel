@@ -5,6 +5,7 @@ import { View } from 'react-native';
 import { proposals, useData } from '@/data';
 import { importerTimeline, NOT_ON_THIS_PHONE, orderAmounts, proposalTimeline, type TimelineItem } from '@/data/orderTimeline';
 import { payoutHistory } from '@/data/signOrder';
+import { useT } from '@/i18n';
 import { useSession } from '@/session';
 import { Button } from '@/ui/Button';
 import { formatMinor } from '@/ui/format';
@@ -21,6 +22,7 @@ import { Frame } from './parts';
 // the demo data or was proposed on this phone. The step that needs the importer leads to the
 // review, where the last signature is given.
 export function ImporterOrder({ orderId }: { orderId: Hex }) {
+  const t = useT();
   const { address } = useSession();
   const view = useData(async (d) => {
     const order = await d.order(orderId);
@@ -33,8 +35,8 @@ export function ImporterOrder({ orderId }: { orderId: Hex }) {
   if (view === undefined) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   if (view === null) {
     return (
-      <Frame label="Order">
-        <Text color="textMuted">This order is not on this phone.</Text>
+      <Frame label={t('Order')}>
+        <Text color="textMuted">{t('This order is not on this phone.')}</Text>
       </Frame>
     );
   }
@@ -58,17 +60,17 @@ export function ImporterOrder({ orderId }: { orderId: Hex }) {
     ) : undefined,
     children: item.action === 'review' ? (
       <View style={{ paddingTop: 4 }}>
-        <Button label="Review and sign" variant="small" onPress={() => router.push({ pathname: '/review/[orderId]', params: { orderId: po.orderId } })} />
+        <Button label={t('Review and sign')} variant="small" onPress={() => router.push({ pathname: '/review/[orderId]', params: { orderId: po.orderId } })} />
       </View>
     ) : undefined,
   }));
 
   const note =
     history.different > 0
-      ? { text: `Different from ${history.different === 1 ? 'an earlier order' : `${history.different} earlier orders`} with ${supplier.short}`, tone: 'bad' as const }
+      ? { text: t(history.different === 1 ? 'Different from an earlier order with {name}' : 'Different from {n} earlier orders with {name}', { n: history.different, name: supplier.short }), tone: 'bad' as const }
       : history.same > 0
-        ? { text: `Same account as your last ${history.same === 1 ? 'order' : `${history.same} orders`} with ${supplier.short}`, tone: 'ok' as const }
-        : { text: `First order with ${supplier.short}`, tone: 'neutral' as const };
+        ? { text: t(history.same === 1 ? 'Same account as your last order with {name}' : 'Same account as your last {n} orders with {name}', { n: history.same, name: supplier.short }), tone: 'ok' as const }
+        : { text: t('First order with {name}', { name: supplier.short }), tone: 'neutral' as const };
   const signedBoth = order.stage !== 'awaiting_signature' && order.stage !== 'rejected';
 
   return (
@@ -85,10 +87,10 @@ export function ImporterOrder({ orderId }: { orderId: Hex }) {
       <View style={{ alignItems: 'center', paddingVertical: 6 }}>
         <Ring
           paid={amounts && amounts.total > 0n ? Number((amounts.paid * 1000n) / amounts.total) / 1000 : undefined}
-          accessibilityLabel={amounts ? `${formatMinor(amounts.paid)} paid to ${supplier.short}, ${formatMinor(amounts.locked)} locked in escrow` : `Order total ${formatMinor(total)}`}
+          accessibilityLabel={amounts ? t('{paid} paid to {name}, {locked} locked in escrow', { paid: formatMinor(amounts.paid), name: supplier.short, locked: formatMinor(amounts.locked) }) : t('Order total {total}', { total: formatMinor(total) })}
         >
           <Text size={13} color="textMuted">
-            Order total
+            {t('Order total')}
           </Text>
           <Text mono size={24} weight={600}>
             {formatMinor(total)}
@@ -101,34 +103,34 @@ export function ImporterOrder({ orderId }: { orderId: Hex }) {
 
       {amounts ? (
         <View>
-          <AmountRow color={colors.money} label={`Paid to ${supplier.short}`} amount={amounts.paid} />
-          {amounts.locked > 0n ? <AmountRow color={colors.locked} label="Locked in escrow" amount={amounts.locked} /> : null}
-          {amounts.returned > 0n ? <AmountRow color={colors.accent} label="Back to you" amount={amounts.returned} /> : null}
+          <AmountRow color={colors.money} label={t('Paid to {name}', { name: supplier.short })} amount={amounts.paid} />
+          {amounts.locked > 0n ? <AmountRow color={colors.locked} label={t('Locked in escrow')} amount={amounts.locked} /> : null}
+          {amounts.returned > 0n ? <AmountRow color={colors.accent} label={t('Back to you')} amount={amounts.returned} /> : null}
         </View>
       ) : (
         <Text size={14} leading={1.45} color="textMuted" style={{ textAlign: 'center' }}>
-          Nothing has been paid yet.
+          {t('Nothing has been paid yet.')}
         </Text>
       )}
 
       {demoOnly ? (
         <Text size={14} leading={1.45} style={{ color: colors.yourTurn }}>
-          {NOT_ON_THIS_PHONE}
+          {t(NOT_ON_THIS_PHONE)}
         </Text>
       ) : null}
 
       <View style={{ gap: 6 }}>
         <Text size={22} weight={800} accessibilityRole="header">
-          Steps
+          {t('Steps')}
         </Text>
         <Steps steps={steps} />
       </View>
 
       <PayoutPanel
-        heading={signedBoth ? 'Paid only to this account' : 'The account in this order'}
+        heading={signedBoth ? t('Paid only to this account') : t('The account in this order')}
         holder={supplier.name}
         address={po.payoutAddress}
-        notes={[note, { text: signedBoth ? 'Both of you signed this account.' : 'Locked once both sign.', tone: 'neutral' }]}
+        notes={[note, { text: signedBoth ? t('Both of you signed this account.') : t('Locked once both sign.'), tone: 'neutral' }]}
       />
     </Frame>
   );
