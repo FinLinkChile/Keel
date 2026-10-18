@@ -8,7 +8,8 @@
     "ingest",
     "app",
     "bot",
-    "redteam"
+    "redteam",
+    "aws"
   ],
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",

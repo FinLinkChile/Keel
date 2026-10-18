@@ -1,5 +1,6 @@
 # Interfaces compartidas
 
+* [Autenticación de la API de Keel en AWS](autenticacion-api.md) - Cómo prueba la app, la naviera o el árbitro quién hace cada petición a la API: mensaje EIP-712 ApiRequest, cabeceras, ventana de tiempo, respuestas y qué no autoriza.
 * [Avisos al bot de Telegram](avisos-al-bot.md) - Cómo le entregan el motor, la ingesta y otros productores los avisos al bot: dos rutas HTTP, sus tokens, cuerpos y respuestas, y cómo se traduce la salida de ingesta a avisos.
 * [Eventos y errores tipados](eventos-y-errores.md) - Nombres fijos de los eventos y errores de PDRGate, del gate de Trade (FundingGate) y de TradeEscrow, por modo.
 * [Carga de documentos de una orden (Keel Trade)](carga-de-documentos.md) - Cómo sube la app el BL, la guía aérea o la factura de una orden a ingesta: mensaje EIP-712 que firma el representante, ruta HTTP, respuestas y registro de órdenes.

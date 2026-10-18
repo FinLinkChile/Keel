@@ -1,5 +1,7 @@
 // Formatting shared by the components. Pure functions, so they can be unit tested.
 
+import { getLanguage } from '../i18n/translate';
+
 // 4800000n with 2 decimals -> "48,000.00"
 export function formatMinor(minor: bigint, decimals = 2): string {
   const negative = minor < 0n;
@@ -47,24 +49,28 @@ export function formatRut(rut: string): string {
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS_ES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+// "Nov 20", or "20 nov" in Spanish
+const monthDay = (month: number, day: number) => (getLanguage() === 'es' ? `${day} ${MONTHS_ES[month]}` : `${MONTHS[month]} ${day}`);
 
 // Unix seconds -> "Nov 20". Contract dates are UTC days, so the day never shifts with the phone.
 export function formatDay(unixSeconds: number | bigint): string {
   const d = new Date(Number(unixSeconds) * 1000);
-  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+  return monthDay(d.getUTCMonth(), d.getUTCDate());
 }
 
 // Unix seconds -> "Oct 14, 09:12" in the phone's time zone: for a signature, which is a moment.
 export function formatLocalDayTime(unixSeconds: number): string {
   const d = new Date(unixSeconds * 1000);
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${monthDay(d.getMonth(), d.getDate())}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 // Unix seconds -> "Oct 15" in the phone's time zone: for things people did, like an upload.
 export function formatLocalDay(unixSeconds: number): string {
   const d = new Date(unixSeconds * 1000);
-  return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  return monthDay(d.getMonth(), d.getDate());
 }
 
 // 4_900_000n (49,000.00) -> "49k": compact figure for limits and gauges

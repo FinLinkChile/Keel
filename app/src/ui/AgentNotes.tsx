@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { useT } from '@/i18n';
+
 import { agentNoteAction, agentNoteText } from '@/data/agentNoteText';
 import type { AgentNote, NoteRule, NoteTone } from '@/data/agentNotes';
 
@@ -12,6 +14,7 @@ const DOT: Record<NoteTone, string> = { warning: colors.danger, caution: colors.
 // The agent's notes before signing. With `onApply` a note with a suggestion can change the term;
 // without it (the order is already signed by the other side) the notes only inform.
 export function AgentNotes({ notes, onApply, footer }: { notes: AgentNote[]; onApply?: (note: AgentNote) => void; footer: string }) {
+  const t = useT();
   const [ignored, setIgnored] = useState<NoteRule[]>([]);
   const shown = notes.filter((n) => !ignored.includes(n.rule));
   if (shown.length === 0) return null;
@@ -19,7 +22,7 @@ export function AgentNotes({ notes, onApply, footer }: { notes: AgentNote[]; onA
   return (
     <View style={{ backgroundColor: colors.surface, borderRadius: radius.card, padding: 16, gap: 14 }}>
       <Text size={13} weight={700} color="textMuted" style={{ letterSpacing: 0.4 }}>
-        AGENT NOTES
+        {t('AGENT NOTES')}
       </Text>
       {shown.map((note) => {
         const action = onApply ? agentNoteAction(note) : undefined;
@@ -40,7 +43,7 @@ export function AgentNotes({ notes, onApply, footer }: { notes: AgentNote[]; onA
                 </Pressable>
                 <Pressable accessibilityRole="button" hitSlop={8} onPress={() => setIgnored([...ignored, note.rule])}>
                   <Text size={14} color="textMuted">
-                    Ignore
+                    {t('Ignore')}
                   </Text>
                 </Pressable>
               </View>

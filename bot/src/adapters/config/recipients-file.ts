@@ -8,19 +8,18 @@ import { AccountId, ROLES, ROLES_BY_KIND, type AccountKind, type Role } from "..
 import { ConfigError } from "./env";
 
 // Shown in messages, so held to letters, digits and plain punctuation.
-const Name = z.string().regex(/^[\p{L}\p{N}][\p{L}\p{N} .,&'-]{0,59}$/u);
+export const AccountName = z.string().regex(/^[\p{L}\p{N}][\p{L}\p{N} .,&'-]{0,59}$/u);
 const Chats = z.array(z.number().int().safe()).max(20);
 
-const DirectoryFile = z.strictObject({
-  accounts: z.record(
-    AccountId,
-    z.strictObject({
-      kind: z.enum(["company", "personal"]),
-      name: Name,
-      roles: z.strictObject({ owner: Chats.optional(), operator: Chats.optional(), cosigner: Chats.optional() }),
-    }),
-  ),
+// One account of the file. The cloud directory (adapters/kv/kv-admin.ts) takes the same shape.
+export const AccountEntry = z.strictObject({
+  kind: z.enum(["company", "personal"]),
+  name: AccountName,
+  roles: z.strictObject({ owner: Chats.optional(), operator: Chats.optional(), cosigner: Chats.optional() }),
 });
+export type AccountEntry = z.infer<typeof AccountEntry>;
+
+const DirectoryFile = z.strictObject({ accounts: z.record(AccountId, AccountEntry) });
 
 interface Account {
   kind: AccountKind;

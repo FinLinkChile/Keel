@@ -11,20 +11,19 @@ import { z } from "zod";
 import { OrderLabel, Parties, Timestamp, type Parties as PartiesT } from "../../domain/notice";
 import { ConfigError } from "./env";
 
-const OrderId = z.string().regex(/^0x[0-9a-fA-F]{64}$/);
+export const OrderId = z.string().regex(/^0x[0-9a-fA-F]{64}$/);
 
-const OrdersFile = z.strictObject({
-  orders: z.record(
-    OrderId,
-    z.strictObject({
-      label: OrderLabel,
-      importer: z.string(),
-      exporter: z.string(),
-      arbiter: z.string().optional(),
-      shipmentDeadline: Timestamp,
-    }),
-  ),
+// One order of the file. The cloud directory (adapters/kv/kv-admin.ts) takes the same shape.
+export const OrderFileEntry = z.strictObject({
+  label: OrderLabel,
+  importer: z.string(),
+  exporter: z.string(),
+  arbiter: z.string().optional(),
+  shipmentDeadline: Timestamp,
 });
+export type OrderFileEntry = z.infer<typeof OrderFileEntry>;
+
+const OrdersFile = z.strictObject({ orders: z.record(OrderId, OrderFileEntry) });
 
 export interface OrderEntry {
   // The bytes32 orderId, lowercase. Used as orderRef, so the app link opens the same order.

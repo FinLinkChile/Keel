@@ -1,7 +1,21 @@
 // Hashing of the shared interfaces. Imported as `@keel/schemas/hash`.
 // It must match contracts/src/KeelHash.sol byte for byte: hash.test.ts runs both.
-import { concat, encodeAbiParameters, hashDomain, hashStruct, hashTypedData, keccak256, stringToHex, toBytes } from "viem";
 import {
+  concat,
+  encodeAbiParameters,
+  encodeFunctionData,
+  hashDomain,
+  hashStruct,
+  hashTypedData,
+  keccak256,
+  parseAbi,
+  stringToHex,
+  toBytes,
+  toFunctionSelector,
+} from "viem";
+import {
+  API_EIP712_TYPES,
+  apiDomain,
   EIP712_TYPES,
   type Eip712Messages,
   type Eip712Type,
@@ -73,8 +87,9 @@ export function requiredDocsHash(docs: readonly RequiredDocType[]): Hex {
 //     keccak256(abi.encodePacked(keccak256(bytes(hsCodes[0])), ..., keccak256(bytes(hsCodes[n])))),
 //     documentHash))
 // with the HS codes deduplicated and sorted ascending first, so their order does not change
-// the hash, and documentHash = keccak256 of the bytes of the full order document. All
-// strings are ASCII, as the schema patterns require. No domain: it is a struct hash.
+// the hash, and documentHash = keccak256 of the bytes of the file the order comes from: when it
+// comes from a proforma, the fileHash that POST /trade/proforma returns (decided by Area 4 in the
+// #66 review). All strings are ASCII, as the schema patterns require. No domain: it is a struct hash.
 export function termsHash(terms: OrderTerms): Hex {
   const parsed = OrderTermsSchema.parse(terms);
   const data = { ...parsed, hsCodes: [...new Set(parsed.hsCodes)].sort() };
@@ -89,4 +104,98 @@ export function docsHash(fileHashes: readonly Hex[]): Hex {
   // The same file twice is not a different package
   if (new Set(fileHashes).size !== fileHashes.length) throw new Error("a document package lists the same file twice");
   return keccak256(concat([...fileHashes].sort()));
+}
+
+// Keel Trade: the Zodiac Roles configuration of an importer Safe and its hash, the
+// `rolesConfigHash` of the Trade policy. Mirrors contracts/script/TradeRolesConfig.sol (T1.7):
+// the same ordered calls the Safe makes on its Roles instance, and
+// keccak256(abi.encode(Call[] { address to; bytes data })) with `to` left as zero (each Safe has
+// its own Roles instance). hash.test.ts runs both.
+export interface TradeRolesParams {
+  token: Hex;
+  escrow: Hex;
+  gate: Hex;
+  agentRole: Hex;
+  cosignedRole: Hex;
+  agentAllowanceKey: Hex;
+  cosignedAllowanceKey: Hex;
+  agentCap: bigint;
+  cosignedCap: bigint;
+  period: bigint;
+}
+
+// Zodiac Roles v2.1.1 (gnosisguild/zodiac-modifier-roles, commit 218a5164): the builders Keel calls
+const ROLES_BUILDER_ABI = parseAbi([
+  "struct ConditionFlat { uint8 parent; uint8 paramType; uint8 operator; bytes compValue; }",
+  "function scopeTarget(bytes32 roleKey, address targetAddress)",
+  "function scopeFunction(bytes32 roleKey, address targetAddress, bytes4 selector, ConditionFlat[] conditions, uint8 options)",
+  "function allowFunction(bytes32 roleKey, address targetAddress, bytes4 selector, uint8 options)",
+  "function setAllowance(bytes32 key, uint128 balance, uint128 maxRefill, uint128 refill, uint64 period, uint64 timestamp)",
+  "function assignRoles(address module, bytes32[] roleKeys, bool[] memberOf)",
+]);
+// Types.sol at 218a5164: ParameterType Static = 1, Calldata = 5; Operator Matches = 5,
+// EqualTo = 16, WithinAllowance = 28; ExecutionOptions None = 0
+const STATIC = 1;
+const CALLDATA = 5;
+const MATCHES = 5;
+const EQUAL_TO = 16;
+const WITHIN_ALLOWANCE = 28;
+const NO_OPTIONS = 0;
+const APPROVE = toFunctionSelector("approve(address,uint256)");
+const FUND = toFunctionSelector("fund(bytes32)");
+const ZERO = "0x0000000000000000000000000000000000000000";
+
+export function tradeRolesConfigCalls(p: TradeRolesParams): { to: Hex; data: Hex }[] {
+  const call = (data: Hex) => ({ to: ZERO as Hex, data });
+  const role = (roleKey: Hex, key: Hex, cap: bigint) => [
+    call(encodeFunctionData({ abi: ROLES_BUILDER_ABI, functionName: "scopeTarget", args: [roleKey, p.token] })),
+    call(
+      encodeFunctionData({
+        abi: ROLES_BUILDER_ABI,
+        functionName: "scopeFunction",
+        args: [
+          roleKey,
+          p.token,
+          APPROVE,
+          // approve(spender, amount): spender is the escrow, amount within the allowance `key`
+          [
+            { parent: 0, paramType: CALLDATA, operator: MATCHES, compValue: "0x" },
+            { parent: 0, paramType: STATIC, operator: EQUAL_TO, compValue: encodeAbiParameters([{ type: "address" }], [p.escrow]) },
+            { parent: 0, paramType: STATIC, operator: WITHIN_ALLOWANCE, compValue: key },
+          ],
+          NO_OPTIONS,
+        ],
+      }),
+    ),
+    call(encodeFunctionData({ abi: ROLES_BUILDER_ABI, functionName: "scopeTarget", args: [roleKey, p.escrow] })),
+    call(encodeFunctionData({ abi: ROLES_BUILDER_ABI, functionName: "allowFunction", args: [roleKey, p.escrow, FUND, NO_OPTIONS] })),
+    call(encodeFunctionData({ abi: ROLES_BUILDER_ABI, functionName: "setAllowance", args: [key, cap, cap, cap, p.period, 0n] })),
+  ];
+  return [
+    ...role(p.agentRole, p.agentAllowanceKey, p.agentCap),
+    ...role(p.cosignedRole, p.cosignedAllowanceKey, p.cosignedCap),
+    call(encodeFunctionData({ abi: ROLES_BUILDER_ABI, functionName: "assignRoles", args: [p.gate, [p.agentRole, p.cosignedRole], [true, true]] })),
+  ];
+}
+
+// The ApiRequest a client signs for the Keel API (./api.ts). The same builder as
+// aws/src/auth.ts `apiRequestTypedData`, here so the app can build it without importing the
+// aws package (and its AWS SDK); app/src/data/api.test.ts checks both against `authenticate`.
+// `body` is the raw body exactly as sent ("" for none).
+export const apiBodyHash = (body: string): Hex => keccak256(toBytes(body));
+
+export function apiRequestTypedData(chainId: number, method: string, path: string, body: string, issuedAt: number) {
+  return {
+    domain: apiDomain(chainId),
+    types: API_EIP712_TYPES,
+    primaryType: "ApiRequest" as const,
+    message: { method: method.toUpperCase(), path, bodyHash: apiBodyHash(body), issuedAt: BigInt(issuedAt) },
+  };
+}
+
+export function tradeRolesConfigHash(p: TradeRolesParams): Hex {
+  const calls = tradeRolesConfigCalls(p);
+  return keccak256(
+    encodeAbiParameters([{ type: "tuple[]", components: [{ name: "to", type: "address" }, { name: "data", type: "bytes" }] }], [calls]),
+  );
 }

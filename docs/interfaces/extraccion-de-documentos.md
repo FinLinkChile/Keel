@@ -5,7 +5,7 @@ description: "Salida del extractor en cuarentena, sin texto libre: factura de cu
 tags: [extraccion, json-schema, bl, factura]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T00:30:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T02:30:00Z }
 ---
 
 **Personal (base).** Factura de una cuenta recurrente:
@@ -70,4 +70,6 @@ El parser y el extractor pasan por las mismas funciones (`ingest/src/trade/norma
 
 Límite declarado: la compactación junta números que solo difieren en los separadores (`AB-12` y `AB1-2` quedan `AB12`). Con los formatos reales de BL (prefijo SCAC más dígitos) no ocurre, pero se declara.
 
-Límite declarado: el parser lee documentos que imprimen cada campo después de su rótulo. Cubre los formatos del corpus (dos navieras y una aerolínea, en `redteam/corpus/trade`), no cualquier BL.
+Límite declarado: el parser lee documentos que imprimen cada campo al lado de su rótulo o debajo, dentro de la misma casilla, como los formularios de CSAV y Hapag-Lloyd (`B/L-No.:` con guion incluido). Una etiqueta cuenta cuando abre un texto o va seguida de dos puntos; dentro de una frase ("from the port of loading, whichever...") no. Cubre esos formularios y los del corpus (dos navieras y una aerolínea, en `redteam/corpus/trade`), no cualquier BL. Un número de documento sin dígitos se retiene: es una etiqueta leída como valor.
+
+Las páginas de términos y condiciones (más de 4.000 caracteres y al menos un 80 % en líneas de 100 o más) no las leen ni el parser ni el extractor: son texto legal fijo, repiten las etiquetas en frases y pasan el límite de 20.000 caracteres del extractor, que se cuenta sin ellas. La detección de texto oculto y de anuncio de cambio de cuenta sigue leyendo todas las páginas. Un texto oculto sin letras ni dígitos (guías de casillas) se descarta en vez de marcarse.

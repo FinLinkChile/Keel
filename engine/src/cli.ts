@@ -1,14 +1,24 @@
-// Command line of the engine. T2.9:
-//   keel verify <txHash> [--rpc <url>] [--evidence <dir>] [--deployments <dir>]   a transaction and every PDR it carries
+// Command line of the engine.
+//   keel verify <txHash> [--rpc <url>] [--evidence <dir>] [--deployments <dir>]   a transaction and every PDR it carries (T2.9)
 //   keel verify --pdr <pdrHash> [--evidence <dir>]                                one PDR from its evidence file, offline
-// Exit code 0 when everything matches and is anchored to the deployed contracts, 1 on any
+//   keel agent --data <dir> [--deployments <dir>] [--once] [--interval <s>]       the agent service of one importer Safe (T2.11)
+//   keel monitor --data <dir> [--deployments <dir>] [--from-block <n>] [--once] [--interval <s>]   the monitor (T2.8)
+// verify exits 0 when everything matches and is anchored to the deployed contracts, 1 on any
 // mismatch, 2 on a usage or read error, 3 when the evidence is consistent but not anchored
 // (offline): that proves the file, not that the chain accepted it.
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import type { Hex } from "@keel/schemas";
-import { createPublicClient, http, isHash, parseAbi } from "viem";
+import { createPublicClient, http, isAddress, isHash, parseAbi } from "viem";
+import { agentAddresses, ConfigurationError, composeAgent, deploymentSettings as fromDeployment } from "./agent/compose";
+import { botNotifier } from "./agent/notices";
+import { rpcChain } from "./agent/rpc";
+import { FileStore } from "./agent/store";
 import { explorerAddressUrl, explorerTxUrl } from "./explorer";
+import { loadPauser, loadPolicySigner, loadRelayer } from "./keys";
+import { Monitor, pauserOn } from "./monitor/monitor";
+import { monitorNotifier } from "./monitor/notices";
+import { rpcMonitorChain } from "./monitor/rpc";
 import { type ChainFacts, type ChainReader, type Check, emitterOf, knownLogs, loadDeployment, loadEvidence, type Verdict, verdict, verifyEvidence } from "./verify";
 
 const DEFAULT_EVIDENCE = fileURLToPath(new URL("../../evidence/pdr/", import.meta.url));
@@ -115,15 +125,125 @@ async function verify(args: string[]): Promise<number> {
   return EXIT[result];
 }
 
-class UsageError extends Error {}
+// The addresses and allowance keys of the chain's deployment, from contracts/deployments/<chainId>.json
+// (Area 1, T1.8), completed by the environment (./agent/compose.ts).
+const deploymentSettings = (dir: string, chainId: number) => fromDeployment(loadDeployment(dir, chainId), process.env, chainId, dir);
+
+// Configuration: KEEL_RPC_URL and the keys RELAYER_PRIVATE_KEY and POLICY_SIGNER_PRIVATE_KEY (never
+// in the repository). The escrow, the Safe, the gate and the allowance keys come from the deployment
+// file of the chain, or from KEEL_ESCROW, KEEL_SAFE, KEEL_FUNDING_GATE, KEEL_AGENT_ALLOWANCE_KEY and
+// KEEL_COSIGNED_ALLOWANCE_KEY where it has none. With the gate and the allowance keys the gate runs on
+// the real Zodiac Roles and the rolesConfigHash is computed from the chain; otherwise (the demo on
+// MockTradeRoles, or no gate) KEEL_ROLES_CONFIG_HASH gives it.
+async function agent(args: string[]): Promise<number> {
+  const { values } = parseArgs({
+    args,
+    options: { data: { type: "string" }, once: { type: "boolean" }, interval: { type: "string" }, evidence: { type: "string" }, deployments: { type: "string" } },
+  });
+  const env = process.env;
+  const rpc = env.KEEL_RPC_URL;
+  if (!rpc) throw new UsageError("set KEEL_RPC_URL");
+  const chainId = await createPublicClient({ transport: http(rpc) }).getChainId();
+  const deployment = deploymentSettings(values.deployments ?? DEFAULT_DEPLOYMENTS, chainId);
+  const { escrow, safe } = agentAddresses(deployment);
+  const data = values.data ?? env.KEEL_DATA_DIR;
+  if (!data) throw new UsageError("set --data or KEEL_DATA_DIR");
+
+  // The bot is optional (T2.6): without its URL and token, events are only printed
+  const botUrl = env.KEEL_BOT_URL;
+  const botToken = env.KEEL_BOT_TOKEN;
+  if (Boolean(botUrl) !== Boolean(botToken)) throw new UsageError("set both KEEL_BOT_URL and KEEL_BOT_TOKEN, or neither");
+
+  // Escrow logs are searched from the deployment block: many RPC providers cap the range of getLogs
+  const chain = rpcChain(rpc, loadRelayer(env), { fromBlock: deployment.file?.deployBlock });
+  const store = new FileStore(data);
+  // The Trade gate, the Roles allowance and the policy (./agent/compose.ts)
+  const { agent: keel } = await composeAgent({
+    chainId,
+    deployment,
+    escrow,
+    safe,
+    chain,
+    store,
+    // Loaded once the deployment checks passed, as before the composition moved out
+    signer: () => loadPolicySigner(env),
+    evidenceDir: values.evidence ?? DEFAULT_EVIDENCE,
+    // Each sent step, hold and notice is printed once as a JSON line and, with the bot
+    // configured, posted to it.
+    notify: botNotifier({ store, endpoint: botUrl && botToken ? { url: botUrl, token: botToken } : undefined }),
+  });
+  const intervalMs = Number(values.interval ?? 15) * 1000;
+  for (;;) {
+    await keel.tick();
+    if (values.once) return 0;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+}
+
+// T2.8. Reads the gate and the escrow of one importer Safe, needs no relayer and holds no
+// authority to move funds. With MONITOR_PAUSER_PRIVATE_KEY it pauses the gate on an incident;
+// until the gate has a pause-only role that pause reverts and the monitor only alerts.
+async function monitor(args: string[]): Promise<number> {
+  const { values } = parseArgs({
+    args,
+    options: {
+      data: { type: "string" },
+      once: { type: "boolean" },
+      interval: { type: "string" },
+      evidence: { type: "string" },
+      deployments: { type: "string" },
+      "from-block": { type: "string" },
+    },
+  });
+  const env = process.env;
+  const rpc = env.KEEL_RPC_URL;
+  if (!rpc) throw new UsageError("set KEEL_RPC_URL");
+  const client = createPublicClient({ transport: http(rpc) });
+  const chainId = await client.getChainId();
+  const { file, required } = deploymentSettings(values.deployments ?? DEFAULT_DEPLOYMENTS, chainId);
+  const escrow = required("KEEL_ESCROW", file?.tradeEscrow, isAddress);
+  const safe = required("KEEL_SAFE", file?.safe, isAddress);
+  const gate = required("KEEL_FUNDING_GATE", file?.fundingGate, isAddress);
+  const data = values.data ?? env.KEEL_DATA_DIR;
+  if (!data) throw new UsageError("set --data or KEEL_DATA_DIR");
+  const botUrl = env.KEEL_BOT_URL;
+  const botToken = env.KEEL_BOT_TOKEN;
+  if (Boolean(botUrl) !== Boolean(botToken)) throw new UsageError("set both KEEL_BOT_URL and KEEL_BOT_TOKEN, or neither");
+  if (values["from-block"] !== undefined && !/^[0-9]+$/.test(values["from-block"])) throw new UsageError("--from-block takes a block number");
+
+  const chain = rpcMonitorChain(rpc);
+  const pauserKey = loadPauser(env);
+  const pauser = pauserKey && pauserOn(rpcChain(rpc, pauserKey), pauserKey.address);
+  const fromBlock = values["from-block"] !== undefined ? BigInt(values["from-block"]) : (await chain.latestBlock()) + 1n;
+  const watch = new Monitor(
+    { chainId, gate, escrow, safe, evidenceDir: values.evidence ?? DEFAULT_EVIDENCE, fromBlock },
+    {
+      chain,
+      pauser,
+      notify: monitorNotifier({ store: new FileStore(data), safe, gate, endpoint: botUrl && botToken ? { url: botUrl, token: botToken } : undefined }),
+    },
+  );
+  console.log(JSON.stringify({ monitor: "started", fromBlock: fromBlock.toString(), pauser: pauser?.address ?? null }));
+  const intervalMs = Number(values.interval ?? 15) * 1000;
+  for (;;) {
+    await watch.tick();
+    if (values.once) return 0;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+}
+
+// A deployment the agent refuses (./agent/compose.ts) is a usage error too: printed as is
+class UsageError extends ConfigurationError {}
 
 async function main(argv: string[]): Promise<number> {
   const [command, ...args] = argv;
   try {
     if (command === "verify") return await verify(args);
+    if (command === "agent") return await agent(args);
+    if (command === "monitor") return await monitor(args);
     throw new UsageError(USAGE);
   } catch (e) {
-    console.error(e instanceof UsageError ? e.message : `error: ${(e as Error).message}`);
+    console.error(e instanceof ConfigurationError ? e.message : `error: ${(e as Error).message}`);
     return 2;
   }
 }

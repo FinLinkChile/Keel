@@ -4,10 +4,12 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { checkStep, DEMO_DRAFT, STEPS, type Draft, type Problems, type Step } from '@/data/onboarding';
+import { useT } from '@/i18n';
 import { useSession } from '@/session';
 import { Button } from '@/ui/Button';
 import { Field } from '@/ui/Field';
 import { Icon } from '@/ui/Icon';
+import { LanguageSwitch } from '@/ui/LanguageSwitch';
 import { Segmented } from '@/ui/Segmented';
 import { Text } from '@/ui/Text';
 import { colors, gutter, radius } from '@/ui/theme';
@@ -31,6 +33,7 @@ const TITLES: Record<Step, { title: string; body: string }> = {
 };
 
 export default function Onboarding() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const { completeOnboarding } = useSession();
   const [step, setStep] = useState(0);
@@ -68,43 +71,46 @@ export default function Onboarding() {
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, marginHorizontal: -8 }}>
-          {step > 0 ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Back"
-              onPress={() => {
-                setProblems({});
-                setStep(step - 1);
-              }}
-              style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Icon name="back" size={22} />
-            </Pressable>
-          ) : (
-            <View style={{ width: 44 }} />
-          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {step > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('Back')}
+                onPress={() => {
+                  setProblems({});
+                  setStep(step - 1);
+                }}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Icon name="back" size={22} />
+              </Pressable>
+            ) : (
+              <View style={{ width: 44 }} />
+            )}
+            <LanguageSwitch />
+          </View>
           <Text mono size={13} color="textMuted" style={{ paddingRight: 8 }}>
-            Step {step + 1} of {STEPS.length}
+            {t('Step {n} of {total}', { n: step + 1, total: STEPS.length })}
           </Text>
         </View>
 
         <View style={{ gap: 8 }}>
           <Text size={30} weight={800} leading={1.1} tracking={-0.8} accessibilityRole="header">
-            {TITLES[current].title}
+            {t(TITLES[current].title)}
           </Text>
           <Text size={15} leading={1.5} color="textMuted">
-            {TITLES[current].body}
+            {t(TITLES[current].body)}
           </Text>
         </View>
 
         {current === 'country' ? (
-          <View accessibilityRole="radiogroup" accessibilityLabel="Country" style={{ gap: 10 }}>
+          <View accessibilityRole="radiogroup" accessibilityLabel={t('Country')} style={{ gap: 10 }}>
             {COUNTRIES.map((c) => (
               <View
                 key={c.code}
                 accessibilityRole="radio"
                 accessibilityState={{ checked: c.available, disabled: !c.available }}
-                accessibilityLabel={c.name}
+                accessibilityLabel={t(c.name)}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -118,11 +124,11 @@ export default function Onboarding() {
               >
                 <Radio on={c.available} />
                 <Text size={17} weight={700} color={c.available ? 'text' : 'textMuted'} style={{ flex: 1 }}>
-                  {c.name}
+                  {t(c.name)}
                 </Text>
                 {c.available ? null : (
                   <Text size={13} color="textFaint">
-                    Not available yet
+                    {t('Not available yet')}
                   </Text>
                 )}
               </View>
@@ -132,40 +138,40 @@ export default function Onboarding() {
 
         {current === 'company' ? (
           <View style={{ gap: 16 }}>
-            <Field label="Company RUT" mono value={draft.companyRut} onChangeText={(companyRut) => patch({ companyRut })} autoCapitalize="characters" placeholder="76.123.456-7" notice={notice('companyRut')} />
-            <Field label="Legal name" value={draft.legalName} onChangeText={(legalName) => patch({ legalName })} autoCapitalize="words" placeholder="Importadora Ejemplo SpA" notice={notice('legalName')} />
-            <Field label="Email" value={draft.email} onChangeText={(email) => patch({ email })} keyboardType="email-address" autoCapitalize="none" placeholder="name@company.cl" notice={notice('email')} />
-            <Field label="Mobile" mono value={draft.phone} onChangeText={(phone) => patch({ phone })} keyboardType="phone-pad" placeholder="+56 9 1234 5678" notice={notice('phone')} />
+            <Field label={t('Company RUT')} mono value={draft.companyRut} onChangeText={(companyRut) => patch({ companyRut })} autoCapitalize="characters" placeholder="76.123.456-7" notice={notice('companyRut')} />
+            <Field label={t('Legal name')} value={draft.legalName} onChangeText={(legalName) => patch({ legalName })} autoCapitalize="words" placeholder="Importadora Ejemplo SpA" notice={notice('legalName')} />
+            <Field label={t('Email')} value={draft.email} onChangeText={(email) => patch({ email })} keyboardType="email-address" autoCapitalize="none" placeholder="name@company.cl" notice={notice('email')} />
+            <Field label={t('Mobile')} mono value={draft.phone} onChangeText={(phone) => patch({ phone })} keyboardType="phone-pad" placeholder="+56 9 1234 5678" notice={notice('phone')} />
             <Text size={13} leading={1.5} color="textFaint">
-              Filled in with the demo company, Pacífico Foods SpA. The documents of the test orders carry this RUT, so change it only to try the form.
+              {t('Filled in with the demo company, Pacífico Foods SpA. The documents of the test orders carry this RUT, so change it only to try the form.')}
             </Text>
           </View>
         ) : null}
 
         {current === 'representative' ? (
           <View style={{ gap: 16 }}>
-            <Field label="Full name" value={draft.repName} onChangeText={(repName) => patch({ repName })} autoCapitalize="words" placeholder="First name and surname" notice={notice('repName')} />
+            <Field label={t('Full name')} value={draft.repName} onChangeText={(repName) => patch({ repName })} autoCapitalize="words" placeholder={t('First name and surname')} notice={notice('repName')} />
             <Field label="RUT" mono value={draft.repRut} onChangeText={(repRut) => patch({ repRut })} autoCapitalize="characters" placeholder="12.345.678-5" notice={notice('repRut')} />
             <View style={{ gap: 6 }}>
               <Text size={14} weight={600}>
-                Are you a politically exposed person?
+                {t('Are you a politically exposed person?')}
               </Text>
               <Segmented
                 options={[
-                  { value: 'no', label: 'No' },
-                  { value: 'yes', label: 'Yes' },
+                  { value: 'no', label: t('No') },
+                  { value: 'yes', label: t('Yes') },
                 ]}
                 value={draft.pep}
                 onChange={(pep) => patch({ pep })}
-                accessibilityLabel="Politically exposed person"
+                accessibilityLabel={t('Politically exposed person')}
                 role="radiogroup"
               />
               <Text size={13} leading={1.5} color="textFaint">
-                Someone who holds or held a senior public office, or a close relative. Banks in Chile ask this by law.
+                {t('Someone who holds or held a senior public office, or a close relative. Banks in Chile ask this by law.')}
               </Text>
             </View>
             <Text size={13} leading={1.5} color="textFaint">
-              Name and RUT are examples. They stay on this phone.
+              {t('Name and RUT are examples. They stay on this phone.')}
             </Text>
           </View>
         ) : null}
@@ -173,8 +179,8 @@ export default function Onboarding() {
         {current === 'identity' ? (
           <View style={{ gap: 16 }}>
             <View style={{ backgroundColor: colors.surface, borderRadius: radius.card, paddingVertical: 8 }}>
-              <Requirement icon="orders" title="Photo of your ID card" detail="Front and back" />
-              <Requirement icon="camera" title="A selfie" detail="Compared with the photo of the card" />
+              <Requirement icon="orders" title={t('Photo of your ID card')} detail={t('Front and back')} />
+              <Requirement icon="camera" title={t('A selfie')} detail={t('Compared with the photo of the card')} />
             </View>
             <Pressable
               accessibilityRole="checkbox"
@@ -208,10 +214,10 @@ export default function Onboarding() {
               </View>
               <View style={{ flex: 1, gap: 4 }}>
                 <Text size={16} weight={700}>
-                  I validated my identity
+                  {t('I validated my identity')}
                 </Text>
                 <Text size={14} leading={1.45} color="textMuted">
-                  Simulated in this version: nothing is captured or checked here. In production, a provider does it.
+                  {t('Simulated in this version: nothing is captured or checked here. In production, a provider does it.')}
                 </Text>
               </View>
             </Pressable>
@@ -221,13 +227,13 @@ export default function Onboarding() {
               </Text>
             ) : null}
             <Text size={13} leading={1.5} color="textFaint">
-              Your details stay on this phone. Keel does not send them to anyone in this version.
+              {t('Your details stay on this phone. Keel does not send them to anyone in this version.')}
             </Text>
           </View>
         ) : null}
 
         <View style={{ marginTop: 'auto', paddingTop: 8 }}>
-          <Button label={last ? 'Enter Keel' : 'Continue'} onPress={next} />
+          <Button label={last ? t('Enter Keel') : t('Continue')} onPress={next} />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
