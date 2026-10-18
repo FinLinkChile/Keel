@@ -3,7 +3,7 @@ import { structHash } from "@keel/schemas/hash";
 import { type AgentChain, deploymentSettings, ESCROW_ABI, orderOfCall } from "@keel/engine";
 import { encodeFunctionResult } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { attestation, documentContext, extractions, order as fixtureOrder, terms, word } from "../../../engine/src/testing/fixtures";
 import { setDdb, toItem } from "../db";
 import { restrictToPdr } from "../keys";
@@ -14,7 +14,7 @@ import { s3Evidence } from "../agent/evidence";
 import { DynamoSnapshotStore } from "../agent/store";
 import type { RuntimeDeployment } from "../agent/deployment";
 import { FakeDynamo, FakeS3, FakeSqs, TEST_ENV } from "../testing/fakes";
-import { type AgentPassDeps, runAgentPass } from "./agent";
+import { type AgentPassDeps, handleMessages, runAgentPass } from "./agent";
 
 const low = (a: string) => a.toLowerCase();
 const relayer = privateKeyToAccount(word("relayer"));
@@ -157,5 +157,37 @@ describe("agent Lambda pass", () => {
 
   it("refuses a Safe the deployment does not serve", async () => {
     expect(await runAgentPass(low(word("other safe").slice(0, 42)), deps())).toEqual({ status: "skipped", reason: "SAFE_NOT_DEPLOYED" });
+  });
+
+  it("a failed pass is logged without the RPC URL and the message is done, so the FIFO group is not blocked", async () => {
+    const body = JSON.stringify({ safe: SAFE });
+    // The handler logs through logLine (console): capture it
+    const printed: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((s) => void printed.push(String(s)));
+    const viemLike = Object.assign(new Error("HTTP request failed.\n\nURL: https://rpc.example/v2/SECRETKEY"), { shortMessage: "HTTP request failed." });
+    for (const error of [viemLike, new Error("connect ECONNREFUSED https://rpc.example/v2/SECRETKEY")]) {
+      const failing = deps({ chain: async () => Promise.reject(error) });
+      await expect(handleMessages({ Records: [{ body, messageId: "m1" }] } as never, failing)).resolves.toBeUndefined();
+    }
+    spy.mockRestore();
+    expect(printed.filter((l) => l.includes("pass_failed"))).toHaveLength(2);
+    expect(printed.join("\n")).not.toContain("SECRETKEY");
+    // The lock was released on the way out
+    expect((await acquire(relayer.address, 110, TEST_ENV))?.release).toBeDefined();
+  });
+
+  it("a failed notice send is reported to the pass, not lost: the marker is gone and the next pass sends it", async () => {
+    let fail = true;
+    const realSend = sqs.send.bind(sqs);
+    sqs.send = async (c: unknown) => (fail ? Promise.reject(new Error("SQS down")) : realSend(c));
+    const logs: Record<string, unknown>[] = [];
+    // The release is sent, its notice is not
+    await runAgentPass(SAFE, deps({ log: (l) => logs.push(l) }));
+    expect(logs).toContainEqual(expect.objectContaining({ bot: "enqueue_failed" }));
+    expect(sqs.sent).toHaveLength(0);
+    fail = false;
+    const notices = [{ id: `${order.orderId}:balance_released` }];
+    expect(await enqueueOnce(notices, TEST_ENV)).toBe(1);
+    expect(sqs.sent).toHaveLength(1);
   });
 });

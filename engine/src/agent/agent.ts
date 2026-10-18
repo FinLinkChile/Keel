@@ -31,6 +31,7 @@ import {
   resolveCall,
   submitShipmentCall,
 } from "./escrow";
+import { errorDetail } from "./detail";
 import type { AgentStore, StoredClosing, StoredOrder } from "./store";
 
 // What the agent needs from the chain. The relayer is the sender of every call.
@@ -175,6 +176,8 @@ export class Agent {
     for (const orderId of this.deps.store.orderIds()) {
       let event: AgentEvent;
       let record: OrderRecord | undefined;
+      // Holds of a relayed signature that went on to the normal step of the same pass
+      const before: AgentEvent[] = [];
       try {
         record = decodeOrderOf(await this.deps.chain.call(orderOfCall(this.config.escrow, orderId)));
         if (record.state === "NONE") {
@@ -185,10 +188,15 @@ export class Agent {
           event = await this.open(orderId, stored);
         } else {
           if (!same(record.po.importer, this.config.safe)) continue;
-          event = await this.step(orderId, record, now);
+          event = await this.step(orderId, record, now, before);
         }
       } catch (e) {
-        event = { orderId, state: record?.state ?? "NONE", outcome: "failed", reason: "AGENT_ERROR", detail: (e as Error).message };
+        // errorDetail: a viem error carries the RPC URL (and its API key) in its message
+        event = { orderId, state: record?.state ?? "NONE", outcome: "failed", reason: "AGENT_ERROR", detail: errorDetail(e) };
+      }
+      for (const held of before) {
+        events.push(held);
+        this.report(held, record);
       }
       events.push(event);
       this.report(event, record);
@@ -213,24 +221,38 @@ export class Agent {
   //                       the dispute window and needs no documents, so waiting for them would
   //                       only delay what the importer already authorized
   //   DISPUTED            a cancel of both parties, then the arbiter's resolution
-  private async step(orderId: Hex, record: OrderRecord, now: bigint): Promise<AgentEvent> {
+  //
+  // A relayed signature the escrow rejects in simulation (stale, wrong, already used) is a hold, but
+  // it must not stop the order: the hold goes to `before` (reported, once) and the normal step of
+  // that state runs in the same pass. Nothing was sent by the held call, so the pass still sends at
+  // most one transaction per order.
+  private async step(orderId: Hex, record: OrderRecord, now: bigint, before: AgentEvent[]): Promise<AgentEvent> {
     const state = record.state;
     const closing = this.deps.store.order(orderId)?.closing;
+    // The event of a closing signature, or undefined when the normal step goes on
+    const closed = (event: AgentEvent | undefined): AgentEvent | undefined => {
+      if (event?.outcome === "held" && event.reason === "SIMULATION_REVERTED") {
+        before.push(event);
+        return undefined;
+      }
+      return event;
+    };
     switch (state) {
       case "OPEN":
-        return (await this.cancelIfSigned(orderId, record, closing)) ?? this.fund(orderId, record, now);
+        return closed(await this.cancelIfSigned(orderId, record, closing)) ?? this.fund(orderId, record, now);
       case "ADVANCE_PAID":
-        return (await this.cancelIfSigned(orderId, record, closing)) ?? this.shipmentOrRefund(orderId, record, now);
+        return closed(await this.cancelIfSigned(orderId, record, closing)) ?? this.shipmentOrRefund(orderId, record, now);
       case "SHIPPED": {
         const approval = closing?.balanceApproval;
         // An approval of another attestation can never pass the escrow: the agent's path goes on
         if (approval && same(approval.attestationHash, record.attestationHash)) {
-          return this.execute(orderId, state, "approveBalance", approveBalanceCall(this.config.escrow, orderId, approval.sigImporter));
+          const approved = closed(await this.execute(orderId, state, "approveBalance", approveBalanceCall(this.config.escrow, orderId, approval.sigImporter)));
+          if (approved) return approved;
         }
         return this.releaseBalance(orderId, record, now);
       }
       case "DISPUTED": {
-        const cancelled = await this.cancelIfSigned(orderId, record, closing);
+        const cancelled = closed(await this.cancelIfSigned(orderId, record, closing));
         if (cancelled) return cancelled;
         const r = closing?.resolution;
         if (r) return this.execute(orderId, state, "resolve", resolveCall(this.config.escrow, orderId, r.toImporter, r.toExporter, r.sigArbiter));
@@ -399,7 +421,9 @@ export class Agent {
 
     const documents = this.deps.store.documents(orderId);
     const stored = this.deps.store.order(orderId);
-    if (!documents || !stored) return { orderId, state, outcome: "waiting", reason: "DOCUMENTS_PENDING" };
+    // Ingest stores the extractions one document at a time: with only the transport document or
+    // only the invoice the package is still being collected, not wrong
+    if (!documents?.extractions?.transport || !documents.extractions.invoice || !stored) return { orderId, state, outcome: "waiting", reason: "DOCUMENTS_PENDING" };
     // The escrow keeps only the attestation hash: the attestation itself must be the one it accepted
     const shipment = this.deps.store.shipment(orderId);
     if (!shipment || structHash("ShipmentAttestation", shipment.attestation) !== record.attestationHash) {

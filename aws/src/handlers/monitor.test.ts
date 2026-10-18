@@ -8,7 +8,7 @@ import { stateId } from "../tables";
 import type { RuntimeDeployment } from "../agent/deployment";
 import { s3EvidenceExists } from "../agent/evidence";
 import { FakeDynamo, FakeS3, TEST_ENV } from "../testing/fakes";
-import { type MonitorPassDeps, runMonitorPass } from "./monitor";
+import { MAX_RANGE, MAX_RANGES_PER_RUN, type MonitorPassDeps, runMonitorPass } from "./monitor";
 
 const word = (label: string): Hex => keccak256(toBytes(label));
 const GATE = word("gate").slice(0, 42).toLowerCase() as Hex;
@@ -38,6 +38,7 @@ describe("monitor Lambda pass", () => {
     latestBlock: async () => DEPLOY + 10n,
     logs: async (_a, from, to) => logs.filter((l) => l.blockNumber >= from && l.blockNumber <= to),
     attestationHash: async () => word("att"),
+    importerOf: async () => SAFE,
   };
   const deps = (): MonitorPassDeps => ({
     env: TEST_ENV,
@@ -92,6 +93,57 @@ describe("monitor Lambda pass", () => {
     const again = await runMonitorPass(deps());
     expect(again.status === "ran" && again.events).toMatchObject([{ reason: "UNKNOWN_FUNDING_PDR", action: "paused" }]);
     expect(pauses).toBe(1);
+  });
+
+  it("an incident with no bot account fails the run before the cursor moves, and is told once the account exists", async () => {
+    logs = [fundingExecuted(FORGED, DEPLOY + 2n)];
+    const lines: Record<string, unknown>[] = [];
+    const withoutAccount = { ...deps(), account: async () => undefined, log: (l: Record<string, unknown>) => lines.push(l) };
+    await expect(runMonitorPass(withoutAccount)).rejects.toThrow("MONITOR_NO_ACCOUNT");
+    expect(lines).toContainEqual(expect.objectContaining({ monitor: "MONITOR_NO_ACCOUNT" }));
+    expect(db.get("agent_state", stateId.cursor("monitor"))).toBeUndefined();
+    expect(enqueued).toEqual([]);
+    // The pause did happen on chain, and is remembered
+    expect(db.get("agent_state", stateId.pause())).toMatchObject({ pausedHere: true });
+
+    const next = await runMonitorPass(deps());
+    expect(next).toMatchObject({ status: "ran", next: DEPLOY + 11n });
+    expect(enqueued.map((n) => n.id)).toContain(`${word("tx 502")}:unauthorized`);
+  });
+
+  it("changes without a bot account do not stop the cursor", async () => {
+    logs = [{ ...fundingExecuted(ISSUED, DEPLOY + 1n) }];
+    expect(await runMonitorPass({ ...deps(), account: async () => undefined })).toMatchObject({ status: "ran", next: DEPLOY + 11n });
+  });
+
+  it("a notice that cannot be enqueued fails the run and keeps the cursor, so the notice is retried", async () => {
+    logs = [fundingExecuted(FORGED, DEPLOY + 2n)];
+    await expect(runMonitorPass({ ...deps(), enqueue: async () => Promise.reject(new Error("SQS down")) })).rejects.toThrow();
+    expect(db.get("agent_state", stateId.cursor("monitor"))).toBeUndefined();
+  });
+
+  it("a run far behind reads at most MAX_RANGES_PER_RUN ranges, saves the cursor, and the next run continues", async () => {
+    const far = DEPLOY + MAX_RANGE * BigInt(MAX_RANGES_PER_RUN + 5);
+    const behind: MonitorPassDeps = { ...deps(), chain: async () => ({ ...chain, latestBlock: async () => far }) };
+    logs = [fundingExecuted(FORGED, DEPLOY + MAX_RANGE * BigInt(MAX_RANGES_PER_RUN + 1) + 3n)];
+    const first = await runMonitorPass(behind);
+    const stop = DEPLOY + MAX_RANGE * BigInt(MAX_RANGES_PER_RUN);
+    expect(first).toMatchObject({ status: "ran", next: stop, events: [] });
+    expect(db.get("agent_state", stateId.cursor("monitor"))).toEqual({ id: stateId.cursor("monitor"), block: String(stop) });
+    const second = await runMonitorPass(behind);
+    expect(second).toMatchObject({ status: "ran", next: far + 1n });
+    expect(second.status === "ran" && second.events).toMatchObject([{ reason: "UNKNOWN_FUNDING_PDR" }]);
+  });
+
+  it("an RPC failure keeps the URL and its key out of the error that leaves the run", async () => {
+    const failing: MonitorPassDeps = {
+      ...deps(),
+      chain: async () => ({ ...chain, logs: async () => Promise.reject(Object.assign(new Error("HTTP request failed.\n\nURL: https://rpc.example/v2/SECRETKEY"), { name: "HttpRequestError" })) }),
+    };
+    const error = await runMonitorPass(failing).catch((e) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect(`${error.message}\n${error.stack}`).not.toContain("SECRETKEY");
+    expect(error.name).toBe("HttpRequestError");
   });
 
   it("an S3 failure fails the run before the cursor moves, instead of reporting an incident", async () => {

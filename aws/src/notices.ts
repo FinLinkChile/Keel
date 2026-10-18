@@ -7,7 +7,7 @@
 //
 // A notice is never in the payment path: a failed send is logged and the caller goes on.
 import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
-import { PutCommand } from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { type Env, required, table } from "./config";
 import { ddb, isConditionFailed, nowSeconds } from "./db";
 import { stateId } from "./tables";
@@ -19,10 +19,16 @@ export function setSqs(c: Pick<SQSClient, "send"> | undefined) {
   sqs = c;
 }
 
+// Throws when the send fails: for a caller that must not lose the notice
+export async function sendNotice(message: NoticeMessage, env: Env = process.env): Promise<void> {
+  sqs ??= new SQSClient({});
+  await sqs.send(new SendMessageCommand({ QueueUrl: required(env, "NOTICES_QUEUE_URL"), MessageBody: JSON.stringify(message) }));
+}
+
+// Never throws: false when the send failed, so the caller can answer 503 or go on
 export async function enqueueNotice(message: NoticeMessage, env: Env = process.env): Promise<boolean> {
   try {
-    sqs ??= new SQSClient({});
-    await sqs.send(new SendMessageCommand({ QueueUrl: required(env, "NOTICES_QUEUE_URL"), MessageBody: JSON.stringify(message) }));
+    await sendNotice(message, env);
     return true;
   } catch (e) {
     console.error(JSON.stringify({ event: "notice_enqueue_failed", kind: message.kind, error: (e as Error).name }));
@@ -50,10 +56,21 @@ export async function firstTime(key: string, env: Env = process.env): Promise<bo
   }
 }
 
-// Enqueue notices that each carry an `id` (the bot's notice id), once per id
+export async function forget(key: string, env: Env = process.env): Promise<void> {
+  await ddb().send(new DeleteCommand({ TableName: table("agentState", env), Key: { id: stateId.notice(key) } }));
+}
+
+// Enqueue notices that each carry an `id` (the bot's notice id), once per id. The marker is taken
+// before the send so two passes cannot both send; when the send fails the markers are removed and
+// the error is thrown, so the notice is not lost: the caller (or the next pass) sends it again.
 export async function enqueueOnce(notices: readonly { id: string }[], env: Env = process.env): Promise<number> {
-  const fresh: object[] = [];
-  for (const n of notices) if (await firstTime(n.id, env)) fresh.push(n);
-  if (fresh.length) await enqueueNotice({ kind: "notices", notices: fresh }, env);
+  const fresh: { id: string }[] = [];
+  try {
+    for (const n of notices) if (await firstTime(n.id, env)) fresh.push(n);
+    if (fresh.length) await sendNotice({ kind: "notices", notices: fresh }, env);
+  } catch (e) {
+    await Promise.allSettled(fresh.map((n) => forget(n.id, env)));
+    throw e;
+  }
   return fresh.length;
 }

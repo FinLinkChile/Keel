@@ -12,6 +12,7 @@ import { ddb, lower } from "../db";
 import { loadKeys } from "../keys";
 import { acquire, type Lock } from "../lock";
 import { enqueueOnce } from "../notices";
+import { redactedError } from "../redact";
 import type { PartyItem } from "../tables";
 import { logLine } from "../agent/clients";
 import { type RuntimeDeployment, rpcUrl, runtimeDeployment } from "../agent/deployment";
@@ -20,6 +21,9 @@ import { readCursor, readPausedHere, writeCursor, writePausedHere } from "../age
 
 // Most blocks per getLogs request: RPC providers limit the range
 export const MAX_RANGE = 2000n;
+// Ranges per run, so a run that starts far behind ends inside the function timeout and the next
+// minute continues from the cursor it saved
+export const MAX_RANGES_PER_RUN = 20;
 // One run at a time: a slow run overlapping the next minute would report and pause twice
 const LOCK_SECONDS = 55;
 const NO_EVIDENCE_DIR = "/tmp/keel-evidence-unused";
@@ -81,25 +85,50 @@ export async function runMonitorPass(deps: MonitorPassDeps): Promise<MonitorPass
     const pauser = await deps.pauser(ctx);
     const account = await deps.account(ctx.safe);
     const pending: Promise<unknown>[] = [];
+    // Blocks whose people were not told must be read again: the cursor stays before them
+    let notAlerted = false;
+    let noAccount = false;
     const notify = (event: MonitorEvent) => {
       deps.log({ monitor: event });
       if (!account) {
         deps.log({ bot: "skipped", reason: "ACCOUNT_MISSING", txHash: event.txHash });
+        if (event.kind === "incident") {
+          noAccount = true;
+          deps.log({ monitor: "MONITOR_NO_ACCOUNT", safe: ctx.safe, txHash: event.txHash, reason: event.reason });
+        }
         return;
       }
       const notices = toMonitorNotices(event, account, gate, deps.now());
-      if (notices.length) pending.push(deps.enqueue(notices).catch((e: Error) => deps.log({ bot: "enqueue_failed", txHash: event.txHash, error: e.name })));
+      if (notices.length) {
+        pending.push(
+          deps.enqueue(notices).catch((e: unknown) => {
+            notAlerted = true;
+            deps.log({ bot: "enqueue_failed", txHash: event.txHash, error: e instanceof Error ? e.name : "Error" });
+          }),
+        );
+      }
     };
     const monitor = new Monitor(
-      { chainId: ctx.chainId, gate, escrow: ctx.escrow, evidenceDir: NO_EVIDENCE_DIR, fromBlock, maxRange: MAX_RANGE, pausedHere },
+      { chainId: ctx.chainId, gate, escrow: ctx.escrow, safe: ctx.safe, evidenceDir: NO_EVIDENCE_DIR, fromBlock, maxRange: MAX_RANGE, maxRangesPerTick: MAX_RANGES_PER_RUN, pausedHere },
       { chain, pauser, notify, isIssued: deps.isIssued },
     );
-    // A failing read throws before the cursor is saved: the next run reads the same blocks again,
-    // and enqueueOnce keeps their notices from repeating
-    const events = await monitor.tick();
+    // A read that fails stops the tick, but the ranges it finished are done: they are saved below
+    // (their notices already went out, and enqueueOnce keeps them from repeating anyway)
+    let events: MonitorEvent[] = [];
+    let failure: unknown;
+    try {
+      events = await monitor.tick();
+    } catch (e) {
+      failure = e;
+    }
     await Promise.all(pending);
-    await writeCursor("monitor", monitor.cursor, deps.env);
+    // The pause happened on chain whatever comes next: remember it
     if (monitor.paused !== pausedHere) await writePausedHere(monitor.paused, deps.env);
+    if (!notAlerted && !noAccount && monitor.cursor > fromBlock) await writeCursor("monitor", monitor.cursor, deps.env);
+    if (failure) throw redactedError(failure);
+    // Throwing (not advancing) retries the incident every minute and shows in the Lambda error metric
+    if (noAccount) throw new Error("MONITOR_NO_ACCOUNT: an incident was found and the Safe has no bot account to tell");
+    if (notAlerted) throw new Error("the monitor could not enqueue its notices");
     deps.log({ monitor: "pass", fromBlock, next: monitor.cursor, events: events.length, pauser: pauser?.address ?? null });
     return { status: "ran", events, next: monitor.cursor };
   } finally {
@@ -107,6 +136,11 @@ export async function runMonitorPass(deps: MonitorPassDeps): Promise<MonitorPass
   }
 }
 
+// An error that leaves this function reaches the Lambda runtime log: no RPC URL in it
 export const handler = async (): Promise<void> => {
-  await runMonitorPass(defaultDeps());
+  try {
+    await runMonitorPass(defaultDeps());
+  } catch (e) {
+    throw redactedError(e);
+  }
 };

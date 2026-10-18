@@ -5,8 +5,13 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda
 import type { Hex } from "@keel/schemas";
 import { type AuthRejection, authenticate } from "./auth";
 import { deployment } from "./config";
+import { safeMessage } from "./redact";
 
-export const MAX_BODY_BYTES = 10 * 1024 * 1024;
+// A synchronous Lambda invocation carries at most 6 MB of payload, and API Gateway wraps the body in
+// an event envelope (headers, request context). 5.5 MB of raw body is what fits, so a larger one
+// gets 413 here instead of an API Gateway error. A base64 body (a PDF in JSON) is capped at 5.5 MB
+// of text: about 4.1 MB of file.
+export const MAX_BODY_BYTES = Math.floor(5.5 * 1024 * 1024);
 
 export class HttpError extends Error {
   constructor(
@@ -89,7 +94,7 @@ export function api(routes: Record<string, Route>, options: Record<string, Route
     } catch (e) {
       if (e instanceof HttpError) return json(e.status, { error: e.code, ...e.extra });
       // The message stays in the logs, never in the reply
-      console.error(JSON.stringify({ event: "api_error", route: event.routeKey, error: (e as Error).message }));
+      console.error(JSON.stringify({ event: "api_error", route: event.routeKey, error: safeMessage(e) }));
       return json(500, { error: "internal" });
     }
   };

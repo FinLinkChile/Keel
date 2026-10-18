@@ -8,6 +8,7 @@ export * from "./pdr";
 export * from "./policy";
 export * from "./verify";
 export * from "./agent/agent";
+export * from "./agent/detail";
 export * from "./agent/escrow";
 export * from "./agent/store";
 // What a host other than the CLI needs to run the agent and the monitor (aws/src/handlers)

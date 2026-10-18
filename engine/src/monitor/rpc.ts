@@ -7,6 +7,11 @@ import type { MonitorChain } from "./monitor";
 
 export function rpcMonitorChain(rpcUrl: string): MonitorChain {
   const client = createPublicClient({ transport: http(rpcUrl) });
+  const orderOf = async (escrow: Hex, orderId: Hex) => {
+    const data = encodeFunctionData({ abi: ESCROW_ABI, functionName: "orderOf", args: [orderId] });
+    const { data: out } = await client.call({ to: escrow, data });
+    return decodeFunctionResult({ abi: ESCROW_ABI, functionName: "orderOf", data: out ?? "0x" });
+  };
   return {
     latestBlock: () => client.getBlockNumber(),
     async logs(addresses, fromBlock, toBlock) {
@@ -21,9 +26,10 @@ export function rpcMonitorChain(rpcUrl: string): MonitorChain {
       }));
     },
     async attestationHash(escrow, orderId) {
-      const data = encodeFunctionData({ abi: ESCROW_ABI, functionName: "orderOf", args: [orderId] });
-      const { data: out } = await client.call({ to: escrow, data });
-      return decodeFunctionResult({ abi: ESCROW_ABI, functionName: "orderOf", data: out ?? "0x" }).attestationHash;
+      return (await orderOf(escrow, orderId)).attestationHash;
+    },
+    async importerOf(escrow, orderId) {
+      return (await orderOf(escrow, orderId)).po.importer;
     },
   };
 }

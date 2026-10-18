@@ -29,6 +29,7 @@ import { lower } from "../db";
 import { loadKeys, type ServerKeys } from "../keys";
 import { acquire, type Lock } from "../lock";
 import { enqueueOnce } from "../notices";
+import { safeMessage } from "../redact";
 import { logLine } from "../agent/clients";
 import { type RuntimeDeployment, rpcUrl, runtimeDeployment } from "../agent/deployment";
 import { s3Evidence } from "../agent/evidence";
@@ -37,6 +38,7 @@ import { DynamoSnapshotStore } from "../agent/store";
 // The lock outlives the function timeout (set below this in infra), so a pass that dies holding
 // it frees the relayer on its own before the next-but-one minute.
 export const LOCK_HOLD_SECONDS = 110;
+export const RECEIPT_TIMEOUT_MS = 60_000;
 // Never read: the evidence goes to S3 through saveEvidence. AgentConfig requires a directory.
 const NO_EVIDENCE_DIR = "/tmp/keel-evidence-unused";
 
@@ -58,7 +60,9 @@ export function defaultDeps(env: Env = process.env): AgentPassDeps {
     keys: (registered) => loadKeys(["relayer", "policySigner"], { env }, registered),
     async chain(relayer, ctx) {
       // Escrow logs are searched from the deployment block: RPC providers cap the range of getLogs
-      const chain = rpcChain(await rpcUrl(env), relayer, ctx.deployBlock > 0n ? { fromBlock: ctx.deployBlock } : {});
+      // The receipt wait stays well inside the function timeout (viem waits 180 s by default): a
+      // transaction mined after it is found by the next pass, which re-reads the order
+      const chain = rpcChain(await rpcUrl(env), relayer, { receiptTimeoutMs: RECEIPT_TIMEOUT_MS, ...(ctx.deployBlock > 0n && { fromBlock: ctx.deployBlock }) });
       const id = await chain.chainId();
       if (id !== ctx.chainId) throw new ConfigError(`the RPC serves chain ${id}, not ${ctx.chainId}`);
       return chain;
@@ -108,7 +112,7 @@ export async function runAgentPass(safeAddress: string, deps: AgentPassDeps): Pr
       try {
         notices = toNotices(event, record, store, deps.now());
       } catch (e) {
-        deps.log({ bot: "skipped", orderId: event.orderId, reason: "DATA_ERROR", detail: (e as Error).message });
+        deps.log({ bot: "skipped", orderId: event.orderId, reason: "DATA_ERROR", detail: safeMessage(e) });
         return;
       }
       if (typeof notices === "string") {
@@ -138,10 +142,14 @@ export async function runAgentPass(safeAddress: string, deps: AgentPassDeps): Pr
   }
 }
 
-// A malformed message is dropped with a log line: retrying it can never succeed. Any other error
-// throws, so SQS retries the message and the Lambda error metric shows it.
-export const handler = async (event: SQSEvent): Promise<void> => {
-  const deps = defaultDeps();
+// A malformed message is dropped with a log line: retrying it can never succeed. A failed pass is
+// logged (URLs removed: viem puts the RPC URL, with its API key, in its messages) and the message
+// is done too, never thrown: the next minute's message runs a full pass anyway, and a failed
+// message would hold back every newer one of the same Safe (FIFO group) for the visibility timeout.
+// The failure is visible as the `agent: "pass_failed"` log line (metric filter in infra).
+export const handler = (event: SQSEvent): Promise<void> => handleMessages(event, defaultDeps());
+
+export async function handleMessages(event: SQSEvent, deps: AgentPassDeps): Promise<void> {
   for (const record of event.Records) {
     let safe: unknown;
     try {
@@ -153,6 +161,10 @@ export const handler = async (event: SQSEvent): Promise<void> => {
       logLine({ agent: "skipped", reason: "BAD_MESSAGE", messageId: record.messageId });
       continue;
     }
-    await runAgentPass(safe, deps);
+    try {
+      await runAgentPass(safe, deps);
+    } catch (e) {
+      logLine({ agent: "pass_failed", safe, messageId: record.messageId, error: e instanceof Error ? e.name : "Error", detail: safeMessage(e) });
+    }
   }
-};
+}

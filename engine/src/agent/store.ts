@@ -80,19 +80,31 @@ function reviveClosing(raw: Raw): StoredClosing | undefined {
   const closing: StoredClosing = {};
   const a = raw.balanceApproval;
   if (a && isHex(a.sigImporter) && isHex(a.attestationHash)) closing.balanceApproval = { sigImporter: a.sigImporter, attestationHash: a.attestationHash };
-  const c = raw.cancel;
-  if (c && (typeof c.cancelNonce === "string" || typeof c.cancelNonce === "number" || typeof c.cancelNonce === "bigint")) {
+  const nonce = uint(raw.cancel?.cancelNonce);
+  if (nonce !== undefined) {
+    const c = raw.cancel;
     closing.cancel = {
-      cancelNonce: BigInt(c.cancelNonce),
+      cancelNonce: nonce,
       ...(isHex(c.sigImporter) && { sigImporter: c.sigImporter }),
       ...(isHex(c.sigExporter) && { sigExporter: c.sigExporter }),
     };
   }
   const r = raw.resolution;
-  if (r && isHex(r.sigArbiter) && r.toImporter !== undefined && r.toExporter !== undefined) {
-    closing.resolution = { toImporter: BigInt(r.toImporter), toExporter: BigInt(r.toExporter), sigArbiter: r.sigArbiter };
+  const toImporter = uint(r?.toImporter);
+  const toExporter = uint(r?.toExporter);
+  if (r && isHex(r.sigArbiter) && toImporter !== undefined && toExporter !== undefined) {
+    closing.resolution = { toImporter, toExporter, sigArbiter: r.sigArbiter };
   }
   return Object.keys(closing).length > 0 ? closing : undefined;
+}
+
+// A non-negative integer as a bigint, from a decimal string, a number or a bigint; anything else
+// (a malformed stored value) is undefined, never an exception
+function uint(v: unknown): bigint | undefined {
+  if (typeof v === "bigint") return v >= 0n ? v : undefined;
+  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? BigInt(v) : undefined;
+  if (typeof v === "string" && /^[0-9]+$/.test(v)) return BigInt(v);
+  return undefined;
 }
 
 export function reviveOrder(raw: Raw): StoredOrder {
