@@ -64,7 +64,10 @@ describe("proposals: happy path", () => {
     });
     expect(ddb.get("parties", { address: exporter.address.toLowerCase() })).toMatchObject({ kind: "exporter", history: [po.totalAmount.toString()] });
     expect(ddb.get("ingest", { pk: `order#${po.orderId.toLowerCase()}`, sk: "entry" })).toMatchObject({
-      value: { orderId: po.orderId.toLowerCase(), payoutAddress: po.payoutAddress, carrier: po.carrier, uploaders: order.uploaders },
+      orderId: po.orderId.toLowerCase(),
+      payoutAddress: po.payoutAddress,
+      carrier: po.carrier,
+      uploaders: order.uploaders,
     });
   });
 

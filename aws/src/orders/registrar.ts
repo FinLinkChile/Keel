@@ -23,7 +23,7 @@ import { actors, getParties } from "./parties";
 import { checkOrder } from "./rules";
 
 // ingest/src/trade/upload.ts TradeOrderEntry, as the ingest table holds it:
-//   { pk: "order#<orderId>", sk: "entry", value: TradeOrderEntry }
+//   { pk: "order#<orderId>", sk: "entry", ...TradeOrderEntry }   (flat: aws/src/ingest/repo.ts orderEntry reads the fields from the item)
 export interface TradeOrderEntry {
   orderId: Hex;
   payoutAddress: Hex;
@@ -111,7 +111,7 @@ export async function registerOrder(orderId: string, opts: { escrow: Hex; env?: 
     carrier: po.carrier,
     uploaders: uploaders.map((u) => ({ address: u.address as Hex, party: u.party })),
   };
-  await ddb().send(new PutCommand({ TableName: table("ingest", env), Item: { ...ingestKey(order.orderId), value: entry } }));
+  await ddb().send(new PutCommand({ TableName: table("ingest", env), Item: { ...entry, ...ingestKey(order.orderId) } }));
   log({ orderId: order.orderId, outcome });
   return outcome;
 }
