@@ -5,7 +5,7 @@ description: "Cómo le entregan el motor, la ingesta y otros productores los avi
 tags: [bot, avisos, telegram, ingesta, motor, t4-3, t4-6]
 modo: ambos
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-15T22:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T22:00:00Z }
 ---
 
 **[PROPUESTA]** Diseño del Área 4 (T4.3 y T4.6) para que lo usen las Áreas 2 y 3. El código ya existe en `bot/` **[HECHO]**. Está por confirmar con las Áreas 2 y 3.
@@ -37,7 +37,7 @@ Los dos tokens miden al menos 32 caracteres, son distintos entre sí y distintos
 
 Avisar es opcional y nunca es un paso del camino de pago. Un productor llama al bot solo si tiene configurados la URL y el token del bot. Si el bot está caído o tarda, el correo, el documento o la decisión se procesan igual: timeout corto y el error solo se registra.
 
-Mandar dos veces lo mismo no repite el mensaje: cada aviso tiene un `id` y el bot envía cada `id` una sola vez. La deduplicación vive en memoria, así que un reinicio del bot puede reenviar.
+Mandar dos veces lo mismo no repite el mensaje: cada aviso tiene un `id` y el bot envía cada `id` una sola vez a cada chat. En local la deduplicación vive en memoria, así que un reinicio del bot puede reenviar; en AWS vive en DynamoDB (abajo).
 
 # Salida de ingesta
 
@@ -60,10 +60,11 @@ Las fuentes de Personal necesitan `BOT_PERSONAL_ACCOUNT_ID`, porque ingesta no c
 | Trade, `held` por `doc_type_mismatch` | `operation_held` con motivo `documents_mismatch` |
 | Trade, `held` por `bl_used_by_other_order` | `operation_held` con motivo `bl_reused` |
 | Trade, `held` por `parser_failed` o `extractor_failed` | `operation_held` con motivo `document_unreadable` |
-| Trade, lectura con `alert` | `account_change_attempt` |
-| Trade, `ready` sin `alert`, `rejected`, `quarantined` o `duplicate` | nada |
+| Trade, lectura (`ready` o `disagreement`) con `alert` | `account_change_attempt`, junto a la retención si la hay. Las cuentas de `found`, los gatillos y el código de recordatorio no llegan al chat |
+| Trade, lectura cuya extracción trae `hidden_text_detected` | `operation_held` con motivo `hidden_text`, junto a cualquier otra retención |
+| Trade, `ready` sin `alert` ni texto oculto, `rejected`, `quarantined` o `duplicate` | nada (la ingesta los registra) |
 
-Las filas de Trade son el mapeo planeado: hoy `trade_upload` responde `501` y su traductor se escribe cuando el código de carga de documentos de Trade del Área 3 llegue a `dev`.
+El traductor de Trade existe (`bot/src/adapters/inbound/ingest-trade-mapper.ts`) y `trade_upload` ya no responde `501`. Una carga puede dar varios avisos; entonces la respuesta es `{ "status": ..., "notices": [...] }` con el estado de cada uno. Una orden que no está en `BOT_ORDERS_FILE` responde `400 mapper_failed`.
 
 Nunca llegan al chat el dominio del remitente, las cuentas encontradas en un documento (`proposed` o `found`) ni texto de un correo o de un documento. De las dos lecturas que no coinciden solo se muestran los valores de forma fija (fechas, montos, monedas, incoterm, puertos, periodo, alias), revalidados. Los identificadores (números de documento, factura u orden, RUT, código arancelario) solo se nombran, porque en ellos cabe un teléfono. Los dos valores están en la app.
 
@@ -72,3 +73,14 @@ Nunca llegan al chat el dominio del remitente, las cuentas encontradas en un doc
 - **Motor (Área 2):** cómo llegan sus avisos (`payment_held`, `payment_deadline`, `operation_held`, `deadline_approaching`). Cada productor manda su propio código de motivo y un adaptador lo traduce al enum del bot. Esa traducción se acuerda con el Área 2. Para las retenciones de Trade ya hay tres motivos del motor, pedidos por el Área 2 en el PR #50: `FUNDING_BLOCKED` pasa a `funding_blocked`, `SIMULATION_REVERTED` a `simulation_failed`, y `ATTESTATION_UNKNOWN` e `IMPORTER_NOT_REGISTERED` a `agent_data_incomplete`. Llegan solo al dueño y al operador del importador, porque son fallas de su lado, y el mensaje no nombra ningún documento.
 - **Resumen de solicitudes de cambio (Área 3):** alguien en ingesta debe ejecutar `changeDigest` periódicamente (por ejemplo, una vez al día) y mandarlo. Falta acordar si las solicitudes de cambio se avisan además una por una. Hoy el bot acepta las dos cosas, con tope por chat.
 - **Eventos del escrow (Área 1):** el escucha de `OrderOpened`, `OrderFunded`, `AdvanceReleased` y los demás eventos de `TradeEscrow`, cuando exista, entrega por `POST /notices`.
+
+# En AWS **[PROPUESTA]**
+
+En la rama `AWS` los avisos viajan por una cola SQS con el mismo cuerpo de estas dos rutas (`{ kind: "notices", notices }` o `{ kind: "ingest_outcome", payload }`), y la Lambda de envío los manda a Telegram ([despliegue en AWS](../arquitectura/despliegue-aws.md)):
+
+* `POST /notices` y `POST /ingest/outcomes` siguen existiendo para productores externos, con un solo token (`bot_inbound_token`), y solo encolan: responden `202 {"queued":true}`, sin el resultado por aviso.
+* El directorio (cuentas, chats por rol, etiquetas de orden) lo carga el operador con `PUT /bot/recipients` y se lee con `GET /bot/recipients`, con token `bot_admin_token` y la cabecera `x-admin-actor`; cada cambio queda auditado. Si una orden no se registra aquí, los avisos de ingesta de esa orden se descartan (`mapper_failed`) sin avisar a nadie.
+* La deduplicación, el tope por chat (por hora de reloj) y las retenciones quedan en DynamoDB. Un fallo reintentable de Telegram vuelve a la cola solo para los chats pendientes y devuelve el cupo de la hora. Cada chat se reserva por 5 minutos mientras se envía y queda marcado como enviado solo al terminar, así que una caída a mitad de envío no pierde el aviso: puede repetirlo una vez (al menos una vez, no como máximo una vez).
+* Un mensaje de la cola con forma inválida se descarta sin reintento y se registra como `queue_invalid`, que tiene alarma.
+* `PUT /bot/recipients` escribe la auditoría antes de aplicar el cambio, y rechaza borrar una cuenta que una orden guardada todavía nombra (400 `invalid_recipients`).
+* `open` y `resolve` del agente todavía no tienen aviso: propuesta al Área 4.

@@ -109,6 +109,11 @@ abstract contract PDRVerifier is IPDRVerifier, EIP712 {
         _verifyCosignature(d, pdrHash, sigCosigner);
     }
 
+    /// @dev Extra check a gate can add on a new policy signer or cosigner, after the zero and
+    /// signer-is-cosigner checks. Internal, so it adds nothing to the ABI; PDRGate keeps this
+    /// default (no check). FundingGate rejects its guardian here.
+    function _checkSigner(address signer) internal view virtual {}
+
     // ----------------------------------------------------------------- views for off-chain parity (T2.1)
 
     function domainSeparator() external view returns (bytes32) {
@@ -140,6 +145,7 @@ abstract contract PDRVerifier is IPDRVerifier, EIP712 {
     function setPolicySigner(address s) external onlySafe {
         if (s == address(0)) revert ZeroAddress();
         if (s == cosigner) revert SignerIsCosigner();
+        _checkSigner(s);
         policySigner = s;
         emit PolicySignerSet(s);
     }
@@ -152,6 +158,7 @@ abstract contract PDRVerifier is IPDRVerifier, EIP712 {
     function setCosigner(address c) external onlySafe {
         if (c == address(0)) revert ZeroAddress();
         if (c == policySigner) revert SignerIsCosigner();
+        _checkSigner(c);
         cosigner = c;
         emit CosignerSet(c);
     }

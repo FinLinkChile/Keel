@@ -29,6 +29,10 @@ function routeOf(n: TradeNotice): Route {
       return { importer: ["owner", "operator"], exporter: ["owner"] };
     case "change_queued":
       return { importer: ["cosigner", "owner"] };
+    case "unauthorized_execution":
+      // A chain incident for the whole account: the owner, the operator who runs the agent and the
+      // cosigner who can stop it all need to know
+      return { importer: ["owner", "operator", "cosigner"] };
     case "transfer_blocked":
     case "agent_revoked":
     case "gate_paused":

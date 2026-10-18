@@ -22,12 +22,31 @@ export {
   type EmailAuthResult,
   type Envelope,
 } from "./email/auth";
-export { MIME_FAILURES, type MimeFailure } from "./email/mime";
+export { MAX_EMAIL_BYTES, MIME_FAILURES, type MimeFailure } from "./email/mime";
+export { MAX_PDF_BYTES } from "./pdf/text";
 export { receiveEmail, type EmailOutcome, type QuarantineReason } from "./email/receive";
-export { createHandler, ServerConfigError, startServer, type LogEntry, type TradeLogEntry } from "./server";
+export {
+  ACTOR_RE,
+  AliasTableSchema,
+  createHandler,
+  MAX_ADMIN_BODY_BYTES,
+  MAX_TRADE_BODY_BYTES,
+  MIN_TOKEN_LENGTH,
+  PROFORMA_REJECTION_STATUS,
+  ProformaUploadBody,
+  ServerConfigError,
+  startServer,
+  TRADE_REJECTION_STATUS,
+  TradeOrderEntrySchema,
+  TradeUploadBody,
+  type LogEntry,
+  type ProformaLogEntry,
+  type TradeLogEntry,
+} from "./server";
 export {
   BotConfigError,
   botNotifierFromEnv,
+  changeDigestPayload,
   createBotNotifier,
   scheduleChangeDigest,
   type BotLogEntry,
@@ -35,23 +54,41 @@ export {
   type BotPayload,
 } from "./botNotifier";
 export {
+  baseUrlsFromEnv,
+  fileSettingsBackend,
   IngestSettings,
+  initialSettings,
   KEY_ENV,
+  keysFromEnv,
+  SettingsChange,
   SettingsError,
   SettingsStore,
+  type ApiKeys,
+  type BaseUrls,
   type SettingsAudit,
+  type SettingsBackend,
   type StoredSettings,
 } from "./settings";
 export {
   CHANGE_COOLDOWN_DAYS,
   CHANGE_RESOLUTIONS,
-  IngestStore,
+  DAY_MS,
   MAX_DOCUMENTS_PER_ORDER_PER_DAY,
   MAX_EMAILS_PER_SENDER_PER_DAY,
+  packageFrom,
+  READ_EXTRACTOR_FAILED,
+  utcDay,
+  type AcceptedDocument,
   type ChangeResolution,
+  type IngestRepo,
   type StoredChangeRequest,
+  type StoredDocument,
+  type StoredUpload,
   type TradePackage,
-} from "./store";
+  type UploadAdmission,
+  type UploadEntry,
+} from "./repo";
+export { IngestStore } from "./store";
 export { invoiceKey } from "./invoiceKey";
 export {
   foldHomoglyphs,
@@ -73,13 +110,14 @@ export {
   type PaymentDestination,
 } from "./parser";
 export { HIDDEN_REASONS, type HiddenReason } from "./pdf/hidden";
-export { PII_PATTERNS, transferLog } from "./privacy";
+export { LLM_PURPOSES, PII_PATTERNS, transferLog } from "./privacy";
 export {
   configFromEnv,
   createExtractor,
   EXTRACTION_FAILURES,
   ExtractionError,
   ExtractorConfigError,
+  LLM_TIMEOUT_MS,
   extractCommercialInvoice,
   extractInvoice,
   extractTransportDocument,
@@ -117,8 +155,30 @@ export {
   TradeParseError,
   type TradeParseFailure,
 } from "./trade/parser";
-export { receiveTradeDocument, type TradeOutcome, type TradeQuarantineReason } from "./trade/receive";
 export {
+  admitTradeUpload,
+  readTradeDocument,
+  receivedOf,
+  receiveTradeDocument,
+  type Received,
+  type TradeOutcome,
+  type TradeQuarantineReason,
+} from "./trade/receive";
+export {
+  MAX_PROFORMAS_PER_IMPORTER_PER_DAY,
+  PROFORMA_REJECTIONS,
+  PROFORMA_TYPES,
+  receiveProforma,
+  sniffMediaType,
+  staticImporters,
+  type ImporterRegistry,
+  type ProformaOutcome,
+  type ProformaRejection,
+} from "./trade/proforma";
+export { extractProforma, MAX_IMAGE_BYTES, MIN_PROFORMA_TEXT_CHARS, type ProformaExtraction } from "./extractor";
+export { missingFields, PROFORMA_FIELDS, type ProformaReading } from "./extractor/proforma";
+export {
+  authorizeDeclaredUpload,
   authorizeUpload,
   fileHash,
   staticOrders,
@@ -126,8 +186,10 @@ export {
   UPLOAD_REJECTIONS,
   UPLOAD_TYPES,
   uploadDomain,
+  type DeclaredUpload,
   type DocumentUpload,
   type OrderRegistry,
+  type Party,
   type TradeOrderEntry,
   type UploadRejection,
 } from "./trade/upload";

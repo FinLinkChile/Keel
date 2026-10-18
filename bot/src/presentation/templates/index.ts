@@ -22,6 +22,7 @@ const TEMPLATES: { [K in NoticeKind]: Render<K> } = {
   account_change_attempt: order.accountChangeAttempt,
   change_queued: wallet.changeQueued,
   transfer_blocked: wallet.transferBlocked,
+  unauthorized_execution: wallet.unauthorizedExecution,
   agent_revoked: wallet.agentRevoked,
   gate_paused: wallet.gatePaused,
   payment_held: personal.paymentHeld,

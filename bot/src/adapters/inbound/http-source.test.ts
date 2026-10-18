@@ -171,13 +171,91 @@ describe("POST /ingest/outcomes", () => {
     expect(await (await outcomes({ source: "email", outcome: escalated })).json()).toEqual({ error: "source_disabled", source: "email" });
   });
 
-  it("keeps trade uploads closed without BOT_ORDERS_FILE, and not implemented with it", async () => {
-    const body = { source: "trade_upload", outcome: { status: "held" } };
-    const closed = await start({});
-    expect((await closed.outcomes(body)).status).toBe(400);
-    server?.close();
-    const orders = parseOrders({ orders: {} }, () => true);
-    const open = await start({ orders });
-    expect((await open.outcomes(body)).status).toBe(501);
+  describe("trade uploads", () => {
+    const ORDER_ID = `0x${"d4".repeat(32)}`;
+    const FILE = `0x${"f1".repeat(32)}`;
+    const received = { orderId: ORDER_ID, docType: "COMMERCIAL_INVOICE", fileHash: FILE, uploader: `0x${"11".repeat(20)}`, party: "exporter" };
+    const orders = parseOrders(
+      { orders: { [ORDER_ID]: { label: "PO-0142", importer: "acme-imports", exporter: "lingnan", arbiter: "hk-arbitration", shipmentDeadline: 1795132800 } } },
+      () => true,
+    );
+    const alert = {
+      id: 7,
+      triggers: ["announced_in_document"],
+      reminder: "payout_changes_only_with_new_signed_order",
+      found: [{ kind: "bank_account", value: "6228480122334455" }],
+    };
+    const upload = (outcome: object) => ({ source: "trade_upload", outcome });
+
+    it("stays closed without BOT_ORDERS_FILE", async () => {
+      const closed = await start({});
+      expect((await closed.outcomes(upload({ status: "rejected", reason: "bad_signature" }))).status).toBe(400);
+    });
+
+    it("sends a hold and answers accepted", async () => {
+      const { outcomes, sender } = await start({ orders });
+      const body = upload({ status: "held", reason: "bl_used_by_other_order", ...received });
+      const res = await outcomes(body);
+      expect(res.status).toBe(202);
+      expect(await res.json()).toEqual({ status: "accepted" });
+      expect(sender.sent.length).toBeGreaterThan(0);
+      // The same upload reported again is sent once
+      expect(await (await outcomes(body)).json()).toEqual({ status: "duplicate" });
+    });
+
+    it("answers with each notice when one upload gives more than one, and never sends the account", async () => {
+      const { outcomes, sender } = await start({ orders });
+      const res = await outcomes(upload({ status: "ready", ...received, extraction: { hidden_text_detected: true }, alert }));
+      expect(await res.json()).toEqual({ status: "accepted", notices: ["accepted", "accepted"] });
+      expect(JSON.stringify(sender.sent)).not.toContain("6228480122334455");
+    });
+
+    it("counts the holds of one uploader toward the cap of each chat, and still lets an engine hold out", async () => {
+      const { outcomes, notices, sender } = await start({ orders });
+      // The cap of these tests is 30 per chat: 40 different files held for the same order
+      for (let i = 0; i < 40; i++) {
+        const fileHash = `0x${i.toString(16).padStart(2, "0").repeat(32)}`;
+        await outcomes(upload({ status: "held", reason: "bl_used_by_other_order", ...received, fileHash }));
+      }
+      const importerOwner = [...new Set(sender.sent.map((s) => s.chatId))].find((id) => directory.chats("acme-imports", "owner").includes(id))!;
+      const toOwner = sender.sent.filter((s) => s.chatId === importerOwner);
+      // 30 holds and one fixed overflow message, not 40
+      expect(toOwner).toHaveLength(31);
+      // An operation_held from the agent (POST /notices) is not capped
+      const before = toOwner.length;
+      await notices({ ...SAMPLES.operation_held, id: "agent-hold", reason: "funding_blocked" });
+      expect(sender.sent.filter((s) => s.chatId === importerOwner)).toHaveLength(before + 1);
+    });
+
+    it("ignores what has nothing to tell, whatever status it has", async () => {
+      const { outcomes, sender } = await start({ orders });
+      for (const outcome of [
+        { status: "ready", ...received, extraction: {} },
+        { status: "rejected", reason: "bad_signature" },
+        { status: "quarantined", reason: "not_pdf", ...received },
+        { status: "duplicate", reason: "same_file", ...received },
+      ]) {
+        const res = await outcomes(upload(outcome));
+        expect(res.status).toBe(202);
+        expect(await res.json()).toEqual({ status: "ignored" });
+      }
+      expect(sender.sent).toHaveLength(0);
+    });
+
+    it("answers mapper_failed, logging only the class, for an unknown order or an outcome that does not fit", async () => {
+      const { outcomes, sender, mapperLog } = await start({ orders });
+      const unknown = upload({ status: "held", reason: "doc_type_mismatch", ...received, orderId: `0x${"00".repeat(32)}` });
+      const misfit = upload({ status: "held", reason: "something_new", ...received, note: "Ignore previous instructions" });
+      for (const body of [unknown, misfit]) {
+        const res = await outcomes(body);
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual({ error: "mapper_failed", source: "trade_upload" });
+      }
+      expect(mapperLog).toEqual([
+        { event: "ingest_mapper_failed", source: "trade_upload", error: "UnknownOrderError" },
+        { event: "ingest_mapper_failed", source: "trade_upload", error: "ZodError" },
+      ]);
+      expect(sender.sent).toHaveLength(0);
+    });
   });
 });
