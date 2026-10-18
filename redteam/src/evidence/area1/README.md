@@ -18,7 +18,7 @@ The Safe may have several owners (ours and Area 4's): the script signs with `OWN
 
 | Case | What | Expected |
 |---|---|---|
-| 1.1 | Safe queues the supplier (DEMO_EXPORTER, DEMO_PAYOUT), carrier, arbiter and verifier (POLICY_SIGNER_ADDRESS), and waits `configDelay` | active |
+| 1.1 | Safe queues the supplier (DEMO_EXPORTER, DEMO_PAYOUT), carrier, arbiter and verifier (POLICY_SIGNER_ADDRESS), plus the app's supplier (APP_EXPORTER_ADDRESS, APP_PAYOUT_ADDRESS) when both are set, and waits `configDelay` | active |
 | 1.2 | Safe queues (DEMO_EXPORTER, DEMO_ATTACKER) and vetoes it | vetoed |
 | 1.3 | Deposit for an order paying the vetoed DEMO_ATTACKER | `UnknownSupplier` |
 | 1.4 | Deposit for an order with an unregistered carrier | `UntrustedParty` |
@@ -31,6 +31,8 @@ The Safe may have several owners (ours and Area 4's): the script signs with `OWN
 | 3.2 | The exporter disputes before the shipment | `InvalidState` |
 | 3.3 | Carrier attestation after `shipmentDeadline + refundGrace` | `DeadlinePassed` |
 | 3.4 | The same bill of lading on a second order | `BillOfLadingAlreadyUsed` |
+
+Step 1.1 is idempotent: it reads the registry first, skips every entry already pending or active with the same data (its file lists the earlier `ChangeQueued` transaction, found by block timestamp so that a 10-block `eth_getLogs` limit is enough) and stops if an entry is registered with other data. Account nonces come from viem's `nonceManager` and the Safe nonce is kept by the script; reads, simulations and gas estimates run at the block of the last receipt or later, because a load-balanced RPC can still answer from an older block right after a receipt.
 
 Orders 1.3 to 1.7 and 1.9 are opened for real in the escrow (the Safe signs through ERC-1271 with the owner key, DEMO_EXPORTER signs too) and stay OPEN. The PDRs of phase 1 are signed by DEMO_ATTACKER: the real policy key is never used.
 

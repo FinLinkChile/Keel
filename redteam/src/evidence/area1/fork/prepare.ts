@@ -9,7 +9,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import type { Hex } from "@keel/schemas";
-import { encodeAbiParameters, encodeFunctionData, keccak256, toHex } from "viem";
+import { encodeAbiParameters, encodeFunctionData, keccak256, nonceManager, toHex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { safeAbi } from "../abi";
 import { type Ctx, connect, gateCall, gateEvents, gateRead, read, safeExec, sendOk, usdcBalance } from "../chain";
@@ -51,7 +51,7 @@ async function base(ctx: Ctx) {
 }
 
 async function deposits(ctx: Ctx, outDir: string) {
-  const policy = privateKeyToAccount(generatePrivateKey());
+  const policy = privateKeyToAccount(generatePrivateKey(), { nonceManager });
   await rpc(ctx, "anvil_setBalance", [policy.address, toHex(10n ** 19n)]);
   await safeExec(ctx, ctx.d.fundingGate, gateCall(ctx, "setPolicySigner", [policy.address]), "setPolicySigner(<throwaway fork key>)");
   if ((await gateRead<Hex>(ctx, "policySigner")) !== policy.address) throw new Error("policy signer not set");

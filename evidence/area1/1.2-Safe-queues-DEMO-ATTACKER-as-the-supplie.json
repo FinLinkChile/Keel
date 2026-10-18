@@ -1,0 +1,55 @@
+{
+  "schema": "keel.area1.evidence/v1",
+  "chainId": 84532,
+  "contracts": {
+    "safe": "0x366E72921895dBFD7688822418BE43E02551Ee82",
+    "roles": "0xD60f4297ed883D9b567A5A511F0735b2A7b19592",
+    "tradeEscrow": "0x8346c6F1AfbaFF8140D35116fAF5ec07e4232970",
+    "fundingGate": "0x2bc56bbB5B47B493009531e751C8Bd90513e927f",
+    "token": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+  },
+  "caseId": "1.2",
+  "phase": 1,
+  "title": "Safe queues DEMO_ATTACKER as the supplier payout and vetoes it",
+  "kind": "state-change",
+  "setup": [
+    {
+      "label": "Safe: queueSupplier(DEMO_EXPORTER, DEMO_ATTACKER)",
+      "hash": "0xc8cc716352baf72ff63fcb8a305c5be1d56afe9c3ab02f6b4e8a0115ce3e706e",
+      "blockNumber": "48236347",
+      "from": "0x998207c916dcf1a0f14a24ddbf46332eedce6fd6",
+      "to": "0x366e72921895dbfd7688822418be43e02551ee82",
+      "status": "success",
+      "gasUsed": "137528",
+      "gasLimit": "187744"
+    },
+    {
+      "label": "Safe: vetoPending(6)",
+      "hash": "0xe13c202643604ce6611ad2e9963aa43c5f8b54335f12122b0f8748a51cb9f96d",
+      "blockNumber": "48236349",
+      "from": "0x998207c916dcf1a0f14a24ddbf46332eedce6fd6",
+      "to": "0x366e72921895dbfd7688822418be43e02551ee82",
+      "status": "success",
+      "gasUsed": "71110",
+      "gasLimit": "112838"
+    }
+  ],
+  "passed": true,
+  "details": {
+    "changeId": "6",
+    "queued": {
+      "changeId": "6",
+      "subject": "0x1dca5bC3e7A06eCa0E50775dcB410a650148f14b",
+      "kind": 1,
+      "payout": "0x2fdD1c7B6dD0fd3a41b2Ec43631D3dBcbd504c63",
+      "roles": 0,
+      "activatesAt": "1792241102"
+    },
+    "vetoedBy": "0x366E72921895dBFD7688822418BE43E02551Ee82",
+    "isKnownSupplierAfter": false
+  },
+  "notes": [
+    "The veto came before activatesAt; the vetoed pair never counts. The cosigner could veto the same way."
+  ],
+  "writtenAt": "2026-10-17T12:43:07.259Z"
+}

@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Hex } from "@keel/schemas";
-import { getAddress, isAddress } from "viem";
+import { getAddress, isAddress, nonceManager } from "viem";
 import { type PrivateKeyAccount, privateKeyToAccount } from "viem/accounts";
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
@@ -89,7 +89,9 @@ export function envAccount(prefix: string): PrivateKeyAccount {
   const raw = requireEnv(keyName);
   let account: PrivateKeyAccount;
   try {
-    account = privateKeyToAccount((raw.startsWith("0x") ? raw : `0x${raw}`) as Hex);
+    // nonceManager: the next nonce comes from the last one this process used, not only from the
+    // RPC, which can still report the old count right after a receipt (seen on Base Sepolia).
+    account = privateKeyToAccount((raw.startsWith("0x") ? raw : `0x${raw}`) as Hex, { nonceManager });
   } catch {
     throw new PreconditionError(`${keyName} is not a valid private key`);
   }
