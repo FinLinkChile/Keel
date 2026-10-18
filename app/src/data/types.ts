@@ -1,4 +1,6 @@
-import type { Hex, OrderTerms, PurchaseOrder, RequiredDocType } from '@keel/schemas';
+import type { Currency, Hex, OrderTerms, PurchaseOrder, RequiredDocType } from '@keel/schemas';
+
+import type { ProformaLine } from '../ingest/proforma';
 
 // Same slugs as bot/examples/recipients.json
 export type PartyId = string;
@@ -54,11 +56,15 @@ export type OrderDocument = {
 // What the proforma asked for, kept with the order to compare with what was signed. Not part of
 // the signed terms.
 export type Quote = {
+  // Prices of quotes in different currencies are never compared
+  currency: Currency | null;
   amountCents: number | null;
   advanceBps: number | null;
   // Unix seconds
   issueDate: number | null;
   latestShipmentDate: number | null;
+  // Quantity, unit and amount of each line, to compare prices per unit
+  lines?: ProformaLine[];
 };
 
 export type Order = {

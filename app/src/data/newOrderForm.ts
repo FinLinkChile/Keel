@@ -213,7 +213,8 @@ export function knownLine(orders: number): string {
 
 // "Uploaded. The agent read 9 terms.": the fields of the reading that the proforma printed
 export function termsReadLine(reading: ProformaReading): string {
-  const read = PROFORMA_FIELDS.length - reading.missing.length;
+  // The lines are not a term of the order
+  const read = PROFORMA_FIELDS.filter((f) => f !== 'lines').length - reading.missing.filter((f) => f !== 'lines').length;
   return t(read === 1 ? 'Uploaded. The agent read {n} term.' : 'Uploaded. The agent read {n} terms.', { n: read });
 }
 

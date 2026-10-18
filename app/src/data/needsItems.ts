@@ -53,10 +53,10 @@ export function needsItemText(item: NeedsItem, role: Role): { title: string; det
     return { title: t('Upload documents for {label}', { label: order.label }), detail: t('Ship, then upload the transport document and the invoice') };
   }
   if (item.kind === 'approve_balance') {
-    return { title: `Release the balance of ${order.label}`, detail: `${counterparty.short} shipped. You can approve the balance now` };
+    return { title: t('Release the balance of {label}', { label: order.label }), detail: t('{name} shipped. You can approve the balance now', { name: counterparty.short }) };
   }
   if (item.kind === 'sign_cancel') {
-    return { title: `Cancel ${order.label}?`, detail: `${counterparty.short} signed a cancellation. It takes both signatures` };
+    return { title: t('Cancel {label}?', { label: order.label }), detail: t('{name} signed a cancellation. It takes both signatures', { name: counterparty.short }) };
   }
   return role === 'importer'
     ? { title: t('Sign {label}', { label: order.label }), detail: t('{name} signed. Yours is the last signature', { name: counterparty.short }) }

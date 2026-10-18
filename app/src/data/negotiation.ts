@@ -37,7 +37,8 @@ export function negotiation(orders: readonly Order[], supplier?: Hex): Negotiati
     orderId: o.po.orderId,
     askedAdvanceBps: o.quote!.advanceBps,
     agreedAdvanceBps: o.po.advanceBps,
-    askedCents: o.quote!.amountCents,
+    // A total in another currency than the order's cannot be compared without an agreed rate
+    askedCents: o.quote!.currency === o.terms.currency ? o.quote!.amountCents : null,
     agreedCents: Number(tokenToCents(o.po.totalAmount)),
   }));
   const withAdvance = rows.filter((r) => r.askedAdvanceBps !== null);
