@@ -12,7 +12,7 @@ import type { EmailOutcome, StoredChangeRequest } from "@keel/ingest";
 import { z } from "zod";
 import type { Notice } from "../../domain/notice";
 import type { OrderBook } from "../config/orders-file";
-import { reply, type JsonRoute, type NoticeSink } from "./http-source";
+import { reply, type Delivery, type JsonRoute, type NoticeSink } from "./http-source";
 import { mapChangeDigest, mapEmailOutcome } from "./ingest-mapper";
 import { mapTradeOutcome } from "./ingest-trade-mapper";
 
@@ -43,42 +43,47 @@ export interface IngestRouteDeps {
 
 export function ingestRoute(deps: IngestRouteDeps): JsonRoute {
   return async (json, res) => {
-    const body = Body.safeParse(json);
-    if (!body.success) return reply(res, 400, { error: "invalid_body" });
-    const { source } = body.data;
+    const { code, body } = await deliverIngest(deps, json);
+    reply(res, code, body);
+  };
+}
 
-    if (source === "trade_upload") {
-      if (!deps.orders) return reply(res, 400, { error: "source_disabled", source });
-      let notices: Notice[];
-      try {
-        notices = mapTradeOutcome(body.data.outcome, { orders: deps.orders, now: deps.now });
-      } catch (err) {
-        deps.log({ event: "ingest_mapper_failed", source, error: err instanceof Error ? err.name : "unknown" });
-        return reply(res, 400, { error: "mapper_failed", source });
-      }
-      const results: string[] = [];
-      // Born from a document: it counts toward the per-chat cap, whatever its kind
-      for (const notice of notices) results.push((await deps.sink.notify(notice, "document")).status);
-      const status = (["accepted", "duplicate", "rejected"] as const).find((s) => results.includes(s)) ?? "ignored";
-      return reply(res, 202, notices.length > 1 ? { status, notices: results } : { status });
-    }
+export async function deliverIngest(deps: IngestRouteDeps, json: unknown): Promise<Delivery> {
+  const body = Body.safeParse(json);
+  if (!body.success) return { code: 400, body: { error: "invalid_body" } };
+  const { source } = body.data;
 
-    const accountId = deps.personalAccountId;
-    if (!accountId) return reply(res, 400, { error: "source_disabled", source });
-    const opts = { accountId, now: deps.now };
-
-    let notice: Notice | null;
+  if (source === "trade_upload") {
+    if (!deps.orders) return { code: 400, body: { error: "source_disabled", source } };
+    let notices: Notice[];
     try {
-      notice =
-        source === "email"
-          ? mapEmailOutcome(body.data.outcome as unknown as EmailOutcome, opts)
-          : mapChangeDigest(body.data.requests as unknown as StoredChangeRequest[], new Date(body.data.since), opts);
+      notices = mapTradeOutcome(body.data.outcome, { orders: deps.orders, now: deps.now });
     } catch (err) {
       deps.log({ event: "ingest_mapper_failed", source, error: err instanceof Error ? err.name : "unknown" });
-      return reply(res, 400, { error: "mapper_failed", source });
+      return { code: 400, body: { error: "mapper_failed", source } };
     }
-    if (notice === null) return reply(res, 202, { status: "ignored" });
-    const result = await deps.sink.notify(notice, "document");
-    reply(res, 202, { status: result.status });
-  };
+    const results: string[] = [];
+    // Born from a document: it counts toward the per-chat cap, whatever its kind
+    for (const notice of notices) results.push((await deps.sink.notify(notice, "document")).status);
+    const status = (["accepted", "duplicate", "rejected"] as const).find((s) => results.includes(s)) ?? "ignored";
+    return { code: 202, body: notices.length > 1 ? { status, notices: results } : { status } };
+  }
+
+  const accountId = deps.personalAccountId;
+  if (!accountId) return { code: 400, body: { error: "source_disabled", source } };
+  const opts = { accountId, now: deps.now };
+
+  let notice: Notice | null;
+  try {
+    notice =
+      source === "email"
+        ? mapEmailOutcome(body.data.outcome as unknown as EmailOutcome, opts)
+        : mapChangeDigest(body.data.requests as unknown as StoredChangeRequest[], new Date(body.data.since), opts);
+  } catch (err) {
+    deps.log({ event: "ingest_mapper_failed", source, error: err instanceof Error ? err.name : "unknown" });
+    return { code: 400, body: { error: "mapper_failed", source } };
+  }
+  if (notice === null) return { code: 202, body: { status: "ignored" } };
+  const result = await deps.sink.notify(notice, "document");
+  return { code: 202, body: { status: result.status } };
 }

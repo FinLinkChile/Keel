@@ -3,13 +3,16 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useData } from '@/data';
+import { LANGUAGES, useLanguage } from '@/i18n';
 import { useSession } from '@/session';
 import { Address } from '@/ui/Address';
 import { Avatar } from '@/ui/Avatar';
 import { Button } from '@/ui/Button';
 import { formatRut } from '@/ui/format';
 import { Icon } from '@/ui/Icon';
+import { Segmented } from '@/ui/Segmented';
 import { Text } from '@/ui/Text';
+import { useTheme } from '@/ui/ThemeProvider';
 import { colors, gutter, radius } from '@/ui/theme';
 
 // Profile: the company and wallet behind this session, and the way back to Connect to choose
@@ -18,6 +21,8 @@ import { colors, gutter, radius } from '@/ui/theme';
 export default function Profile() {
   const insets = useSafeAreaInsets();
   const { role, address, onboarding, resetOnboarding } = useSession();
+  const { language, setLanguage, t } = useLanguage();
+  const { mode, setMode } = useTheme();
   const profile = useData(async (d) => {
     const account = await d.account(role);
     const me = await d.party(account.party);
@@ -40,7 +45,7 @@ export default function Profile() {
       <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: -8 }}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Back"
+          accessibilityLabel={t('Back')}
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))}
           style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
         >
@@ -54,43 +59,74 @@ export default function Profile() {
           {me.name}
         </Text>
         <Text size={15} color="textMuted">
-          {role === 'importer' ? 'Importer' : 'Exporter'}, {account.title}
+          {role === 'importer' ? t('Importer') : t('Exporter')}, {t(account.title)}
         </Text>
       </View>
 
       <View style={{ backgroundColor: colors.surface, borderRadius: radius.card, paddingVertical: 8 }}>
-        <Row label="Account" value="Company" />
-        <Row label="Role" value={role === 'importer' ? 'Importer' : 'Exporter'} />
-        <Row label="Based in" value={me.place} />
+        <Row label={t('Account')} value={t('Company')} />
+        <Row label={t('Role')} value={role === 'importer' ? t('Importer') : t('Exporter')} />
+        <Row label={t('Based in')} value={me.place} />
         {me.taxId ? <Row label="RUT" value={formatRut(me.taxId)} mono /> : null}
       </View>
 
       {onboarding ? (
         <View style={{ backgroundColor: colors.surface, borderRadius: radius.card, paddingVertical: 8 }}>
-          <Row label="Account holder" value={onboarding.representative.name} />
-          <Row label="Holder RUT" value={formatRut(onboarding.representative.rut)} mono />
-          <Row label="Email" value={onboarding.company.email} />
-          <Row label="Mobile" value={onboarding.company.phone} mono />
-          <Row label="Identity" value="Validated with TOC (simulated)" />
+          <Row label={t('Account holder')} value={onboarding.representative.name} />
+          <Row label={t('Holder RUT')} value={formatRut(onboarding.representative.rut)} mono />
+          <Row label={t('Email')} value={onboarding.company.email} />
+          <Row label={t('Mobile')} value={onboarding.company.phone} mono />
+          <Row label={t('Identity')} value={t('Validated with TOC (simulated)')} />
         </View>
       ) : null}
 
       {address ? (
         <View style={{ gap: 8 }}>
           <Text size={15} weight={700}>
-            Test wallet
+            {t('Test wallet')}
           </Text>
           <Address address={address} full />
           <Text size={13} leading={1.5} color="textFaint">
-            The key was made on this phone and stays here. Keel never holds it.
+            {t('The key was made on this phone and stays here. Keel never holds it.')}
           </Text>
         </View>
       ) : null}
 
+      <View style={{ gap: 8 }}>
+        <Text size={15} weight={700}>
+          {t('Language')}
+        </Text>
+        <Segmented
+          options={LANGUAGES.map((l) => ({ value: l.code, label: l.label }))}
+          value={language}
+          onChange={setLanguage}
+          accessibilityLabel={t('Language')}
+          on="surface"
+          role="radiogroup"
+        />
+      </View>
+
+      <View style={{ gap: 8 }}>
+        <Text size={15} weight={700}>
+          {t('Appearance')}
+        </Text>
+        <Segmented
+          options={[
+            { value: 'dark' as const, label: t('Dark') },
+            { value: 'light' as const, label: t('Light') },
+          ]}
+          value={mode}
+          onChange={setMode}
+          accessibilityLabel={t('Appearance')}
+          on="surface"
+          role="radiogroup"
+        />
+      </View>
+
       <View style={{ gap: 10, marginTop: 8 }}>
-        <Button label="Log out" variant="secondary" onPress={() => router.replace('/connect')} />
+        <Button label={t('Log out')} variant="secondary" onPress={() => router.replace('/connect')} />
         <Text size={13} leading={1.5} color="textFaint" style={{ textAlign: 'center' }}>
-          You go back to choose how you use Keel. Your test wallet stays on this phone.
+          {t('You go back to choose how you use Keel. Your test wallet stays on this phone.')}
         </Text>
         {/* Test builds only: do the sign-up again */}
         {__DEV__ || process.env.EXPO_PUBLIC_WALLET_CHECK === '1' ? (
@@ -104,7 +140,7 @@ export default function Profile() {
             style={{ alignSelf: 'center', marginTop: 6 }}
           >
             <Text size={13} weight={700} color="textMuted" style={{ textDecorationLine: 'underline' }}>
-              Sign up again
+              {t('Sign up again')}
             </Text>
           </Pressable>
         ) : null}

@@ -7,7 +7,7 @@ import { DEFAULT_FUNDING_POLICY, type FundingPolicy } from "./funding";
 
 // Bump it whenever a rule of funding.ts or documents.ts changes what it decides.
 // policy.test.ts fails on any change to those files until the version is reviewed.
-export const TRADE_RULES_VERSION = "keel-trade/1";
+export const TRADE_RULES_VERSION = "keel-trade/2";
 
 export interface TradePolicy {
   rulesVersion: string;

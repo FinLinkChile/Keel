@@ -35,7 +35,12 @@ forge test --match-path 'test/fork/*' -vv
 | `src/KeelHashing.sol` | EIP-712 typehashes and struct hashes for the shared structs. Kept apart so `KeelTypes.sol` stays untouched. |
 | `src/PDRGate.sol` | The Keel Personal gate (T1.6). Sole member of the AGENT role; verifies the signed PDR and executes `USDC.transfer` through the Roles Modifier. |
 | `src/IRoles.sol` | Minimal interface of Zodiac Roles v2 `execTransactionWithRole`. |
-| `script/DeployPDRGate.s.sol` | Deploys `PDRGate` against an existing Safe and Roles Modifier and writes `deployments/<chainId>.json`. |
+| `script/DeployPDRGate.s.sol` | Deploys `PDRGate` against an existing Safe and Roles Modifier and merges `pdrGate` and `personal` into `deployments/<chainId>.json`. |
+| `script/DeployTrade.s.sol` | Deploys Keel Trade on Base Sepolia: Safe 1.4.1, Roles 2.1.1 and Delay 1.1.0 from their master copies, `TradeEscrow` and `FundingGate`; applies `TradeRolesConfig` and hands the Safe to `OWNER_ADDRESS`, checking everything in its simulation. Send with `--broadcast --slow`; then `--sig "record(address,uint256)" <safe> <deployBlock>` (no broadcast) re-checks the deployment against the chain and only then merges its keys into `deployments/<chainId>.json`. |
+| `script/SetTradePolicy.s.sol` | Sets the gate policy hash through the Delay: `queue()` by the owner, `execute()` by anyone after the 180 s cooldown. |
+| `script/TradeRolesConfig.sol` | The Roles configuration of a Trade Safe, shared by the deployment and the fork tests, and its `configHash`. |
+| `script/KeelExternal.sol`, `script/DeploymentsFile.sol` | Third-party addresses and interfaces with their sources; the shared deployments file merge. |
+| `test/fork/` | Base Sepolia fork tests (skipped without `BASE_SEPOLIA_RPC_URL`): FundingGate against the real Roles, and the whole DeployTrade script. Run with `forge test --match-path 'test/fork/*'`. |
 | `test/PDRGate.t.sol` | One revert per typed error, compromised-signer cases, panic button, Safe-only configuration and two fuzz properties. |
 | `test/Eip712Vectors.t.sol` | Writes the EIP-712 test vector (`out-vectors/eip712.json`) that the TypeScript side must reproduce byte for byte. |
 | `test/DeployPDRGate.t.sol` | Runs the deployment script end to end against mocks. |

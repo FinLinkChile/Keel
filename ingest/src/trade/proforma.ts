@@ -11,7 +11,7 @@ import type { AttachmentType, ExtractorProvider } from "../extractor/contract";
 import { ExtractionError, extractProforma, MAX_IMAGE_BYTES } from "../extractor";
 import { missingFields, type ProformaReading } from "../extractor/proforma";
 import { MAX_PDF_BYTES, pdfHeaderOffset } from "../pdf/text";
-import type { IngestStore } from "../store";
+import type { IngestRepo } from "../repo";
 import { fileHash, uploadDomain, UPLOAD_MAX_SKEW_SECONDS } from "./upload";
 
 // Same domain as the document upload; a different primary type, so neither signature can be
@@ -28,7 +28,7 @@ export const MAX_PROFORMAS_PER_IMPORTER_PER_DAY = 20;
 // The importers' representatives who may upload a proforma. In the prototype: the importer
 // uploaders of the orders file plus INGEST_IMPORTERS_FILE.
 export interface ImporterRegistry {
-  has(address: Hex): boolean;
+  has(address: Hex): boolean | Promise<boolean>;
 }
 
 export const staticImporters = (addresses: readonly Hex[]): ImporterRegistry => {
@@ -84,7 +84,7 @@ export async function receiveProforma(
   req: ProformaRequest,
   importers: ImporterRegistry,
   extractor: ExtractorProvider,
-  opts: { store: IngestStore; chainId: number; now?: Date },
+  opts: { store: IngestRepo; chainId: number; now?: Date },
 ): Promise<ProformaOutcome> {
   const now = opts.now ?? new Date();
   const mediaType = sniffMediaType(req.file);
@@ -109,18 +109,18 @@ export async function receiveProforma(
     return { status: "rejected", reason: "bad_signature" };
   }
   // A file swapped after signing recovers another address and lands here
-  if (!importers.has(signer)) return { status: "rejected", reason: "not_an_importer" };
+  if (!(await importers.has(signer))) return { status: "rejected", reason: "not_an_importer" };
 
-  const cached = opts.store.proformaReading<{ input: "text" | "file"; proforma: ProformaReading }>(signer, hash);
+  const cached = await opts.store.proformaReading<{ input: "text" | "file"; proforma: ProformaReading }>(signer, hash);
   if (cached) return { status: "read", fileHash: hash, ...cached, missing: missingFields(cached.proforma) };
-  if (opts.store.proformaUploadsToday(signer) >= MAX_PROFORMAS_PER_IMPORTER_PER_DAY) {
+  if ((await opts.store.proformaUploadsToday(signer)) >= MAX_PROFORMAS_PER_IMPORTER_PER_DAY) {
     return { status: "rejected", reason: "rate_limited" };
   }
-  opts.store.recordProformaUpload(signer, hash);
+  await opts.store.recordProformaUpload(signer, hash);
 
   try {
     const { reading, input } = await extractProforma(req.file, mediaType, extractor);
-    opts.store.saveProformaReading(signer, hash, { input, proforma: reading });
+    await opts.store.saveProformaReading(signer, hash, { input, proforma: reading });
     return { status: "read", fileHash: hash, input, proforma: reading, missing: missingFields(reading) };
   } catch (e) {
     if (e instanceof ExtractionError) return { status: "unreadable", reason: e.reason, fileHash: hash };

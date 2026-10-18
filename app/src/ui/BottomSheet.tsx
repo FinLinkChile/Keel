@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { Modal, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useT } from '@/i18n';
+
 import { Text } from './Text';
 import { colors, gutter, radius } from './theme';
 
@@ -15,11 +17,12 @@ type Props = {
 // A panel that slides up over the screen to pick one thing. Tapping outside closes it.
 export function BottomSheet({ visible, title, onClose, children }: Props) {
   const insets = useSafeAreaInsets();
+  const t = useT();
   return (
     <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Close"
+        accessibilityLabel={t('Close')}
         onPress={onClose}
         style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' }}
       >
