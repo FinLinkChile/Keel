@@ -7,7 +7,7 @@
 import type { Hex } from "@keel/schemas";
 import { Monitor, type MonitorChain, type MonitorEvent, type Pauser, pauserOn, rpcChain, rpcMonitorChain, toMonitorNotices } from "@keel/engine";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
-import { ConfigError, type Env, required, table } from "../config";
+import { ConfigError, DEFAULT_LOG_RANGE, type Env, logRange, required, table } from "../config";
 import { ddb, lower } from "../db";
 import { loadKeys } from "../keys";
 import { acquire, type Lock } from "../lock";
@@ -19,11 +19,11 @@ import { type RuntimeDeployment, rpcUrl, runtimeDeployment } from "../agent/depl
 import { s3EvidenceExists } from "../agent/evidence";
 import { readCursor, readPausedHere, writeCursor, writePausedHere } from "../agent/state";
 
-// Most blocks per getLogs request: RPC providers limit the range
-export const MAX_RANGE = 2000n;
+// Default blocks per getLogs request; KEEL_LOG_RANGE overrides it (aws/src/config.ts)
+export const MAX_RANGE = DEFAULT_LOG_RANGE;
 // Ranges per run, so a run that starts far behind ends inside the function timeout and the next
 // minute continues from the cursor it saved
-export const MAX_RANGES_PER_RUN = 20;
+export const MAX_RANGES_PER_RUN = 60;
 // One run at a time: a slow run overlapping the next minute would report and pause twice
 const LOCK_SECONDS = 55;
 const NO_EVIDENCE_DIR = "/tmp/keel-evidence-unused";
@@ -109,7 +109,7 @@ export async function runMonitorPass(deps: MonitorPassDeps): Promise<MonitorPass
       }
     };
     const monitor = new Monitor(
-      { chainId: ctx.chainId, gate, escrow: ctx.escrow, safe: ctx.safe, evidenceDir: NO_EVIDENCE_DIR, fromBlock, maxRange: MAX_RANGE, maxRangesPerTick: MAX_RANGES_PER_RUN, pausedHere },
+      { chainId: ctx.chainId, gate, escrow: ctx.escrow, safe: ctx.safe, evidenceDir: NO_EVIDENCE_DIR, fromBlock, maxRange: logRange(deps.env), maxRangesPerTick: MAX_RANGES_PER_RUN, pausedHere },
       { chain, pauser, notify, isIssued: deps.isIssued },
     );
     // A read that fails stops the tick, but the ranges it finished are done: they are saved below

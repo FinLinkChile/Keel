@@ -28,6 +28,18 @@ export type TableName = keyof typeof TABLE_ENV;
 
 export const table = (name: TableName, env: Env = process.env): string => required(env, TABLE_ENV[name]);
 
+// Most blocks per eth_getLogs request (KEEL_LOG_RANGE). Providers cap it: the public Base Sepolia
+// endpoint answers "eth_getLogs is limited to a 200 range", so 200 works with any of them; a
+// provider that allows more can raise it and catch up in fewer requests.
+export const DEFAULT_LOG_RANGE = 200n;
+
+export function logRange(env: Env = process.env): bigint {
+  const value = env.KEEL_LOG_RANGE;
+  if (!value) return DEFAULT_LOG_RANGE;
+  if (!/^[1-9][0-9]{0,6}$/.test(value)) throw new ConfigError("KEEL_LOG_RANGE must be a positive integer");
+  return BigInt(value);
+}
+
 export interface Deployment {
   chainId: number;
   deployBlock: bigint;

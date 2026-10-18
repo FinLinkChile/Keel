@@ -25,7 +25,17 @@ export interface RpcChainOptions {
   // Most milliseconds to wait for a receipt. Default: viem's (180 s), which suits the CLI; a Lambda
   // with a shorter timeout passes less, and the next pass finds the order where the chain left it.
   receiptTimeoutMs?: number;
+  // Most blocks per eth_getLogs request. Many RPC providers cap the range (the public Base Sepolia
+  // endpoint answers "limited to a 200 range"). Unset, the funding log is searched in one request
+  // from fromBlock, as before; set, it is searched backwards from the latest block in ranges of
+  // this size, at most maxLogRanges of them.
+  logRange?: bigint;
+  // Most ranges searched for one order. An order funded further back is not found: fundedAt
+  // answers undefined and the escrow's own check decides, as when the log is missing.
+  maxLogRanges?: number;
 }
+
+export const DEFAULT_MAX_LOG_RANGES = 50;
 
 export function rpcChain(rpcUrl: string, relayer: LocalAccount, options: RpcChainOptions = {}): AgentChain & { chainId(): Promise<number> } {
   const transport = http(rpcUrl);
@@ -44,7 +54,21 @@ export function rpcChain(rpcUrl: string, relayer: LocalAccount, options: RpcChai
       }
     },
     async fundedAt(escrow, orderId) {
-      const [log] = await client.getLogs({ address: escrow, event: ORDER_FUNDED_EVENT, args: { orderId }, fromBlock: options.fromBlock ?? "earliest", toBlock: "latest" });
+      const find = (fromBlock: bigint | "earliest", toBlock: bigint | "latest") =>
+        client.getLogs({ address: escrow, event: ORDER_FUNDED_EVENT, args: { orderId }, fromBlock, toBlock });
+      let log: Awaited<ReturnType<typeof find>>[number] | undefined;
+      if (options.logRange === undefined) {
+        [log] = await find(options.fromBlock ?? "earliest", "latest");
+      } else {
+        // The funding is recent for the orders an agent still steps, so the newest ranges go first
+        const floor = options.fromBlock ?? 0n;
+        let to = await client.getBlockNumber();
+        for (let i = 0; i < (options.maxLogRanges ?? DEFAULT_MAX_LOG_RANGES) && to >= floor && !log; i++) {
+          const from = to - options.logRange + 1n > floor ? to - options.logRange + 1n : floor;
+          [log] = await find(from, to);
+          to = from - 1n;
+        }
+      }
       if (!log?.blockHash) return undefined;
       return (await client.getBlock({ blockHash: log.blockHash })).timestamp;
     },

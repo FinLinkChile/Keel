@@ -179,3 +179,9 @@ variable "proforma_throttle_burst" {
   type    = number
   default = 5
 }
+
+variable "log_block_range" {
+  description = "Bloques por consulta eth_getLogs (KEEL_LOG_RANGE). La URL publica de Base Sepolia acepta 200; un proveedor pagado o Alchemy puede aceptar mas"
+  type        = number
+  default     = 200
+}

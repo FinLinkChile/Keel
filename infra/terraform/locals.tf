@@ -110,6 +110,7 @@ locals {
     KEEL_CONFIG_PREFIX  = "${local.cfg_prefix}/"
     KEEL_SECRETS_PREFIX = local.secrets_prefix
     KEEL_STAGE          = var.stage
+    KEEL_LOG_RANGE      = tostring(var.log_block_range)
   }
 
   t = { for k, v in aws_dynamodb_table.t : k => v.name }
