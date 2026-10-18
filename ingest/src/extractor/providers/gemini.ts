@@ -10,8 +10,9 @@ export class GeminiProvider implements ExtractorProvider {
   constructor(
     apiKey: string,
     readonly model: string,
+    timeoutMs?: number,
   ) {
-    this.client = new GoogleGenAI({ apiKey });
+    this.client = new GoogleGenAI({ apiKey, ...(timeoutMs ? { httpOptions: { timeout: timeoutMs } } : {}) });
   }
 
   async complete(request: ExtractionRequest): Promise<string> {

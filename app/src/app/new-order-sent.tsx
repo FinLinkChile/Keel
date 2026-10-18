@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useData } from '@/data';
 import { tokenToCents } from '@/data/amounts';
+import { useT } from '@/i18n';
 import { useSession } from '@/session';
 import { Button } from '@/ui/Button';
 import { formatMinor, initials } from '@/ui/format';
@@ -15,6 +16,7 @@ import { colors, gutter, radius } from '@/ui/theme';
 // 03c Sent to <supplier>. The order is saved on this phone and waits for the supplier's
 // signature; nothing is signed or paid yet. Only the importer sends orders.
 export default function NewOrderSent() {
+  const t = useT();
   const { role } = useSession();
   const { orderId } = useLocalSearchParams<{ orderId: Hex }>();
   const insets = useSafeAreaInsets();
@@ -45,20 +47,20 @@ export default function NewOrderSent() {
           <Icon name="send" size={36} color="accent" />
         </View>
         <Text size={28} weight={800} accessibilityRole="header" style={{ marginTop: 8, textAlign: 'center' }}>
-          Sent to {supplier.short}
+          {t('Sent to {name}', { name: supplier.short })}
         </Text>
         <Text size={15} leading={1.5} color="textMuted" style={{ textAlign: 'center', maxWidth: 300 }}>
-          They check the terms and sign. Then it comes back to you for the last signature. Nothing is signed or paid yet.
+          {t('They check the terms and sign. Then it comes back to you for the last signature. Nothing is signed or paid yet.')}
         </Text>
 
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', alignSelf: 'stretch', marginTop: 24 }}>
-          <Step label="Order sent" done>
+          <Step label={t('Order sent')} done>
             <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: colors.moneyMuted, alignItems: 'center', justifyContent: 'center' }}>
               <Icon name="check" size={18} strokeWidth={3} color="money" />
             </View>
           </Step>
           <Link />
-          <Step label={`${supplier.short} signs`} strong>
+          <Step label={t('{name} signs', { name: supplier.short })} strong>
             <View
               style={{
                 width: 48,
@@ -75,7 +77,7 @@ export default function NewOrderSent() {
             </View>
           </Step>
           <Link />
-          <Step label="You sign, money moves">
+          <Step label={t('You sign, money moves')}>
             <View
               style={{
                 width: 48,
@@ -89,7 +91,7 @@ export default function NewOrderSent() {
               }}
             >
               <Text size={14} weight={800} color="textMuted">
-                You
+                {t('You')}
               </Text>
             </View>
           </Step>
@@ -122,9 +124,9 @@ export default function NewOrderSent() {
       </View>
 
       <View style={{ gap: 12 }}>
-        <Button label="Done" onPress={() => router.replace('/home')} />
+        <Button label={t('Done')} onPress={() => router.replace('/home')} />
         <Text size={13} color="textFaint" style={{ textAlign: 'center' }}>
-          We&apos;ll tell you in Needs you when it&apos;s your turn.
+          {t('We\'ll tell you in Needs you when it\'s your turn.')}
         </Text>
       </View>
     </View>
@@ -132,10 +134,11 @@ export default function NewOrderSent() {
 }
 
 function Step({ label, done = false, strong = false, children }: { label: string; done?: boolean; strong?: boolean; children: React.ReactNode }) {
+  const t = useT();
   return (
     <View
       accessible
-      accessibilityLabel={done ? `${label}, done` : label}
+      accessibilityLabel={done ? t('{label}, done', { label }) : label}
       style={{ width: 96, alignItems: 'center', gap: 8 }}
     >
       {children}

@@ -4,16 +4,17 @@ title: "Sistema de pago"
 description: "Qué token y red se usan en cada modo, entrada y salida de fiat, tipo de cambio, los tres modelos de liquidación y el financiamiento."
 tags: [token, red, fiat, tipo-de-cambio, liquidacion, bancos]
 modo: ambos
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T02:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-16T18:00:00Z }
 ---
 
 # Qué dinero se mueve
 
 | Modo | Token | Red | Por qué |
 | --- | --- | --- | --- |
-| Trade (competencia) | Stablecoin disponible en la red elegida, o un token de prueba declarado como tal **[ABIERTO]** | Red cerrada por definir; FISCO BCOS es la candidata natural **[ABIERTO]** | Participantes identificados y un entorno que un banco puede operar |
+| Trade (competencia) | USDC de prueba de Circle (`0x036CbD53842c5426634e7929541eC2318f3dCF7e`, 6 decimales). Riesgo de emisor declarado: Circle puede pausarlo o poner en lista negra | Base Sepolia (chainId 84532) | Safe y Zodiac ya desplegados, explorador público para verificar los hashes |
+| Trade (piloto, red cerrada) | El token que exista en esa red | Red cerrada; FISCO BCOS es la candidata natural | Participantes identificados y un entorno que un banco puede operar |
 | Trade (piloto) | Stablecoin regulada en la jurisdicción del pago (Hong Kong) | La que soporte esa stablecoin | Las partes necesitan un activo legal en su país |
-| Personal | USDC en el diseño original; se alinea con el token de la red elegida **[ABIERTO]** | Base Sepolia en el diseño original; se decide junto con la red de Trade **[ABIERTO]** | Estable y con costos bajos por pago |
+| Personal | USDC de prueba de Circle, el mismo token de Trade | Base Sepolia, la misma red de Trade | Estable y con costos bajos por pago |
 
 # Entrada y salida de dinero fiat
 

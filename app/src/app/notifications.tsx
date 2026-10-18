@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 import { proposals, useData } from '@/data';
 import { tokenToCents } from '@/data/amounts';
 import { loadNeedsItems, needsItemHref, needsItemText } from '@/data/needsItems';
+import { useT } from '@/i18n';
 import { Frame } from '@/orders/parts';
 import { useSession } from '@/session';
 import { Avatar } from '@/ui/Avatar';
@@ -15,6 +16,7 @@ import { colors } from '@/ui/theme';
 // Notifications, from the bell on Home: what needs this person, signatures first. Each one opens
 // the screen where it is done.
 export default function Notifications() {
+  const t = useT();
   const { role } = useSession();
   const items = useData(async (d) => {
     const all = await loadNeedsItems(d, role, async (id) => !!(await proposals.get(id)));
@@ -22,13 +24,13 @@ export default function Notifications() {
   }, [role]);
 
   return (
-    <Frame label="Notifications">
+    <Frame label={t('Notifications')}>
       <Text size={28} weight={800} accessibilityRole="header">
-        Needs you
+        {t('Needs you')}
       </Text>
       {items === undefined ? null : items.length === 0 ? (
         <Text size={15} color="textMuted">
-          Nothing right now. Orders that wait for your signature show up here.
+          {t('Nothing right now. Orders that wait for your signature show up here.')}
         </Text>
       ) : (
         <View>

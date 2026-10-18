@@ -75,7 +75,7 @@ function encodeOrder({ po, terms }: { po: PurchaseOrder; terms: OrderTerms }): R
   return { po: rawPo, terms: { ...terms, invoiceAmountMinor: terms.invoiceAmountMinor.toString() } };
 }
 
-function decodeOrder(raw: Raw): { po: PurchaseOrder; terms: OrderTerms } {
+export function decodeOrder(raw: Raw): { po: PurchaseOrder; terms: OrderTerms } {
   const rawPo = { ...(raw.po as Raw) };
   for (const k of BIG_ORDER) rawPo[k] = BigInt(rawPo[k] as string);
   const terms = { ...(raw.terms as Raw) };

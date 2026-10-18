@@ -17,9 +17,11 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
+import { LanguageProvider } from '@/i18n';
 import { SessionProvider } from '@/session';
 import { Splash } from '@/ui/Splash';
 import { colors } from '@/ui/theme';
+import { ThemeProvider, useTheme } from '@/ui/ThemeProvider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -47,19 +49,32 @@ export default function RootLayout() {
   if (!loaded && !error) return null;
 
   return (
-    <SessionProvider>
-      <StatusBar style="light" />
-      <View style={{ flex: 1, backgroundColor: colors.bg }}>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
-        {opening ? (
-          <Splash
-            onDone={() => {
+    <LanguageProvider>
+      <SessionProvider>
+        <ThemeProvider>
+          <Shell
+            opening={opening}
+            onOpened={() => {
               openingPlayed = true;
               setOpening(false);
             }}
           />
-        ) : null}
+        </ThemeProvider>
+      </SessionProvider>
+    </LanguageProvider>
+  );
+}
+
+// Drawn again whenever the theme changes, so it reads the new palette
+function Shell({ opening, onOpened }: { opening: boolean; onOpened: () => void }) {
+  const { mode } = useTheme();
+  return (
+    <>
+      <StatusBar style={mode === 'light' ? 'dark' : 'light'} />
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+        {opening ? <Splash onDone={onOpened} /> : null}
       </View>
-    </SessionProvider>
+    </>
   );
 }

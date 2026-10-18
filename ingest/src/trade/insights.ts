@@ -10,7 +10,7 @@ import type { Hex } from "@keel/schemas";
 import type { ExtractorProvider } from "../extractor/contract";
 import { ExtractionError } from "../extractor";
 import { logTransfer } from "../privacy";
-import type { IngestStore } from "../store";
+import type { IngestRepo } from "../repo";
 import type { ImporterRegistry } from "./proforma";
 import { uploadDomain, UPLOAD_MAX_SKEW_SECONDS } from "./upload";
 
@@ -196,7 +196,7 @@ export async function receiveInsights(
   req: InsightsRequest,
   importers: ImporterRegistry,
   analyst: ExtractorProvider,
-  opts: { store: IngestStore; chainId: number; now?: Date },
+  opts: { store: IngestRepo; chainId: number; now?: Date },
 ): Promise<InsightsOutcome> {
   const now = opts.now ?? new Date();
   if (Buffer.byteLength(req.input, "utf8") > MAX_INPUT_BYTES) return { status: "rejected", reason: "too_large" };
@@ -215,14 +215,14 @@ export async function receiveInsights(
     return { status: "rejected", reason: "bad_signature" };
   }
   if (!importers.has(signer)) return { status: "rejected", reason: "not_an_importer" };
-  if (opts.store.insightsToday(signer) >= MAX_INSIGHTS_PER_IMPORTER_PER_DAY) return { status: "rejected", reason: "rate_limited" };
+  if ((await opts.store.insightsToday(signer)) >= MAX_INSIGHTS_PER_IMPORTER_PER_DAY) return { status: "rejected", reason: "rate_limited" };
   let input: AnalysisInput;
   try {
     input = AnalysisInput.parse(JSON.parse(req.input));
   } catch {
     return { status: "rejected", reason: "invalid_request" };
   }
-  opts.store.recordInsights(signer);
+  await opts.store.recordInsights(signer);
   try {
     const raw = await analyst.complete({
       text: req.input,

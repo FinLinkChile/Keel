@@ -80,6 +80,10 @@ interface IZodiacRolesV2 {
     function avatar() external view returns (address);
     function target() external view returns (address);
     function isModuleEnabled(address module) external view returns (bool);
+    function getModulesPaginated(address start, uint256 pageSize)
+        external
+        view
+        returns (address[] memory array, address next);
 
     function assignRoles(address module, bytes32[] calldata roleKeys, bool[] calldata memberOf) external;
     function scopeTarget(bytes32 roleKey, address targetAddress) external;

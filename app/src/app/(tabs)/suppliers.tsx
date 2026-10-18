@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useData } from '@/data';
 import { supplierScore } from '@/data/supplierScore';
+import { useT } from '@/i18n';
 import { useSession } from '@/session';
 import { Avatar } from '@/ui/Avatar';
 import { Icon } from '@/ui/Icon';
@@ -16,6 +17,7 @@ import { colors, gutter } from '@/ui/theme';
 // check and has its payout account registered. Each one opens its profile, with the score of
 // how it delivered on the orders signed with it. Adding one is not built yet.
 export default function Suppliers() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const { role } = useSession();
   const suppliers = useData(async (d) => {
@@ -29,21 +31,21 @@ export default function Suppliers() {
       contentContainerStyle={{ paddingTop: Math.max(56, insets.top + 12), paddingHorizontal: gutter, paddingBottom: 48, gap: 20 }}
     >
       <Text size={28} weight={800} accessibilityRole="header">
-        Suppliers
+        {t('Suppliers')}
       </Text>
 
       {role !== 'importer' ? (
         <Text size={15} color="textMuted">
-          Suppliers are managed by the importer.
+          {t('Suppliers are managed by the importer.')}
         </Text>
       ) : (
         <>
           <Text size={15} leading={1.5} color="textMuted">
-            Companies you can open an order with. Each one passed the supplier check.
+            {t('Companies you can open an order with. Each one passed the supplier check.')}
           </Text>
           {suppliers === undefined ? null : suppliers.length === 0 ? (
             <Text size={15} color="textMuted">
-              No suppliers yet.
+              {t('No suppliers yet.')}
             </Text>
           ) : (
             <View>
@@ -51,7 +53,7 @@ export default function Suppliers() {
                 <Pressable
                   key={party.id}
                   accessibilityRole="button"
-                  accessibilityLabel={`${party.name}, ${score.stars === null ? 'no score yet' : `${score.stars} out of 5 stars`}`}
+                  accessibilityLabel={`${party.name}, ${score.stars === null ? t('no score yet') : t('{n} out of 5 stars', { n: score.stars })}`}
                   onPress={() => router.push({ pathname: '/supplier/[partyId]', params: { partyId: party.id } })}
                   style={({ pressed }) => ({
                     flexDirection: 'row',
@@ -73,12 +75,12 @@ export default function Suppliers() {
                     </Text>
                   </View>
                   {score.stars === null ? (
-                    <StatusWord tone="plain">New</StatusWord>
+                    <StatusWord tone="plain">{t('New')}</StatusWord>
                   ) : (
                     <View style={{ alignItems: 'flex-end', gap: 3 }}>
                       <Stars value={score.stars} size={13} />
                       <Text size={12} color="textFaint">
-                        {score.rated} {score.rated === 1 ? 'order' : 'orders'}
+                        {score.rated} {score.rated === 1 ? t('order') : t('orders')}
                       </Text>
                     </View>
                   )}
@@ -88,7 +90,7 @@ export default function Suppliers() {
             </View>
           )}
           <Text size={13} leading={1.5} color="textFaint">
-            Adding a supplier and the test transfer that verifies it are not available in this version.
+            {t('Adding a supplier and the test transfer that verifies it are not available in this version.')}
           </Text>
         </>
       )}
