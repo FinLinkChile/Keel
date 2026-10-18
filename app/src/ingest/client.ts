@@ -25,10 +25,12 @@ export type UploadResult =
   | { kind: 'accepted' }
   | { kind: 'under_review' }
   | { kind: 'duplicate' }
+  // Through the Keel API: the file is stored and will be read; the outcome arrives later
+  | { kind: 'sent' }
   | { kind: 'rejected'; reason: UploadRejection }
   | { kind: 'failed'; reason: 'not_configured' | 'network' | 'server' };
 
-const REJECTIONS: readonly UploadRejection[] = [
+export const REJECTIONS: readonly UploadRejection[] = [
   'bad_signature',
   'stale_signature',
   'not_a_party',
@@ -54,6 +56,9 @@ export function readUploadResponse(httpStatus: number, body: unknown): UploadRes
         return { kind: 'failed', reason: 'server' };
     }
   }
+  // Ingest on AWS reads asynchronously: the file is stored and the outcome comes later
+  if (httpStatus === 202 && b.status === 'accepted_for_reading') return { kind: 'sent' };
+  if (httpStatus === 409 && b.status === 'duplicate') return { kind: 'duplicate' };
   if (httpStatus === 413) return { kind: 'rejected', reason: 'too_large' };
   const reason = (b.reason ?? b.error) as UploadRejection;
   if (httpStatus >= 400 && httpStatus < 500 && REJECTIONS.includes(reason)) return { kind: 'rejected', reason };

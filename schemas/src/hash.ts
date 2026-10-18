@@ -14,6 +14,8 @@ import {
   toFunctionSelector,
 } from "viem";
 import {
+  API_EIP712_TYPES,
+  apiDomain,
   EIP712_TYPES,
   type Eip712Messages,
   type Eip712Type,
@@ -174,6 +176,21 @@ export function tradeRolesConfigCalls(p: TradeRolesParams): { to: Hex; data: Hex
     ...role(p.cosignedRole, p.cosignedAllowanceKey, p.cosignedCap),
     call(encodeFunctionData({ abi: ROLES_BUILDER_ABI, functionName: "assignRoles", args: [p.gate, [p.agentRole, p.cosignedRole], [true, true]] })),
   ];
+}
+
+// The ApiRequest a client signs for the Keel API (./api.ts). The same builder as
+// aws/src/auth.ts `apiRequestTypedData`, here so the app can build it without importing the
+// aws package (and its AWS SDK); app/src/data/api.test.ts checks both against `authenticate`.
+// `body` is the raw body exactly as sent ("" for none).
+export const apiBodyHash = (body: string): Hex => keccak256(toBytes(body));
+
+export function apiRequestTypedData(chainId: number, method: string, path: string, body: string, issuedAt: number) {
+  return {
+    domain: apiDomain(chainId),
+    types: API_EIP712_TYPES,
+    primaryType: "ApiRequest" as const,
+    message: { method: method.toUpperCase(), path, bodyHash: apiBodyHash(body), issuedAt: BigInt(issuedAt) },
+  };
 }
 
 export function tradeRolesConfigHash(p: TradeRolesParams): Hex {
