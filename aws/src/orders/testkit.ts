@@ -141,13 +141,12 @@ export interface Call {
   body: any;
 }
 
-// An API Gateway HTTP API event signed by `who` (or unsigned), and the parsed reply
-export async function call(
-  handler: Handler,
+// An API Gateway HTTP API event signed by `who` (or unsigned)
+export async function signedEvent(
   who: Account | null,
   routeKey: string,
   opts: { params?: Record<string, string>; query?: Record<string, string>; body?: unknown; headers?: Record<string, string> } = {},
-): Promise<Call> {
+): Promise<APIGatewayProxyEventV2> {
   const [method, template] = routeKey.split(" ") as [string, string];
   const path = template.replace(/\{(\w+)\}/g, (_m, k: string) => opts.params?.[k] ?? "");
   const body = opts.body === undefined ? "" : JSON.stringify(json(opts.body));
@@ -158,7 +157,7 @@ export async function call(
     headers[API_HEADERS.issuedAt] = String(issuedAt);
     headers[API_HEADERS.signature] = await who.signTypedData(apiRequestTypedData(CHAIN, method, path, body, issuedAt));
   }
-  const event = {
+  return {
     routeKey,
     rawPath: path,
     body,
@@ -168,10 +167,19 @@ export async function call(
     queryStringParameters: opts.query,
     requestContext: { http: { method } },
   } as unknown as APIGatewayProxyEventV2;
+}
+
+// Sends an event as is: the same event twice is a replay of the same signed request
+export async function send(handler: Handler, event: APIGatewayProxyEventV2): Promise<Call> {
   const res = (await handler(event)) as { statusCode: number; body: string };
   return { status: res.statusCode, body: JSON.parse(res.body) };
 }
 
 export function resetChainDeps() {
   setChainDeps(undefined);
+}
+
+// A fresh signed request, sent and parsed
+export async function call(handler: Handler, who: Account | null, routeKey: string, opts: Parameters<typeof signedEvent>[2] = {}): Promise<Call> {
+  return send(handler, await signedEvent(who, routeKey, opts));
 }

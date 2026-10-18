@@ -6,14 +6,14 @@
 // (UnknownSupplier) and the engine reads through engine/src/agent/gate.ts. A supplier listed here
 // and not in the gate is held at funding; a supplier missing here can still be proposed.
 // Writing it is an operator task (bearer token `directory_admin_token`), never a user's.
-import { GetCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, GetCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import type { Hex } from "@keel/schemas";
 import { z } from "zod";
 import { type Deployment, type Env, table } from "../config";
 import { ddb, lower } from "../db";
 import { HttpError } from "../http";
 import type { PartyItem } from "../tables";
-import { representedSafes } from "./parties";
+import { getParties, getParty, representedSafes } from "./parties";
 
 const address = z.string().regex(/^0x[0-9a-fA-F]{40}$/);
 
@@ -114,4 +114,79 @@ export function tradeSetup(d: Deployment) {
     token: token && /^0x[0-9a-fA-F]{40}$/.test(token) ? token : null,
     deployBlock: d.deployBlock.toString(),
   };
+}
+
+// ---------------------------------------------------------------- importer Safes (operator)
+
+// Who represents an importer Safe in the API. The Safe's item is the authority (`representatives`);
+// each representative's item only points back at it (`safe`). This says who Keel lets act through
+// the API for the Safe, not who can sign for it: the Safe's owners and threshold decide that, and
+// the escrow asks the Safe through ERC-1271. Operator only (bearer `directory_admin_token`).
+export const ImporterBody = z.strictObject({
+  safe: address,
+  // Replaces the list; at least one, or the Safe could not use any importer route
+  representatives: z.array(address).min(1).max(20),
+  name: z.string().min(1).max(100).optional(),
+  taxId: z.string().regex(/^[A-Za-z0-9.-]{1,40}$/).optional(),
+  account: z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/).optional(),
+});
+
+export interface ImporterView {
+  safe: string;
+  representatives: string[];
+  name?: string;
+  taxId?: string;
+  account?: string;
+}
+
+const importerView = (p: PartyItem): ImporterView => ({
+  safe: p.address,
+  representatives: p.representatives ?? [],
+  ...(p.name && { name: p.name }),
+  ...(p.taxId && { taxId: p.taxId }),
+  ...(p.account && { account: p.account }),
+});
+
+export async function getImporter(safeAddress: string, env?: Env): Promise<ImporterView> {
+  if (!/^0x[0-9a-fA-F]{40}$/.test(safeAddress)) throw new HttpError(404, "not_found");
+  const p = await getParty(safeAddress, env);
+  if (!p || p.kind !== "importer") throw new HttpError(404, "not_found");
+  return importerView(p);
+}
+
+// Upserts the importer Safe and its representatives. Concurrent operator writes are last-writer-wins.
+export async function putImporter(body: z.infer<typeof ImporterBody>, env?: Env): Promise<ImporterView> {
+  const safe = lower(body.safe);
+  const reps = [...new Set(body.representatives.map(lower))];
+  if (reps.includes(safe)) throw new HttpError(422, "same_parties");
+  const items = await getParties([safe, ...reps], env);
+  const prev = items.get(safe);
+  if (prev && prev.kind !== "importer") throw new HttpError(409, "kind_conflict", { address: safe, kind: prev.kind });
+  for (const rep of reps) {
+    const r = items.get(rep);
+    if (!r) continue;
+    // A representative of another Safe is not silently moved, and an address registered as
+    // something else (an exporter, a carrier) is not turned into a representative
+    if (r.kind !== "representative") throw new HttpError(409, "kind_conflict", { address: rep, kind: r.kind });
+    if (r.safe && lower(r.safe) !== safe) throw new HttpError(409, "representative_of_another_safe", { address: rep, safe: r.safe });
+  }
+  const item: PartyItem = {
+    ...prev,
+    address: safe,
+    kind: "importer",
+    representatives: reps,
+    ...(body.name && { name: body.name }),
+    ...(body.taxId && { taxId: body.taxId }),
+    ...(body.account && { account: body.account }),
+  };
+  await ddb().send(new PutCommand({ TableName: table("parties", env), Item: item }));
+  for (const rep of reps) {
+    await ddb().send(new PutCommand({ TableName: table("parties", env), Item: { ...items.get(rep), address: rep, kind: "representative", safe } satisfies PartyItem }));
+  }
+  // Representatives dropped from the list lose their pointer (it granted nothing alone)
+  const dropped = (prev?.representatives ?? []).map(lower).filter((r) => !reps.includes(r));
+  const droppedItems = await getParties(dropped, env);
+  const stale = [...droppedItems.values()].filter((r) => r.kind === "representative" && r.safe && lower(r.safe) === safe);
+  for (const r of stale) await ddb().send(new DeleteCommand({ TableName: table("parties", env), Key: { address: r.address } }));
+  return importerView(item);
 }

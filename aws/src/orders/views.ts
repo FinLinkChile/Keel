@@ -144,7 +144,7 @@ export interface Need {
 //   sign_as_importer     proposal awaiting_importer, caller acts for the importer
 //   approve_balance      order SHIPPED with no BalanceApproval yet, caller acts for the importer
 //                        (optional: the balance also leaves with the verifier's DocumentDecision)
-//   sign_cancel          the other side signed a cancellation for the current state, this side not
+//   sign_cancel          the other side signed a cancellation in the state the mirror still shows, this side not
 //   upload_documents     order ADVANCE_PAID without documents, caller is one of its uploaders
 // Carrier attestations and arbiter resolutions are not listed: those parties have no index here.
 export async function needsYou(signer: Hex, ctx: Ctx): Promise<Need[]> {
@@ -162,7 +162,9 @@ export async function needsYou(signer: Hex, ctx: Ctx): Promise<Need[]> {
       needs.push({ action: "approve_balance", ...base, as: "importer", ...(attestationHash && { attestationHash }) });
     }
     const cancel = v.closing?.cancel;
-    if (cancel && (CANCELLABLE_STATES as readonly string[]).includes(v.state)) {
+    // The pair counts only while the mirror still shows the state the cancellation was signed in:
+    // a state change moves the escrow's cancel nonce, so the stored one would be dead
+    if (cancel && cancel.state === v.state && (CANCELLABLE_STATES as readonly string[]).includes(v.state)) {
       if (v.you.includes("importer") && !cancel.sigImporter && cancel.sigExporter) needs.push({ action: "sign_cancel", ...base, as: "importer", cancelNonce: cancel.cancelNonce });
       if (v.you.includes("exporter") && !cancel.sigExporter && cancel.sigImporter) needs.push({ action: "sign_cancel", ...base, as: "exporter", cancelNonce: cancel.cancelNonce });
     }

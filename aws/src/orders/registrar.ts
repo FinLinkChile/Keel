@@ -5,7 +5,8 @@
 //   1. creates the OrderItem the agent reads (engine StoredOrder plus both signatures), once:
 //      attribute_not_exists(orderId);
 //   2. in the same transaction, appends the order total to the exporter's amount history (engine
-//      Registry.history, input of the funding rules), so a retry never counts an order twice;
+//      Registry.history, input of the funding rules), so a retry never counts an order twice,
+//      and only when the importer is a registered importer Safe (kind "importer" in parties);
 //   3. registers in the ingest table who may upload documents for the order and where the
 //      exporter is paid (ingest TradeOrderEntry), both taken from the signed PurchaseOrder.
 //
@@ -78,21 +79,32 @@ export async function registerOrder(orderId: string, opts: { escrow: Hex; env?: 
     createdAt: opts.now ?? nowSeconds(),
   };
 
+  // Amount history feeds the engine's amount-in-range rule, so only an order of a registered
+  // importer Safe may add to it. POST /proposals accepts any EOA as its own importer (a signer
+  // acts for itself), so an exporter with a second key could otherwise inflate its own history.
+  // Such an order is still stored for the API; it contributes no history.
+  const countsForHistory = parties.get(p.importer)?.kind === "importer";
+  if (!countsForHistory) log({ orderId, warning: "importer_not_registered_no_history" });
+
   let outcome: RegisterOutcome = "created";
   try {
     await ddb().send(
       new TransactWriteCommand({
         TransactItems: [
           { Put: { TableName: table("orders", env), Item: order, ConditionExpression: "attribute_not_exists(orderId)" } },
-          {
-            Update: {
-              TableName: table("parties", env),
-              Key: { address: lower(p.exporter) },
-              UpdateExpression: "SET history = list_append(if_not_exists(history, :empty), :total), #kind = if_not_exists(#kind, :exporter)",
-              ExpressionAttributeNames: { "#kind": "kind" },
-              ExpressionAttributeValues: { ":empty": [], ":total": [po.totalAmount.toString()], ":exporter": "exporter" },
-            },
-          },
+          ...(countsForHistory
+            ? [
+                {
+                  Update: {
+                    TableName: table("parties", env),
+                    Key: { address: lower(p.exporter) },
+                    UpdateExpression: "SET history = list_append(if_not_exists(history, :empty), :total), #kind = if_not_exists(#kind, :exporter)",
+                    ExpressionAttributeNames: { "#kind": "kind" },
+                    ExpressionAttributeValues: { ":empty": [], ":total": [po.totalAmount.toString()], ":exporter": "exporter" },
+                  },
+                },
+              ]
+            : []),
         ],
       }),
     );

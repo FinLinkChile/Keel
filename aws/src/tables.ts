@@ -59,7 +59,9 @@ export interface OrderItem {
   // Closing signatures the agent submits on its next pass
   closing?: {
     balanceApproval?: { sigImporter: Hex; attestationHash: Hex };
-    cancel?: { cancelNonce: string; sigImporter?: Hex; sigExporter?: Hex };
+    // `state`: the mirror state (OrderItem.chain.state) when the latest signature was stored, whose
+    // nonce was read from the escrow right then; views drop the pair once the mirror moved on
+    cancel?: { cancelNonce: string; state?: string; sigImporter?: Hex; sigExporter?: Hex };
     resolution?: { toImporter: string; toExporter: string; sigArbiter: Hex };
   };
   // Who may upload documents for this order (ingest TradeOrderEntry.uploaders)
