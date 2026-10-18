@@ -15,6 +15,7 @@ import {
   type Call,
   decodeOrderOf,
   decodeRefundGrace,
+  openCall,
   type OrderRecord,
   orderOfCall,
   refundCall,
@@ -57,7 +58,7 @@ export interface FundingGatePort {
   executeCall(intent: FundIntent, signed: SignedPolicyDecision): Call;
 }
 
-export type AgentAction = "fund" | "submitShipment" | "releaseBalance" | "refundAfterDeadline";
+export type AgentAction = "open" | "fund" | "submitShipment" | "releaseBalance" | "refundAfterDeadline";
 
 // Reason codes for the bot templates (Area 4), never free text.
 export type AgentReason =
@@ -160,8 +161,15 @@ export class Agent {
       let record: OrderRecord | undefined;
       try {
         record = decodeOrderOf(await this.deps.chain.call(orderOfCall(this.config.escrow, orderId)));
-        if (record.state === "NONE" || !same(record.po.importer, this.config.safe)) continue;
-        event = await this.step(orderId, record, now);
+        if (record.state === "NONE") {
+          // Not in the escrow yet: open it if the app delivered the order with both signatures
+          const opened = await this.open(orderId);
+          if (!opened) continue;
+          event = opened;
+        } else {
+          if (!same(record.po.importer, this.config.safe)) continue;
+          event = await this.step(orderId, record, now);
+        }
       } catch (e) {
         event = { orderId, state: record?.state ?? "NONE", outcome: "failed", reason: "AGENT_ERROR", detail: (e as Error).message };
       }
@@ -193,6 +201,19 @@ export class Agent {
         // Final states, and disputes: the arbiter or both parties move the funds, not the agent
         return Promise.resolve({ orderId, state: record.state, outcome: "waiting", reason: "NOTHING_TO_DO" });
     }
+  }
+
+  // Step 1: submit the order both parties signed. `open` takes no permission (the signatures are
+  // the authority) and the relayer only pays the gas (decision 17). Only orders of this Safe are
+  // opened, so the agent never pays gas to register someone else's order.
+  private async open(orderId: Hex): Promise<AgentEvent | undefined> {
+    const stored = this.deps.store.order(orderId);
+    if (!stored?.signatures || !same(stored.order.importer, this.config.safe)) return undefined;
+    const state: EscrowState = "NONE";
+    if (stored.order.orderId !== orderId) return { orderId, state, outcome: "failed", reason: "AGENT_ERROR", detail: "order.json does not belong to this folder" };
+    const { sigImporter, sigExporter } = stored.signatures;
+    // A revert (bad signature, role separation, wrong token) is held with its name and no gas is spent
+    return this.execute(orderId, state, "open", openCall(this.config.escrow, stored.order, sigImporter, sigExporter));
   }
 
   // Simulate, then send. A call that would revert is held with its revert name and no gas is spent.

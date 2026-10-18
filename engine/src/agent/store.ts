@@ -3,7 +3,7 @@
 // who delivers them is open decision 15; until it closes they are JSON files of the demo:
 //
 //   <dir>/registry.json                     parties, amount history
-//   <dir>/orders/<orderId>/order.json       { order, terms, label } (app, Area 4)
+//   <dir>/orders/<orderId>/order.json       { order, terms, label, sigImporter, sigExporter } (app, Area 4)
 //   <dir>/orders/<orderId>/shipment.json    { attestation, sigCarrier } (carrier)
 //   <dir>/orders/<orderId>/documents.json   { extractions, fileHashes } (ingest, Area 3)
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -18,6 +18,9 @@ export interface StoredOrder {
   terms: OrderTerms;
   // What people call the order in the bot notices, such as PO-0131 (the bot's OrderLabel)
   label?: string;
+  // The two EIP-712 signatures over the order. With them the agent opens the order in the escrow
+  // (decision 17); an order stored without them is opened by someone else.
+  signatures?: { sigImporter: Hex; sigExporter: Hex };
 }
 
 export interface StoredShipment {
@@ -70,6 +73,7 @@ export class FileStore implements AgentStore {
       order: reviveStruct(EIP712_TYPES.PurchaseOrder, raw.order),
       terms: OrderTerms.parse({ ...raw.terms, invoiceAmountMinor: BigInt(raw.terms.invoiceAmountMinor) }),
       ...(typeof raw.label === "string" && { label: raw.label }),
+      ...(typeof raw.sigImporter === "string" && typeof raw.sigExporter === "string" && { signatures: { sigImporter: raw.sigImporter, sigExporter: raw.sigExporter } }),
     };
   }
 

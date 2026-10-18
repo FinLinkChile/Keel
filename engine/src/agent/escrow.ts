@@ -15,6 +15,7 @@ export const ESCROW_ABI = parseAbi([
   "struct DocumentDecision { bytes32 orderId; bytes32 attestationHash; bytes32 docsHash; bytes32 policyHash; bytes32 inputsHash; uint64 expiresAt; }",
   "struct OrderRecord { PurchaseOrder po; uint8 state; uint64 stateVersion; bytes32 orderHash; uint256 paidOut; bytes32 attestationHash; bytes32 docsHash; uint64 shippedAt; bool funded; }",
   "function orderOf(bytes32 orderId) view returns (OrderRecord)",
+  "function open(PurchaseOrder po, bytes sigImporter, bytes sigExporter) returns (bytes32 orderHash)",
   "function refundGrace() view returns (uint64)",
   "function fund(bytes32 orderId)",
   "function submitShipment(bytes32 orderId, ShipmentAttestation att, bytes sigCarrier)",
@@ -65,6 +66,11 @@ export function decodeOrderOf(data: Hex): OrderRecord {
   const r = decodeFunctionResult({ abi: ESCROW_ABI, functionName: "orderOf", data });
   return { po: r.po, state: ESCROW_STATES[r.state] ?? "NONE", orderHash: r.orderHash, attestationHash: r.attestationHash, shippedAt: r.shippedAt };
 }
+
+export const openCall = (escrow: Hex, po: PurchaseOrder, sigImporter: Hex, sigExporter: Hex): Call => ({
+  to: escrow,
+  data: encodeFunctionData({ abi: ESCROW_ABI, functionName: "open", args: [po, sigImporter, sigExporter] }),
+});
 
 export const refundGraceCall = (escrow: Hex): Call => ({
   to: escrow,
