@@ -183,6 +183,17 @@ describe("configFromEnv", () => {
     expect(() => configFromEnv({ LLM_API_KEY: "k", LLM_BASE_URL: "http://proxy.example" })).toThrow(/https/);
   });
 
+  it("behind a proxy the key goes as x-api-key and as a Bearer token; straight to Anthropic only as x-api-key", async () => {
+    const client = async (baseURL?: string) =>
+      (
+        (await createExtractor({ provider: "anthropic", apiKey: "k", model: "claude-opus-5-5", baseURL })) as unknown as {
+          client: { apiKey: string | null; authToken: string | null };
+        }
+      ).client;
+    expect(await client("https://proxy.example")).toMatchObject({ apiKey: "k", authToken: "k" });
+    expect((await client()).authToken).toBeNull();
+  });
+
   it("validates configs built by hand, not only from the environment", async () => {
     await expect(
       createExtractor({ provider: "openai-compatible", apiKey: "k", model: "q", baseURL: "http://evil.example/v1" }),

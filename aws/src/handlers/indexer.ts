@@ -13,7 +13,7 @@ import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import type { EscrowEvent, EscrowState, Hex } from "@keel/schemas";
 import { ESCROW_ABI, EVENT_STATE, type MonitorChain, type MonitorLog, rpcMonitorChain } from "@keel/engine";
 import { decodeEventLog } from "viem";
-import { type Env, table } from "../config";
+import { DEFAULT_LOG_RANGE, type Env, logRange, table } from "../config";
 import { ddb, isConditionFailed } from "../db";
 import { acquire } from "../lock";
 import { redactedError } from "../redact";
@@ -22,9 +22,11 @@ import { logLine } from "../agent/clients";
 import { type RuntimeDeployment, rpcUrl, runtimeDeployment } from "../agent/deployment";
 import { readCursor, writeCursor } from "../agent/state";
 
-export const MAX_RANGE = 2000n;
-// Ranges per run, so a run that starts far behind still ends well inside the function timeout
-export const MAX_RANGES_PER_RUN = 20;
+// Default blocks per getLogs request; KEEL_LOG_RANGE overrides it (aws/src/config.ts)
+export const MAX_RANGE = DEFAULT_LOG_RANGE;
+// Ranges per run, so a run that starts far behind still ends well inside the function timeout:
+// 60 requests of 200 blocks read about 6.7 hours of Base blocks in a few seconds
+export const MAX_RANGES_PER_RUN = 60;
 const LOCK_SECONDS = 55;
 
 // Progress of an order through the escrow (contracts/src/TradeEscrow.sol): every transition goes
@@ -106,8 +108,9 @@ export async function runIndexerPass(deps: IndexerPassDeps): Promise<IndexerPass
     const from = (await readCursor("indexer", deps.env)) ?? ctx.deployBlock;
     let next = from;
     let applied = 0;
+    const range = logRange(deps.env);
     for (let ranges = 0; ranges < MAX_RANGES_PER_RUN && next <= latest; ranges++) {
-      const to = next + MAX_RANGE - 1n < latest ? next + MAX_RANGE - 1n : latest;
+      const to = next + range - 1n < latest ? next + range - 1n : latest;
       const logs = await chain.logs([ctx.escrow], next, to);
       logs.sort((a, b) => (a.blockNumber === b.blockNumber ? a.logIndex - b.logIndex : a.blockNumber < b.blockNumber ? -1 : 1));
       for (const log of logs) {

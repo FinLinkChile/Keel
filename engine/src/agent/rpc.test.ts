@@ -64,6 +64,41 @@ describe("agent chain over JSON-RPC", () => {
     expect(asked).toEqual([{ address: escrow, topics: orderFundedTopics(orderId), fromBlock: "0x7", toBlock: "latest" }]);
   });
 
+  it("with logRange, searches backwards in ranges no larger than the provider allows, and stops at the cap", async () => {
+    const escrow = call.to;
+    const orderId = keccak256(toBytes("order"));
+    const blockHash = keccak256(toBytes("block"));
+    const ranges: [number, number][] = [];
+    const url = await node((method, params) => {
+      if (method === "eth_blockNumber") return { result: "0x3e8" }; // 1000
+      if (method === "eth_getLogs") {
+        const { fromBlock, toBlock } = params[0] as { fromBlock: string; toBlock: string };
+        const [from, to] = [Number(fromBlock), Number(toBlock)];
+        ranges.push([from, to]);
+        // A provider that refuses wide ranges, like the public Base Sepolia endpoint
+        if (to - from + 1 > 200) return { error: { code: -32614, message: "eth_getLogs is limited to a 200 range" } };
+        const funded = 650;
+        if (from > funded || to < funded) return { result: [] };
+        const log = { address: escrow, topics: orderFundedTopics(orderId), data: `0x${"00".repeat(32)}`, blockHash, blockNumber: "0x28a", transactionHash: blockHash, transactionIndex: "0x0", logIndex: "0x0", removed: false };
+        return { result: [log] };
+      }
+      if (method === "eth_getBlockByHash") return { result: { hash: blockHash, number: "0x28a", timestamp: "0x690a0000", transactions: [] } };
+      return { error: { code: -32601, message: "method not found" } };
+    });
+    expect(await rpcChain(url, relayer, { fromBlock: 100n, logRange: 200n }).fundedAt(escrow, orderId)).toBe(0x690a0000n);
+    expect(ranges).toEqual([
+      [801, 1000],
+      [601, 800],
+    ]);
+    ranges.length = 0;
+    // Funded before the searched window: not found, and never more than maxLogRanges requests
+    expect(await rpcChain(url, relayer, { fromBlock: 100n, logRange: 100n, maxLogRanges: 2 }).fundedAt(escrow, orderId)).toBeUndefined();
+    expect(ranges).toEqual([
+      [901, 1000],
+      [801, 900],
+    ]);
+  });
+
   it("gives up waiting for a receipt after receiptTimeoutMs", async () => {
     const hash = keccak256(toBytes("tx"));
     const url = await node((method) => {

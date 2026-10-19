@@ -20,7 +20,7 @@ La regla común: la API no decide nada y cada ruta exige su firma o su token. Un
 | GET | `/proposals`, `/proposals/{orderId}` | Propuestas | Las partes | Petición firmada | Nuevo |
 | POST | `/proposals/{orderId}/exporter-signature`, `/importer-signature`, `/reject` | Propuestas | Exportador o importador | Firma de la `PurchaseOrder` | Nuevo |
 | GET | `/orders`, `/orders/{orderId}` | Consulta de órdenes | Las partes | Petición firmada | Nuevo |
-| GET | `/needs-you`, `/wallet` | Consulta de órdenes | Importador o exportador | Petición firmada | Nuevo |
+| GET | `/needs-you`, `/wallet` | Consulta de órdenes | Importador o exportador | Petición firmada | Nuevo. `/wallet` incluye `available`, el saldo del token de la Safe leído en la cadena, y `payouts`, el saldo de cada dirección de cobro de las órdenes del exportador; si el RPC no responde, la ruta contesta sin esos saldos |
 | GET | `/suppliers` | Directorio | Importador | Petición firmada | Nuevo |
 | GET | `/trade-setup` | Directorio | Cualquiera (datos públicos del despliegue: escrow, gate, Safe, token, `chainId`) | Ninguna | Nuevo |
 | POST | `/suppliers` | Directorio | Operador | Token de administración | Nuevo |
@@ -32,6 +32,7 @@ La regla común: la API no decide nada y cada ruta exige su firma o su token. Un
 | POST | `/trade/uploads` | Carga de documentos | Las partes de la orden | Firma `DocumentUpload` | Decidir |
 | POST | `/trade/documents` | Carga de documentos | Las partes de la orden | Firma `DocumentUpload` | Cambia |
 | POST | `/trade/proforma` | Proforma | Importador registrado | Firma `ProformaUpload` | Existe |
+| POST | `/trade/insights` **[PROPUESTA]** | Análisis de compras | Importador registrado | Firma `InsightsRequest` sobre el hash de las métricas | Nuevo: el modelo ve solo métricas agregadas que la app calculó y firmó, hasta 10 al día por importador; su respuesta es un consejo y no decide nada |
 | POST | `/inbound` | Correo | Reenviador | Bearer `INGEST_WEBHOOK_TOKEN` | Decidir |
 | GET, PUT | `/admin/settings` | Ajustes de ingesta | Operador | Bearer `INGEST_ADMIN_TOKEN` y `x-admin-actor` | Existe |
 | POST | `/notices`, `/ingest/outcomes` | Envío de avisos | Agente, monitor e ingesta | Bearer; pasan a una cola interna | Cambia |

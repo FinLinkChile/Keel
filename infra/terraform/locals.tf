@@ -17,6 +17,7 @@ locals {
     "ingest_webhook_token",  # POST /inbound (reenviador de correo)
     "ingest_admin_token",    # GET y PUT /admin/settings
     "llm_keys",              # JSON {anthropic?, openai?, gemini?, compat?}
+    "carrier_private_key",   # solo si demo_auto_attest = true: llave de prueba de la naviera
   ]
   secret_arn = { for n in local.secret_names : n => "arn:aws:ssm:${var.region}:${data.aws_caller_identity.me.account_id}:parameter${local.secrets_prefix}${n}" }
 
@@ -77,6 +78,15 @@ locals {
   # ---------- Funciones: una por archivo de aws/src/handlers ----------
   # role: rol de IAM. reserve: concurrencia reservada de 1 si use_reserved_concurrency (el candado
   # en DynamoDB ya evita vueltas simultaneas; la reserva es una segunda barrera opcional).
+  # URL del proxy de Anthropic (vacia: la API de Anthropic). Va en el entorno y nunca en llm_keys
+  # ni por la API de administracion. La reciben las funciones que arman el extractor.
+  # ATAJO DE DEMO, apagado por defecto: el extractor firma la prueba de embarque con la llave de la
+  # naviera al tener BL y factura (aws/src/orders/autoAttest.ts). Rompe la separacion de poderes.
+  demo_attest_env = { for k, v in { KEEL_DEMO_AUTO_ATTEST = "1" } : k => v if var.demo_auto_attest }
+
+  llm_env = { for k, v in { ANTHROPIC_BASE_URL = var.anthropic_base_url } : k => v if v != "" }
+
+  # Funciones: 20 desde el analisis de compras (insights).
   # El agente retiene su candado 110 s: su timeout tiene que ser menor. Monitor e indexador, 55 s.
   # El extractor puede tardar 3 intentos de 60 s del LLM (LLM_TIMEOUT_MS); la cola le da 720 s de visibilidad.
   # Proforma e inbound llaman al LLM dentro de la peticion (API Gateway corta a los 29 s): su
@@ -91,6 +101,7 @@ locals {
     upload     = { role = "upload", timeout = 28, memory = 512, reserve = false }
     inbound    = { role = "inbound", timeout = 28, memory = 512, reserve = false }
     proforma   = { role = "proforma", timeout = 28, memory = 1024, reserve = false }
+    insights   = { role = "insights", timeout = 28, memory = 512, reserve = false }
     admin      = { role = "admin", timeout = 28, memory = 512, reserve = false }
     extractor  = { role = "extractor", timeout = 300, memory = 1536, reserve = false }
     digest     = { role = "digest", timeout = 60, memory = 512, reserve = true }
@@ -108,6 +119,7 @@ locals {
     KEEL_CONFIG_PREFIX  = "${local.cfg_prefix}/"
     KEEL_SECRETS_PREFIX = local.secrets_prefix
     KEEL_STAGE          = var.stage
+    KEEL_LOG_RANGE      = tostring(var.log_block_range)
   }
 
   t = { for k, v in aws_dynamodb_table.t : k => v.name }
@@ -130,11 +142,13 @@ locals {
       PARTIES_TABLE   = local.t["parties"]
       INGEST_TABLE    = local.t["ingest"]
     }
-    upload    = { INGEST_TABLE = local.t["ingest"], DOCS_BUCKET = aws_s3_bucket.docs.bucket }
-    inbound   = { INGEST_TABLE = local.t["ingest"], DOCS_BUCKET = aws_s3_bucket.docs.bucket, NOTICES_QUEUE_URL = aws_sqs_queue.notices.url, LLM_TIMEOUT_MS = "20000" }
-    proforma  = { INGEST_TABLE = local.t["ingest"], PARTIES_TABLE = local.t["parties"], LLM_TIMEOUT_MS = "20000" }
-    admin     = { INGEST_TABLE = local.t["ingest"] }
-    extractor = { INGEST_TABLE = local.t["ingest"], ORDERS_TABLE = local.t["orders"], DOCS_BUCKET = aws_s3_bucket.docs.bucket, NOTICES_QUEUE_URL = aws_sqs_queue.notices.url }
+    upload   = { INGEST_TABLE = local.t["ingest"], DOCS_BUCKET = aws_s3_bucket.docs.bucket }
+    inbound  = merge(local.llm_env, { INGEST_TABLE = local.t["ingest"], DOCS_BUCKET = aws_s3_bucket.docs.bucket, NOTICES_QUEUE_URL = aws_sqs_queue.notices.url, LLM_TIMEOUT_MS = "20000" })
+    proforma = merge(local.llm_env, { INGEST_TABLE = local.t["ingest"], PARTIES_TABLE = local.t["parties"], LLM_TIMEOUT_MS = "20000" })
+    # El analisis de compras llama al modelo dentro de la peticion, igual que la proforma
+    insights  = merge(local.llm_env, { INGEST_TABLE = local.t["ingest"], PARTIES_TABLE = local.t["parties"], LLM_TIMEOUT_MS = "20000" })
+    admin     = merge(local.llm_env, { INGEST_TABLE = local.t["ingest"] })
+    extractor = merge(local.llm_env, local.demo_attest_env, { INGEST_TABLE = local.t["ingest"], ORDERS_TABLE = local.t["orders"], DOCS_BUCKET = aws_s3_bucket.docs.bucket, NOTICES_QUEUE_URL = aws_sqs_queue.notices.url })
     digest    = { INGEST_TABLE = local.t["ingest"], NOTICES_QUEUE_URL = aws_sqs_queue.notices.url }
     fanout    = { ORDERS_TABLE = local.t["orders"], AGENT_QUEUE_URL = aws_sqs_queue.agent.url }
     agent = {
@@ -180,6 +194,7 @@ locals {
     upload     = ["POST /trade/uploads", "POST /trade/documents"]
     inbound    = ["POST /inbound"]
     proforma   = ["POST /trade/proforma"]
+    insights   = ["POST /trade/insights"]
     admin      = ["GET /admin/settings", "PUT /admin/settings"]
     noticesIn  = ["POST /notices", "POST /ingest/outcomes"]
     botAdmin   = ["GET /bot/recipients", "PUT /bot/recipients"]
@@ -213,6 +228,8 @@ locals {
     orders_read = [
       { actions = local.ddb_read, resources = [local.tbl["proposals"], local.tbl_idx["proposals"], local.tbl["orders"], local.tbl_idx["orders"], local.tbl["parties"]] },
       local.ssm_read,
+      # GET /wallet lee el saldo del token de la Safe en la cadena
+      local.secrets["rpc_url"],
     ]
     # Propuestas, firmas de cierre y atestaciones: escriben propuestas y ordenes, leen partes, y
     # consultan la cadena para ERC-1271 y cancelNonceOf
@@ -255,6 +272,14 @@ locals {
       local.ssm_read,
       local.secrets["llm_keys"],
     ]
+    # Analisis de compras: el cupo diario por importador vive en la tabla de ingesta; lee partes
+    # para saber si quien firma es importador; solo ve las metricas que la app firmo
+    insights = [
+      { actions = local.ddb_rw, resources = [local.tbl["ingest"]] },
+      { actions = local.ddb_read, resources = [local.tbl["parties"]] },
+      local.ssm_read,
+      local.secrets["llm_keys"],
+    ]
     admin = [
       { actions = local.ddb_rw, resources = [local.tbl["ingest"]] },
       local.ssm_read,
@@ -262,7 +287,7 @@ locals {
       # Los ajustes validan el proveedor contra las llaves disponibles (availableProviders); nunca las devuelven
       local.secrets["llm_keys"],
     ]
-    extractor = [
+    extractor = concat([
       { actions = local.sqs_consume, resources = [aws_sqs_queue.extraction.arn] },
       { actions = ["s3:GetObject", "s3:DeleteObject"], resources = ["${aws_s3_bucket.docs.arn}/orders/*"] },
       # Sin ListBucket, S3 responde 403 en vez de NoSuchKey a un objeto ausente
@@ -271,7 +296,7 @@ locals {
       { actions = ["sqs:SendMessage"], resources = [aws_sqs_queue.notices.arn] },
       local.ssm_read,
       local.secrets["llm_keys"],
-    ]
+    ], var.demo_auto_attest ? [local.secrets["carrier_private_key"], local.secrets["rpc_url"]] : [])
     digest = [
       { actions = local.ddb_rw, resources = [local.tbl["ingest"]] },
       { actions = ["sqs:SendMessage"], resources = [aws_sqs_queue.notices.arn] },

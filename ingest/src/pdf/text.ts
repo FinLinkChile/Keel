@@ -1,7 +1,14 @@
+/// <reference path="./pdfjs-worker.d.ts" />
 // Reads every text run of a PDF with the attributes needed to tell visible from hidden
 // text. Walks the pdf.js operator list instead of getTextContent, which drops color,
 // opacity, layers and rendering mode.
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
+// Without a worker thread pdf.js loads ./pdf.worker.mjs next to itself, a file a bundle (the AWS
+// Lambdas) does not have: every PDF then fails as unreadable. The worker module imported here
+// is the one pdf.js uses in this thread instead.
+import * as pdfjsWorker from "pdfjs-dist/legacy/build/pdf.worker.mjs";
+
+(globalThis as { pdfjsWorker?: unknown }).pdfjsWorker ??= pdfjsWorker;
 
 export const MAX_PDF_BYTES = 10 * 1024 * 1024;
 export const MAX_PDF_PAGES = 20;

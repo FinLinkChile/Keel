@@ -71,7 +71,9 @@ export interface OrderView {
   sigImporter: Hex;
   sigExporter: Hex;
   shipment?: { attestation: Raw; sigCarrier: Hex };
-  documents?: { fileHashes: Hex[] };
+  // received: the accepted documents (BILL_OF_LADING, AIR_WAYBILL, COMMERCIAL_INVOICE); older API versions omit it
+  // details: the trade fields read from the bill of lading and the invoice
+  documents?: { fileHashes: Hex[]; received?: RequiredDocType[]; details?: { transport?: Record<string, string>; invoice?: Record<string, string> } };
   closing?: {
     balanceApproval?: { sigImporter: Hex; attestationHash: Hex };
     cancel?: { cancelNonce: string; sigImporter?: Hex; sigExporter?: Hex };
@@ -102,7 +104,16 @@ export interface WalletView {
   byState: Record<string, number>;
   locked: string;
   pendingFunding: string;
+  // The Safe's token balance on chain, token minor units; absent when the API could not ask the chain
+  available?: string;
   orders: { orderId: Hex; label?: string; state: string; totalAmount: string; locked: string }[];
+}
+
+// A payout address of the caller's orders as exporter and its token balance on chain (minor
+// units); available is absent when the API could not ask the chain
+export interface PayoutView {
+  address: string;
+  available?: string;
 }
 
 export interface TradeSetupView {
@@ -222,6 +233,7 @@ export function apiClient({ baseUrl, fetchFn = (...a) => fetch(...a), now = Date
     getOrder: (s: Signer, orderId: Hex) => call<OrderView>(s, 'GET', `/orders/${id(orderId)}`),
     needsYou: async (s: Signer) => (await call<{ needs: Need[] }>(s, 'GET', '/needs-you')).needs,
     wallet: async (s: Signer, safe?: string) => (await call<{ wallets: WalletView[] }>(s, 'GET', '/wallet', undefined, { safe })).wallets,
+    payouts: async (s: Signer) => (await call<{ payouts?: PayoutView[] }>(s, 'GET', '/wallet')).payouts ?? [],
 
     // Directory (aws/src/handlers/directory.ts)
     suppliers: async (s: Signer, safe?: string) =>

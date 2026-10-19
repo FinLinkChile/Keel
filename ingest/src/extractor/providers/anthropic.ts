@@ -27,7 +27,13 @@ export class AnthropicProvider implements ExtractorProvider {
     baseURL?: string,
     timeoutMs?: number,
   ) {
-    this.client = new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}), ...(timeoutMs ? { timeout: timeoutMs } : {}) });
+    // Behind a proxy the key also goes as a Bearer token: proxies set up for Claude Code
+    // (ANTHROPIC_AUTH_TOKEN) read Authorization, others read x-api-key. Both go to the same proxy.
+    this.client = new Anthropic({
+      apiKey,
+      ...(baseURL ? { baseURL, authToken: apiKey } : {}),
+      ...(timeoutMs ? { timeout: timeoutMs } : {}),
+    });
     this.proxied = baseURL !== undefined;
     this.provider = this.proxied ? "anthropic-proxy" : "anthropic";
   }

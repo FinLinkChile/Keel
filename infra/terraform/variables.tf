@@ -179,3 +179,25 @@ variable "proforma_throttle_burst" {
   type    = number
   default = 5
 }
+
+variable "anthropic_base_url" {
+  description = "URL base de un proxy de Anthropic (ANTHROPIC_BASE_URL), con https. Vacia: la API de Anthropic. Los documentos de las ordenes pasan por ese proxy"
+  type        = string
+  default     = ""
+  validation {
+    condition     = var.anthropic_base_url == "" || startswith(var.anthropic_base_url, "https://")
+    error_message = "anthropic_base_url debe usar https."
+  }
+}
+
+variable "demo_auto_attest" {
+  description = "ATAJO DE DEMO: el extractor firma la prueba de embarque con la llave de prueba de la naviera (secreto carrier_private_key) cuando la orden tiene BL y factura. Rompe la separacion de poderes: un BL inventado prueba un embarque. Solo en un despliegue de prueba"
+  type        = bool
+  default     = false
+}
+
+variable "log_block_range" {
+  description = "Bloques por consulta eth_getLogs (KEEL_LOG_RANGE). La URL publica de Base Sepolia acepta 200; un proveedor pagado o Alchemy puede aceptar mas"
+  type        = number
+  default     = 200
+}

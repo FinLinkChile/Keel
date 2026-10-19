@@ -10,3 +10,4 @@
 * [Calendario y puntos de integración](calendario.md) - Hitos día a día del 12 al 20 de octubre (hora de Chile) y los cuatro puntos de integración entre áreas.
 * [Reglas de recorte](recortes.md) - Qué se recorta y en qué orden si falta tiempo, qué nunca cae y qué queda como trabajo futuro declarado.
 * [Mapa de críticas](mapa-de-criticas.md) - Cada crítica recibida (8 a 19) con el área y la tarea que la resuelve, en Personal y en Trade.
+* [Plan: APIs pendientes de Keel en AWS](plan-apis-aws.md) - Qué falta construir en la API de AWS y en la app para que muestren todo el recorrido de una orden, dividido en partes independientes, con dónde va cada pieza, el contrato de cada ruta, las pruebas y el orden para ejecutarlo con agentes.

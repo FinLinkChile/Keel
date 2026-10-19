@@ -5,6 +5,7 @@ import type { Signer, Signers } from '../wallet/signer';
 
 import { tokenToCents } from './amounts';
 import { isApiError, type ApiClient, type Need, type OrderView } from './api';
+import { reportApiFailure, reportApiSuccess } from './apiHealth';
 import { decodeOrder } from './proposals';
 import type { KeelData, NeedsYou, Order, OrderStage, Role } from './types';
 
@@ -43,11 +44,13 @@ export function orderFromView(v: OrderView, carrier: string, goods?: string): Or
     // The order exists on the API once both signed
     signedAt: v.createdAt,
     transportDoc: 'BILL_OF_LADING',
-    documents: [],
+    // The API keeps only accepted documents, without their file name or upload time
+    documents: (v.documents?.received ?? []).map((docType) => ({ docType, status: 'accepted' as const })),
     po,
     terms,
     escrowState: v.state,
     ...(v.shipment && { shipment: v.shipment }),
+    ...(v.documents?.details && { documentDetails: v.documents.details }),
   };
 }
 
@@ -67,13 +70,16 @@ export function needFromApi(n: Need): NeedsYou {
 
 const ROLES: readonly Role[] = ['importer', 'exporter'];
 
-// A read that fails (network, server) shows the fallback and says so in the logs, instead of a
-// screen that never finishes loading
+// A read that fails (network, server) shows the fallback instead of a screen that never finishes
+// loading, and reports the failure (apiHealth.ts) so the screens say Keel was not reached
 async function orElse<T>(what: string, read: () => Promise<T>, fallback: () => Promise<T>): Promise<T> {
   try {
-    return await read();
+    const value = await read();
+    reportApiSuccess(what);
+    return value;
   } catch (e) {
     console.warn(`keel api: ${what} failed`, isApiError(e) ? e.code : e);
+    reportApiFailure(what, e);
     return fallback();
   }
 }
@@ -148,7 +154,9 @@ export function withApi(base: KeelData, api: ApiClient, signers: () => Signers):
         async () => [],
       );
     },
-    // Available money and the agent's allowance are not in the API: they stay the base's
+    // Available money is the token balance on chain, when the API could read it: the importer's
+    // Safe, or the exporter's payout addresses (where the escrow pays the advance and the balance).
+    // The agent's allowance is not in the API: it stays the base's
     wallet: async (role) => {
       const w = await base.wallet(role);
       const s = signers()[role];
@@ -157,9 +165,17 @@ export function withApi(base: KeelData, api: ApiClient, signers: () => Signers):
         'wallet',
         async () => {
           let locked = 0n;
-          if (role === 'importer') for (const safe of await api.wallet(s)) locked += BigInt(safe.locked);
-          else for (const v of await api.listOrders(s)) if (v.you.includes('exporter')) locked += BigInt(v.locked);
-          return { ...w, lockedMinor: tokenToCents(locked) };
+          let available: bigint | undefined;
+          if (role === 'importer') {
+            for (const safe of await api.wallet(s)) {
+              locked += BigInt(safe.locked);
+              if (safe.available !== undefined) available = (available ?? 0n) + BigInt(safe.available);
+            }
+          } else {
+            for (const v of await api.listOrders(s)) if (v.you.includes('exporter')) locked += BigInt(v.locked);
+            for (const p of await api.payouts(s)) if (p.available !== undefined) available = (available ?? 0n) + BigInt(p.available);
+          }
+          return { ...w, lockedMinor: tokenToCents(locked), ...(available !== undefined && { availableMinor: tokenToCents(available) }) };
         },
         async () => w,
       );

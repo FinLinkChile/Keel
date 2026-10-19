@@ -502,8 +502,17 @@ export class DynamoIngestRepo implements IngestRepo {
 
   // Keel Trade, purchase analysis --------------------------------------------------------
 
-  async recordInsights(importer: Hex): Promise<void> {
-    await this.send(new UpdateCommand(this.increment(ingestKey.insightsCount(importer, utcDay(this.now()))) as never));
+  // The count goes up only while it is under the limit, in one conditional update: two requests
+  // at once cannot both pass the last slot. The window is the UTC day of the counter.
+  async recordInsights(importer: Hex, limit: number): Promise<boolean> {
+    return this.conditional(
+      new UpdateCommand(
+        this.increment(ingestKey.insightsCount(importer, utcDay(this.now())), {
+          condition: "attribute_not_exists(#n) OR #n < :max",
+          values: { ":max": limit },
+        }) as never,
+      ),
+    );
   }
 
   async insightsToday(importer: Hex): Promise<number> {
