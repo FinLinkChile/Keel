@@ -118,7 +118,7 @@ resource "aws_s3_bucket_public_access_block" "docs" {
 resource "aws_s3_bucket_cors_configuration" "docs" {
   bucket = aws_s3_bucket.docs.id
   cors_rule {
-    allowed_origins = [var.app_origin]
+    allowed_origins = local.app_origins
     allowed_methods = ["PUT"]
     allowed_headers = ["*"]
     max_age_seconds = 600

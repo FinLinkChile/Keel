@@ -11,9 +11,19 @@ variable "stage" {
 }
 
 variable "app_origin" {
-  description = "Origen de la app, el unico que acepta CORS"
+  description = "Origen principal de la app: acepta CORS y es la base de los enlaces del bot"
   type        = string
   default     = "https://app.keel.example"
+}
+
+variable "extra_app_origins" {
+  description = "Otros origenes que aceptan CORS, por ejemplo la app local (http://localhost:8081). Sin barra final"
+  type        = list(string)
+  default     = []
+  validation {
+    condition     = alltrue([for o in var.extra_app_origins : can(regex("^https?://[^/]+$", o))])
+    error_message = "Cada origen es http(s)://host[:puerto], sin ruta ni barra final."
+  }
 }
 
 # De contracts/deployments/84532.json. Si el archivo cambia, actualizar estos valores: el agente
