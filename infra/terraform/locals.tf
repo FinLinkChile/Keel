@@ -77,6 +77,10 @@ locals {
   # ---------- Funciones: una por archivo de aws/src/handlers ----------
   # role: rol de IAM. reserve: concurrencia reservada de 1 si use_reserved_concurrency (el candado
   # en DynamoDB ya evita vueltas simultaneas; la reserva es una segunda barrera opcional).
+  # URL del proxy de Anthropic (vacia: la API de Anthropic). Va en el entorno y nunca en llm_keys
+  # ni por la API de administracion. La reciben las funciones que arman el extractor.
+  llm_env = { for k, v in { ANTHROPIC_BASE_URL = var.anthropic_base_url } : k => v if v != "" }
+
   # Funciones: 20 desde el analisis de compras (insights).
   # El agente retiene su candado 110 s: su timeout tiene que ser menor. Monitor e indexador, 55 s.
   # El extractor puede tardar 3 intentos de 60 s del LLM (LLM_TIMEOUT_MS); la cola le da 720 s de visibilidad.
@@ -134,12 +138,12 @@ locals {
       INGEST_TABLE    = local.t["ingest"]
     }
     upload   = { INGEST_TABLE = local.t["ingest"], DOCS_BUCKET = aws_s3_bucket.docs.bucket }
-    inbound  = { INGEST_TABLE = local.t["ingest"], DOCS_BUCKET = aws_s3_bucket.docs.bucket, NOTICES_QUEUE_URL = aws_sqs_queue.notices.url, LLM_TIMEOUT_MS = "20000" }
-    proforma = { INGEST_TABLE = local.t["ingest"], PARTIES_TABLE = local.t["parties"], LLM_TIMEOUT_MS = "20000" }
+    inbound  = merge(local.llm_env, { INGEST_TABLE = local.t["ingest"], DOCS_BUCKET = aws_s3_bucket.docs.bucket, NOTICES_QUEUE_URL = aws_sqs_queue.notices.url, LLM_TIMEOUT_MS = "20000" })
+    proforma = merge(local.llm_env, { INGEST_TABLE = local.t["ingest"], PARTIES_TABLE = local.t["parties"], LLM_TIMEOUT_MS = "20000" })
     # El analisis de compras llama al modelo dentro de la peticion, igual que la proforma
-    insights  = { INGEST_TABLE = local.t["ingest"], PARTIES_TABLE = local.t["parties"], LLM_TIMEOUT_MS = "20000" }
-    admin     = { INGEST_TABLE = local.t["ingest"] }
-    extractor = { INGEST_TABLE = local.t["ingest"], ORDERS_TABLE = local.t["orders"], DOCS_BUCKET = aws_s3_bucket.docs.bucket, NOTICES_QUEUE_URL = aws_sqs_queue.notices.url }
+    insights  = merge(local.llm_env, { INGEST_TABLE = local.t["ingest"], PARTIES_TABLE = local.t["parties"], LLM_TIMEOUT_MS = "20000" })
+    admin     = merge(local.llm_env, { INGEST_TABLE = local.t["ingest"] })
+    extractor = merge(local.llm_env, { INGEST_TABLE = local.t["ingest"], ORDERS_TABLE = local.t["orders"], DOCS_BUCKET = aws_s3_bucket.docs.bucket, NOTICES_QUEUE_URL = aws_sqs_queue.notices.url })
     digest    = { INGEST_TABLE = local.t["ingest"], NOTICES_QUEUE_URL = aws_sqs_queue.notices.url }
     fanout    = { ORDERS_TABLE = local.t["orders"], AGENT_QUEUE_URL = aws_sqs_queue.agent.url }
     agent = {

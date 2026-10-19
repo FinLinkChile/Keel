@@ -180,6 +180,16 @@ variable "proforma_throttle_burst" {
   default = 5
 }
 
+variable "anthropic_base_url" {
+  description = "URL base de un proxy de Anthropic (ANTHROPIC_BASE_URL), con https. Vacia: la API de Anthropic. Los documentos de las ordenes pasan por ese proxy"
+  type        = string
+  default     = ""
+  validation {
+    condition     = var.anthropic_base_url == "" || startswith(var.anthropic_base_url, "https://")
+    error_message = "anthropic_base_url debe usar https."
+  }
+}
+
 variable "log_block_range" {
   description = "Bloques por consulta eth_getLogs (KEEL_LOG_RANGE). La URL publica de Base Sepolia acepta 200; un proveedor pagado o Alchemy puede aceptar mas"
   type        = number
