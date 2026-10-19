@@ -50,6 +50,7 @@ export function orderFromView(v: OrderView, carrier: string, goods?: string): Or
     terms,
     escrowState: v.state,
     ...(v.shipment && { shipment: v.shipment }),
+    ...(v.documents?.details && { documentDetails: v.documents.details }),
   };
 }
 

@@ -99,6 +99,8 @@ export type Order = {
   // The carrier's attestation of the shipment as the API holds it (attestation fields as strings),
   // only for orders read from the API once the shipment is attested
   shipment?: { attestation: Record<string, unknown>; sigCarrier: string };
+  // What the extractor read from the bill of lading and the invoice, only for orders read from the API
+  documentDetails?: { transport?: Record<string, string>; invoice?: Record<string, string> };
 };
 
 export type Wallet = {

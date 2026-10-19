@@ -40,7 +40,9 @@ async function viewFrom(state: string, over: Partial<OrderView> = {}): Promise<O
 
 describe('orderFromView', () => {
   it('shows the documents the API accepted, so a reload does not ask for them again', async () => {
-    const v = await viewFrom('ADVANCE_PAID', { documents: { fileHashes: ['0x01', '0x02'], received: ['BILL_OF_LADING', 'COMMERCIAL_INVOICE'] } });
+    const details = { transport: { document_number: 'HLIN26100142', port_of_loading: 'HKHKG' }, invoice: { order_number: 'PO0001' } };
+    const v = await viewFrom('ADVANCE_PAID', { documents: { fileHashes: ['0x01', '0x02'], received: ['BILL_OF_LADING', 'COMMERCIAL_INVOICE'], details } });
+    expect(orderFromView(v, 'harbor-line').documentDetails).toEqual(details);
     expect(orderFromView(v, 'harbor-line').documents).toEqual([
       { docType: 'BILL_OF_LADING', status: 'accepted' },
       { docType: 'COMMERCIAL_INVOICE', status: 'accepted' },

@@ -15,6 +15,7 @@ import { uploadPreview } from '@/files/uploadPreview';
 import { t, useT } from '@/i18n';
 import { ExporterReview } from '@/orders/ExporterReview';
 import { ImporterOrder } from '@/orders/ImporterOrder';
+import { OrderComplete, ShipmentDocuments } from '@/orders/ShipmentDocuments';
 import { uploadDocument, type UploadResult } from '@/ingest/client';
 import { uploadStatus } from '@/ingest/uploadStatus';
 import { useSession } from '@/session';
@@ -84,6 +85,8 @@ function ExporterOrder({ orderId }: { orderId: Hex }) {
   const daysLeft = Math.max(0, Math.ceil((Number(order.po.shipmentDeadline) - now) / DAY));
   const deadline = formatDay(order.po.shipmentDeadline);
   const yourTurn = order.stage === 'advance_paid';
+  const settled = order.stage === 'settled';
+  const shipped = order.stage === 'shipped' || settled;
 
   return (
     <ScrollView
@@ -121,6 +124,8 @@ function ExporterOrder({ orderId }: { orderId: Hex }) {
         </Text>
       </View>
 
+      <OrderComplete order={order} role="exporter" />
+
       <View style={{ backgroundColor: colors.surface, borderRadius: radius.card }}>
         <View style={{ paddingTop: 20, paddingHorizontal: 20, paddingBottom: 16, gap: 2 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -129,7 +134,7 @@ function ExporterOrder({ orderId }: { orderId: Hex }) {
               {t('Received')}
             </Text>
           </View>
-          <Amount minor={advance} currency={order.terms.currency} size={36} tracking={-1.4} currencyColor="textMuted" />
+          <Amount minor={settled ? total : advance} currency={order.terms.currency} size={36} tracking={-1.4} currencyColor="textMuted" />
         </View>
         <View
           style={{
@@ -146,10 +151,12 @@ function ExporterOrder({ orderId }: { orderId: Hex }) {
           <Text size={15} color="textMuted" style={{ flex: 1 }}>
             {t('Locked for you')}
           </Text>
-          <Amount minor={balance} size={14} weight={500} />
+          <Amount minor={settled ? 0n : balance} size={14} weight={500} />
         </View>
         <Text size={13} leading={1.45} color="textMuted" style={{ paddingHorizontal: 20, paddingBottom: 18 }}>
-          {t('Paid to you once the shipment is proven. No proof by {date} and it goes back to {name}.', { date: deadline, name: buyer.short })}
+          {settled
+            ? t('Paid in full to your signed account.')
+            : t('Paid to you once the shipment is proven. No proof by {date} and it goes back to {name}.', { date: deadline, name: buyer.short })}
         </Text>
       </View>
 
@@ -175,12 +182,14 @@ function ExporterOrder({ orderId }: { orderId: Hex }) {
           ) : (
             <View />
           )}
-          <Text mono size={13}>
-            {daysLeft === 1 ? t('1 day left') : t('{n} days left', { n: daysLeft })}
-          </Text>
+          {shipped ? null : (
+            <Text mono size={13}>
+              {daysLeft === 1 ? t('1 day left') : t('{n} days left', { n: daysLeft })}
+            </Text>
+          )}
         </View>
         <Text size={18} weight={800}>
-          {t('Ship by {date} and send the documents', { date: deadline })}
+          {shipped ? t('Shipment proven and documents sent') : t('Ship by {date} and send the documents', { date: deadline })}
         </Text>
         <Text size={14} leading={1.45} color="textMuted">
           {t('{name} confirms the shipment; you can\'t sign that yourself.', { name: carrier.name })}
@@ -197,6 +206,8 @@ function ExporterOrder({ orderId }: { orderId: Hex }) {
           ))}
         </View>
       </View>
+
+      <ShipmentDocuments order={order} />
 
       <View style={{ gap: 8 }}>
         <Text size={20} weight={800} accessibilityRole="header">
@@ -219,15 +230,17 @@ function steps(order: Order, total: bigint, balance: bigint, deadline: string): 
     </Text>
   );
   const shipped = order.stage === 'shipped' || order.stage === 'settled';
+  // Orders read from the Keel API carry no deposit date: the stage says the deposit happened
+  const funded = order.advancePaidAt !== undefined || (['advance_paid', 'shipped', 'settled', 'refunded'] as Order['stage'][]).includes(order.stage);
   return [
     { key: 'signed', title: t('Signed by both'), state: order.signedAt ? 'done' : 'todo', trailing: when(order.signedAt) },
     {
       key: 'locked',
       title: t('Buyer locked {amount}', { amount: formatMinor(total / 100n, 0) }),
-      state: order.advancePaidAt ? 'done' : 'todo',
+      state: funded ? 'done' : 'todo',
       trailing: when(order.advancePaidAt),
     },
-    { key: 'advance', title: t('Advance received'), state: order.advancePaidAt ? 'done' : 'todo', trailing: when(order.advancePaidAt) },
+    { key: 'advance', title: t('Advance received'), state: funded ? 'done' : 'todo', trailing: when(order.advancePaidAt) },
     {
       key: 'shipment',
       title: t('Shipment and documents'),

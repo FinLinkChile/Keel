@@ -29,9 +29,10 @@ export interface OrderView {
   sigImporter: Hex;
   sigExporter: Hex;
   shipment?: OrderItem["shipment"];
-  // Only the hashes of the files ingest read and which documents they are; the extractions stay
-  // server side
-  documents?: { fileHashes: Hex[]; received: RequiredDocType[] };
+  // The hashes of the files ingest read, which documents they are, and the trade fields the parties
+  // check (BL number, ports, dates, invoice number and amount). The rest of the extractions (tax
+  // ids, the hidden text checks) stays server side.
+  documents?: { fileHashes: Hex[]; received: RequiredDocType[]; details: DocumentDetails };
   closing?: OrderItem["closing"];
   // Escrow state from the indexer's mirror; "NONE" until it sees OrderOpened
   state: string;
@@ -56,12 +57,36 @@ function receivedDocs(extractions: Record<string, unknown> | undefined): Require
   return out;
 }
 
+export interface DocumentDetails {
+  transport?: Record<string, string>;
+  invoice?: Record<string, string>;
+}
+
+const TRANSPORT_FIELDS = ["doc_type", "document_number", "port_of_loading", "port_of_discharge", "on_board_date"];
+const INVOICE_FIELDS = ["invoice_number", "order_number", "amount_minor", "currency", "incoterm", "hs_code"];
+
+function pick(source: unknown, fields: string[]): Record<string, string> | undefined {
+  if (!source || typeof source !== "object") return undefined;
+  const out: Record<string, string> = {};
+  for (const f of fields) {
+    const v = (source as Record<string, unknown>)[f];
+    if (typeof v === "string" || typeof v === "number") out[f] = String(v);
+  }
+  return out;
+}
+
+function documentDetails(extractions: Record<string, unknown> | undefined): DocumentDetails {
+  const transport = pick(extractions?.["transport"], TRANSPORT_FIELDS);
+  const invoice = pick(extractions?.["invoice"], INVOICE_FIELDS);
+  return { ...(transport && { transport }), ...(invoice && { invoice }) };
+}
+
 export function orderView(o: OrderItem, you: Role[]): OrderView {
   const po = poFrom(o.order);
   const { documents, uploaders: _uploaders, ...rest } = o;
   return {
     ...rest,
-    ...(documents && { documents: { fileHashes: documents.fileHashes, received: receivedDocs(documents.extractions) } }),
+    ...(documents && { documents: { fileHashes: documents.fileHashes, received: receivedDocs(documents.extractions), details: documentDetails(documents.extractions) } }),
     state: stateOf(o),
     totalAmount: po.totalAmount.toString(),
     advance: advanceOf(po).toString(),
