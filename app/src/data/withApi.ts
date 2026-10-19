@@ -122,8 +122,17 @@ export function withApi(base: KeelData, api: ApiClient, signers: () => Signers):
   async function suppliers(): Promise<SupplierRecord[]> {
     const s = signers().importer;
     if (!s) return [];
+    let safes: Awaited<ReturnType<ApiClient['suppliers']>>;
+    try {
+      safes = await api.suppliers(s);
+    } catch (e) {
+      // This phone's importer wallet represents no Safe (the exporter's phone has one too): it has
+      // no suppliers, and that is not an API failure to warn about
+      if (isApiError(e, 'not_representative')) return [];
+      throw e;
+    }
     const out: SupplierRecord[] = [];
-    for (const safe of await api.suppliers(s)) for (const v of safe.suppliers) {
+    for (const safe of safes) for (const v of safe.suppliers) {
       const r = supplierFromView(v);
       if (r) out.push(r);
     }

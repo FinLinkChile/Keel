@@ -144,6 +144,11 @@ describe('withApi', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const down = { suppliers: async () => Promise.reject(new ApiError(0, 'network')) };
     expect(await withApi(base, down as unknown as ApiClient, () => ({ importer })).verifiedSuppliers()).toEqual([]);
+    expect(warn).toHaveBeenCalledTimes(1);
+    // The exporter's phone: its importer wallet represents no Safe, which is not an outage
+    const notMine = { suppliers: async () => Promise.reject(new ApiError(403, 'not_representative')) };
+    expect(await withApi(base, notMine as unknown as ApiClient, () => ({ importer })).verifiedSuppliers()).toEqual([]);
+    expect(warn).toHaveBeenCalledTimes(1);
     warn.mockRestore();
   });
 
