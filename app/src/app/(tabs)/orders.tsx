@@ -99,7 +99,9 @@ export default function Orders() {
 async function loadRows(d: KeelData, role: Role): Promise<Row[]> {
   const account = await d.account(role);
   const me = await d.party(account.party);
-  const orders = (await d.orders()).filter((o) => (role === 'importer' ? o.po.importer : o.po.exporter) === me?.address);
+  // Addresses compare without case: an order signed elsewhere may carry them lowercase
+  const mine = me?.address.toLowerCase();
+  const orders = (await d.orders()).filter((o) => (role === 'importer' ? o.po.importer : o.po.exporter).toLowerCase() === mine);
   const rows = await Promise.all(
     orders.map(async (order) => ({
       order,

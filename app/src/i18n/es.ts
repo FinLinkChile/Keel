@@ -144,6 +144,10 @@ export const es: Record<string, string> = {
   "Upload": "Subir",
   "Upload documents for {label}": "Subir documentos de {label}",
   "Ship, then upload the transport document and the invoice": "Embarca y luego sube el documento de transporte y la factura",
+  "{name} ships next. ": "{name} embarca a continuación. ",
+  "Nothing to do yet.": "Aún no hay nada que hacer.",
+  "{label} is funded": "{label} está fondeada",
+  "{name} ships next. You approve the balance when the shipment is proven": "{name} embarca a continuación. Tú apruebas el saldo cuando se pruebe el embarque",
   "Sign {label}": "Firmar {label}",
   "Review and sign {label}": "Revisar y firmar {label}",
   "{name} signed. Yours is the last signature": "{name} firmó. La tuya es la última firma",
@@ -754,4 +758,5 @@ export const es: Record<string, string> = {
   "You received {total}: the advance and the balance. Nothing is left in the escrow.": "Recibiste {total}: el anticipo y el saldo. No queda nada en el escrow.",
   "Paid in full to your signed account.": "Pagado completo a tu cuenta firmada.",
   "Shipment proven and documents sent": "Embarque probado y documentos enviados",
+  "Registered supplier": "Proveedor registrado",
 };

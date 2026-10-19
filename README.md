@@ -195,6 +195,8 @@ The full procedure is in [infra/terraform/README.md](infra/terraform/README.md) 
    ```hcl
    region             = "us-east-2"
    alert_email        = "you@example.com"   # alarms and budget by email
+   app_origin         = "https://keel-app-finlink.vercel.app"   # the app's origin: CORS and the bot's links
+   extra_app_origins  = ["http://localhost:8081"]      # more origins allowed by CORS, such as the local app
    anthropic_base_url = ""                  # https URL of an Anthropic proxy, or empty for the Anthropic API
    log_block_range    = 200                 # blocks per eth_getLogs; 10 on Alchemy's free tier
    key_source_pauser  = "ssm"               # "" runs the monitor in alert-only mode
@@ -259,6 +261,10 @@ EXPO_PUBLIC_WALLET_CHECK=1      # test builds only: lets you import test keys
 Start it from `app/` (not from the repository root) with `npx expo start -c`. With `EXPO_PUBLIC_WALLET_CHECK=1`, **Connect → Wallet check** imports a test key into the role you are connected as. The importer key must belong to an owner of the Safe, and the exporter key to the registered supplier.
 
 ## Walk through an order end to end
+
+For the same walk-through screen by screen, with screenshots, see the [user manual](docs/entrega/user-manual.md).
+
+To try the app without building it, install the test APK (`keel.apk`) from https://github.com/FinLinkChile/Keel/releases/latest , under **Assets**.
 
 1. **Importer:** create an order with the registered supplier and sign it.
 2. **Exporter:** open the order and sign it. The agent opens it in the escrow and funds it on its next pass (every minute on AWS). The advance reaches the exporter's payout address.

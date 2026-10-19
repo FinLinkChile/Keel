@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/keel-deck-en.html" },
+    { "source": "/index.html", "destination": "/keel-deck-en.html" }
+  ]
+}

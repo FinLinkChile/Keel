@@ -130,6 +130,31 @@ describe('withApi', () => {
     expect((await d.wallet('exporter')).availableMinor).toBe(30n);
   });
 
+  it("offers only the suppliers registered for the importer's Safe, and their parties", async () => {
+    const supplier = { exporter: '0xC419891eE6bdEfa7aE285961C743047E34E1320d' as const, name: 'Proveedor demo', payoutAddresses: ['0xc419891ee6bdefa7ae285961c743047e34e1320d'] };
+    const api = { suppliers: vi.fn(async () => [{ safe: '0x366e', suppliers: [supplier, { exporter: '0x01', payoutAddresses: [] }] }]) };
+    const d = withApi(base, api as unknown as ApiClient, () => ({ importer }));
+    const list = await d.verifiedSuppliers();
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ payoutAddress: supplier.exporter, party: { name: 'Proveedor demo', address: supplier.exporter } });
+    expect(await d.partyByAddress(supplier.exporter)).toMatchObject({ name: 'Proveedor demo' });
+    expect(await d.party(list[0]!.party.id)).toMatchObject({ name: 'Proveedor demo' });
+    // No importer wallet, or the API down: no supplier rather than a demo one the gate would refuse
+    expect(await withApi(base, api as unknown as ApiClient, () => ({ exporter })).verifiedSuppliers()).toEqual([]);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const down = { suppliers: async () => Promise.reject(new ApiError(0, 'network')) };
+    expect(await withApi(base, down as unknown as ApiClient, () => ({ importer })).verifiedSuppliers()).toEqual([]);
+    expect(warn).toHaveBeenCalledTimes(1);
+    // The exporter's phone: its importer wallet represents no Safe, which is not an outage
+    const notMine = { suppliers: async () => Promise.reject(new ApiError(403, 'not_representative')) };
+    // ... and its list is its own company, so the exporter's review finds its registered payout
+    const ownId = (await base.account('exporter')).party;
+    const exporterPhone = await withApi(base, notMine as unknown as ApiClient, () => ({ importer })).verifiedSuppliers();
+    expect(exporterPhone.map((r) => r.party.id)).toEqual([ownId]);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
   it('lists and opens the orders of the API', async () => {
     const v = await viewFrom('SHIPPED');
     const api = {

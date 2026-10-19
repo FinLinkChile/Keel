@@ -1,17 +1,18 @@
 import type { Hex } from '@keel/schemas';
+import { getAddress } from 'viem';
 
 import { t } from '../i18n/translate';
 import type { Signer, Signers } from '../wallet/signer';
 
 import { tokenToCents } from './amounts';
-import { isApiError, type ApiClient, type Need, type OrderView } from './api';
+import { isApiError, type ApiClient, type Need, type OrderView, type SupplierView } from './api';
 import { reportApiFailure, reportApiSuccess } from './apiHealth';
 import { decodeOrder } from './proposals';
-import type { KeelData, NeedsYou, Order, OrderStage, Role } from './types';
+import type { KeelData, NeedsYou, Order, OrderStage, Party, Role, SupplierRecord } from './types';
 
 // The data source when the Keel API is configured (EXPO_PUBLIC_API_URL): the orders, what needs
-// you and the locked amounts come from the API, read with the wallets of this phone. Parties and
-// the trade setup still come from the base (the API has no names for them yet). `base` already
+// you, the locked amounts and the importer's suppliers come from the API, read with the wallets of
+// this phone. The other parties and the trade setup still come from the base. `base` already
 // includes the API proposals (withProposals over httpProposalStore).
 
 const STAGE: Record<string, OrderStage> = {
@@ -52,6 +53,18 @@ export function orderFromView(v: OrderView, carrier: string, goods?: string): Or
     ...(v.shipment && { shipment: v.shipment }),
     ...(v.documents?.details && { documentDetails: v.documents.details }),
   };
+}
+
+// A supplier the operator registered for the importer's Safe (POST /suppliers), as a party of the
+// screens. Its id is its address, so it never collides with a demo party.
+export function supplierFromView(v: SupplierView): SupplierRecord | undefined {
+  const payout = v.payoutAddresses[0];
+  if (!payout) return undefined;
+  // Checksummed, as the rest of the app writes addresses: the order is signed with them
+  const address = getAddress(v.exporter);
+  const name = v.name ?? `${address.slice(0, 6)}…${address.slice(-4)}`;
+  const party: Party = { id: `supplier:${address.toLowerCase()}`, name, short: name, place: t('Registered supplier'), address, tint: parseInt(address.slice(-2), 16) % 4 };
+  return { party, payoutAddress: getAddress(payout) };
 }
 
 export function needFromApi(n: Need): NeedsYou {
@@ -106,10 +119,44 @@ export function withApi(base: KeelData, api: ApiClient, signers: () => Signers):
     return undefined;
   }
 
+  // The suppliers of the Safe this phone's importer wallet represents. An order can go only to one
+  // of them: the gate funds registered suppliers only, so the demo parties are never offered.
+  async function suppliers(): Promise<SupplierRecord[]> {
+    const s = signers().importer;
+    if (!s) return [];
+    let safes: Awaited<ReturnType<ApiClient['suppliers']>>;
+    try {
+      safes = await api.suppliers(s);
+    } catch (e) {
+      // This phone's importer wallet represents no Safe: it is the exporter's phone, which has an
+      // importer test wallet too. That is not an API failure. Its list is its own company, so the
+      // exporter's review finds the payout account registered for it, as without the API.
+      if (isApiError(e, 'not_representative')) return ownCompany();
+      throw e;
+    }
+    const out: SupplierRecord[] = [];
+    for (const safe of safes) for (const v of safe.suppliers) {
+      const r = supplierFromView(v);
+      if (r) out.push(r);
+    }
+    return out;
+  }
+  // The exporter's own company and payout account, from the base (the demo binds them to this
+  // phone's exporter wallet). Never offered to an importer: the importer's list is the API's.
+  async function ownCompany(): Promise<SupplierRecord[]> {
+    const own = (await base.account('exporter')).party;
+    return (await base.verifiedSuppliers()).filter((r) => r.party.id === own);
+  }
+  const registered = () => orElse('suppliers', suppliers, async () => []);
+
   const toOrder = async (v: OrderView, goods?: string) => orderFromView(v, await carrierId(decodeOrder({ po: v.order, terms: v.terms }).po), goods);
 
   return {
     ...base,
+    verifiedSuppliers: registered,
+    // A registered supplier is a party too: its orders show its name on the importer's phone
+    party: async (id) => (await base.party(id)) ?? (id.startsWith('supplier:') ? (await registered()).find((r) => r.party.id === id)?.party : undefined),
+    partyByAddress: async (a) => (await base.partyByAddress(a)) ?? (await registered()).find((r) => r.party.address.toLowerCase() === a.toLowerCase())?.party,
     // Proposals still being signed, then the orders of the API in their escrow state. A fully
     // signed proposal is shown as its order, with the goods typed in the proposal.
     orders: () =>

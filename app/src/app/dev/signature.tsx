@@ -1,7 +1,7 @@
 import type { Hex } from '@keel/schemas';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { ScrollView, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { keccak256, recoverTypedDataAddress, stringToBytes } from 'viem';
 
@@ -11,6 +11,7 @@ import { UPLOAD_TYPES, uploadDomain, type DocumentUpload } from '@/ingest/upload
 import { useSession } from '@/session';
 import { Address } from '@/ui/Address';
 import { Button } from '@/ui/Button';
+import { Icon } from '@/ui/Icon';
 import { Text } from '@/ui/Text';
 import { colors, gutter } from '@/ui/theme';
 import { keyStorage } from '@/wallet';
@@ -61,6 +62,17 @@ export default function Signature() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentContainerStyle={{ padding: gutter, gap: 24, paddingBottom: 64 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginHorizontal: -8, marginBottom: -8 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/connect'))}
+            style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Icon name="back" size={22} />
+          </Pressable>
+        </View>
+
         <Text size={28} weight={800}>
           Wallet check
         </Text>
@@ -126,7 +138,6 @@ export default function Signature() {
           />
           <Button
             label="Import test key"
-            variant="secondary"
             disabled={!keyText.trim()}
             onPress={async () => {
               try {
@@ -146,7 +157,9 @@ export default function Signature() {
           ) : null}
         </Field>
 
-        <Button label="Sign a test upload" onPress={sign} disabled={!signer} />
+        {/* The check signs the upload of the example order PO-0142: without it (a build that talks to
+            the Keel API) there is nothing to sign, so the button is not shown */}
+        {orderId ? <Button label="Sign a test upload" variant="secondary" onPress={sign} disabled={!signer} /> : null}
         {/* For tests against ingest: the next "Set up test wallet" makes a new key */}
         <Button
           label="Reset test wallet"

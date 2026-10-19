@@ -63,6 +63,12 @@ export function needsItemText(item: NeedsItem, role: Role): { title: string; det
     return { title: t('Verify {name}\'s account', { name: item.supplier.short }), detail: t('New supplier, test transfer') };
   }
   const { order, counterparty } = item;
+  if (item.kind === 'upload_documents' && role === 'importer') {
+    return {
+      title: t('{label} is funded', { label: order.label }),
+      detail: t('{name} ships next. You approve the balance when the shipment is proven', { name: counterparty.short }),
+    };
+  }
   if (item.kind === 'upload_documents') {
     return { title: t('Upload documents for {label}', { label: order.label }), detail: t('Ship, then upload the transport document and the invoice') };
   }

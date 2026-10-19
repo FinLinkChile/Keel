@@ -4,7 +4,7 @@ title: "Alcance: dentro, fuera y lo que no prometemos"
 description: "Qué entra en la entrega, qué se declara como trabajo futuro, qué no se promete y la hoja de ruta por fases."
 tags: [alcance, trabajo-futuro, hoja-de-ruta]
 modo: ambos
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T20:30:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T23:00:00Z }
 ---
 
 # Dentro
@@ -27,6 +27,8 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T20:30:00Z }
 - Identidad empresarial con credenciales verificables (WeIdentity o similar) y validez legal de la firma (Ley 19.799).
 - Bancos y rampas de entrada y salida de dinero fiat.
 - Financiamiento: un tercero que deposite a nombre del importador y cobre después.
+- Evaluar el modelo de negocio con banco socio (por ejemplo WeBank): rendimiento del dinero retenido en el escrow y comisiones por servicio, con un solo banco que garantiza que los fondos existen. Falta elegir banco, repartir la utilidad, la opinión legal sobre captación y cómo se une el rendimiento con el token del escrow ([opciones de negocio](../negocio/Keel%20opciones%20de%20negocio%20y%20an%C3%A1lisis%20de%20datos.md)). **[PROPUESTA]**
+- Reglas de negocio parametrizables: la proforma (hoy hay una sola) y las reglas de cada flujo se configuran por empresa y por país, para que cualquier empresa de cualquier país sea importadora o exportadora. El corredor Chile y China es el caso del MVP. **[PROPUESTA]**
 - KYC, KYB y monitoreo AML/KYT.
 - Desaduanamiento: agente de aduana, declaración de ingreso, derechos e IVA.
 - Pago del flete a la naviera.

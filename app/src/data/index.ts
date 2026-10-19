@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { AppState, type NativeEventSubscription } from 'react-native';
 
 import { config } from '@/config';
 import type { Signers } from '@/wallet/signer';
@@ -10,6 +11,7 @@ import { withoutExamples } from './cleanStart';
 import { httpProposalStore } from './httpProposals';
 import { bindWallets as bindMockWallets, mockData } from './mock';
 import { observedStore } from './proposals';
+import { sameData } from './sameData';
 import { proposalStore } from './proposalStore';
 import type { KeelData } from './types';
 import { withApi } from './withApi';
@@ -38,9 +40,35 @@ const changed = () => {
   listeners.forEach((l) => l());
 };
 export const proposals = observedStore(api ? httpProposalStore(api, currentSigners) : proposalStore, changed);
+// With the Keel API, what the agent, the other company or the engine does to an order reaches the
+// phone only if the phone asks again. While a screen is on display the data is read again every
+// REFRESH_MS, and at once when the app comes back to the foreground. Without the API nothing outside
+// the phone moves, so it stays off. A screen whose data did not change keeps what it has (useData).
+const REFRESH_MS = 15_000;
+let timer: ReturnType<typeof setInterval> | undefined;
+let foreground: NativeEventSubscription | undefined;
+const startRefreshing = () => {
+  if (!api || timer) return;
+  timer = setInterval(() => {
+    if (AppState.currentState === 'active') changed();
+  }, REFRESH_MS);
+  foreground = AppState.addEventListener('change', (state) => {
+    if (state === 'active') changed();
+  });
+};
+const stopRefreshing = () => {
+  if (timer) clearInterval(timer);
+  timer = undefined;
+  foreground?.remove();
+  foreground = undefined;
+};
 const subscribe = (l: () => void) => {
   listeners.add(l);
-  return () => void listeners.delete(l);
+  startRefreshing();
+  return () => {
+    listeners.delete(l);
+    if (listeners.size === 0) stopRefreshing();
+  };
 };
 
 // Hands the orders signed on this phone to ingest (POST /trade/orders) until it takes them: after
@@ -76,7 +104,9 @@ export function useData<T>(load: (d: KeelData) => Promise<T>, deps: unknown[] = 
   const [value, setValue] = useState<T>();
   useEffect(() => {
     let live = true;
-    load(data).then((v) => live && setValue(v));
+    // A read that finds the same data leaves the screen as it is: no redraw, and the effects that
+    // watch the object do not run again
+    load(data).then((v) => live && setValue((previous) => (previous !== undefined && sameData(previous, v) ? previous : v)));
     return () => {
       live = false;
     };

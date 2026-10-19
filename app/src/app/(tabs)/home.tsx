@@ -153,6 +153,9 @@ function NeedsYouSheet({ item, role }: { item: Item; role: Role }) {
   }
 
   const { order, counterparty } = item;
+  // Once the escrow holds the order, the exporter has to ship and upload; the importer can only
+  // follow it, so it gets Review and nothing is asked of it
+  const following = item.kind === 'upload_documents' && role === 'importer';
   const lead =
     item.kind === 'sign_order'
       ? t('{name} signed. ', { name: shortName(counterparty) })
@@ -162,8 +165,10 @@ function NeedsYouSheet({ item, role }: { item: Item; role: Role }) {
           ? t('{name} asked to cancel. ', { name: shortName(counterparty) })
           : item.kind === 'register_order'
             ? t('Keel has not registered this order yet. ')
-            : t('Ship and upload. ');
-  const action = item.kind === 'upload_documents' ? 'Upload' : 'Review';
+            : following
+              ? t('{name} ships next. ', { name: shortName(counterparty) })
+              : t('Ship and upload. ');
+  const action = item.kind === 'upload_documents' && !following ? 'Upload' : 'Review';
   return (
     <Sheet>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -176,7 +181,7 @@ function NeedsYouSheet({ item, role }: { item: Item; role: Role }) {
         <Text size={14} color="textMuted" leading={1.35} style={{ flex: 1 }}>
           {lead}
           <Text size={14} weight={700}>
-            {item.kind === 'register_order' ? t('See why.') : t('Your turn.')}
+            {item.kind === 'register_order' ? t('See why.') : following ? t('Nothing to do yet.') : t('Your turn.')}
           </Text>
         </Text>
         <Text mono size={12} color="textFaint">

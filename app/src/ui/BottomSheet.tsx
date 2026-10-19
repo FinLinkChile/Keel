@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useT } from '@/i18n';
@@ -20,15 +20,10 @@ export function BottomSheet({ visible, title, onClose, children }: Props) {
   const t = useT();
   return (
     <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('Close')}
-        onPress={onClose}
-        style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' }}
-      >
-        {/* Swallows the tap so touching the panel does not close it */}
-        <Pressable
-          accessible={false}
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' }}>
+        {/* A sibling behind the panel, not its parent: on the web a button inside a button is invalid */}
+        <Pressable accessibilityRole="button" accessibilityLabel={t('Close')} onPress={onClose} style={StyleSheet.absoluteFill} />
+        <View
           style={{
             backgroundColor: colors.surface,
             borderTopLeftRadius: radius.sheet,
@@ -42,8 +37,8 @@ export function BottomSheet({ visible, title, onClose, children }: Props) {
             {title}
           </Text>
           <View>{children}</View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }

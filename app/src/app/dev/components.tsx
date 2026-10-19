@@ -18,7 +18,7 @@ import { colors, gutter } from '@/ui/theme';
 export default function Components() {
   const orders = useData((d) => d.orders());
   const parties = useData((d) => Promise.all(['lingnan', 'kowloon', 'pearl-delta'].map((id) => d.party(id))));
-  const exporterOf = (o: Order) => parties?.find((p) => p?.address === o.po.exporter);
+  const exporterOf = (o: Order) => parties?.find((p) => p?.address.toLowerCase() === o.po.exporter.toLowerCase());
   const pending = orders?.filter((o) => o.stage === 'awaiting_signature' || o.blockedBy) ?? [];
 
   return (

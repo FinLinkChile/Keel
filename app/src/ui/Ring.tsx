@@ -18,20 +18,26 @@ export function Ring({ paid, size = 220, accessibilityLabel, children }: Props) 
   const stroke = 22;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  const arc = (from: number, to: number, color: string) => (
-    <Circle
-      cx={size / 2}
-      cy={size / 2}
-      r={r}
-      fill="none"
-      stroke={color}
-      strokeWidth={stroke}
-      strokeDasharray={`${c * (to - from)} ${c}`}
-      strokeDashoffset={-c * from}
-      rotation={110}
-      origin={`${size / 2}, ${size / 2}`}
-    />
-  );
+  // A circle is drawn from 3 o'clock; the arc starts START degrees later. Done with the dash offset
+  // and a pattern as long as the circumference (so an arc that crosses the start wraps round)
+  // instead of rotating the shape: on the web, react-native-svg turns `rotation` and `origin`
+  // into a `transform-origin` attribute that React rejects.
+  const START = 110 / 360;
+  const arc = (from: number, to: number, color: string) => {
+    const length = c * (to - from);
+    return (
+      <Circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke={color}
+        strokeWidth={stroke}
+        strokeDasharray={`${length} ${c - length}`}
+        strokeDashoffset={-c * (from + START)}
+      />
+    );
+  };
   return (
     <View accessible accessibilityRole="image" accessibilityLabel={accessibilityLabel} style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <Svg width={size} height={size} style={{ position: 'absolute' }}>

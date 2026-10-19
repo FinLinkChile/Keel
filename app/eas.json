@@ -1,0 +1,20 @@
+{
+  "cli": {
+    "appVersionSource": "local"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://rxd2coa23f.execute-api.us-east-2.amazonaws.com",
+        "EXPO_PUBLIC_CHAIN_ID": "84532",
+        "EXPO_PUBLIC_ESCROW_ADDRESS": "0x8346c6F1AfbaFF8140D35116fAF5ec07e4232970",
+        "EXPO_PUBLIC_IMPORTER_SAFE": "0x366E72921895dBFD7688822418BE43E02551Ee82",
+        "EXPO_PUBLIC_WALLET_CHECK": "1"
+      }
+    }
+  }
+}

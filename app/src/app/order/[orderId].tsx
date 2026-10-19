@@ -316,8 +316,10 @@ function DocumentRow({ order, docType, existing, last }: { order: Order; docType
     setUpload({ phase: 'done', fileName: file.name, at: Date.now() / 1000, result });  }
 
   const outcome = upload?.phase === 'done' ? uploadStatus(upload.result) : undefined;
-  const word =
-    outcome?.word ?? (existing && !upload ? (existing.status === 'accepted' ? t('Accepted') : t('Under review')) : undefined);
+  // What the server says about the document, once it has read it
+  const served = existing ? (existing.status === 'accepted' ? 'Accepted' : 'Under review') : undefined;
+  // "Uploaded" only says the file left the phone: when the server has read it, its answer wins
+  const word = outcome?.word === 'Uploaded' ? (served ?? outcome.word) : (outcome?.word ?? (!upload ? served : undefined));
   const busy = upload?.phase === 'signing' || upload?.phase === 'uploading';
 
   let detail: string;
