@@ -1,4 +1,5 @@
 import type { Hex } from '@keel/schemas';
+import { getAddress } from 'viem';
 
 import { t } from '../i18n/translate';
 import type { Signer, Signers } from '../wallet/signer';
@@ -59,10 +60,11 @@ export function orderFromView(v: OrderView, carrier: string, goods?: string): Or
 export function supplierFromView(v: SupplierView): SupplierRecord | undefined {
   const payout = v.payoutAddresses[0];
   if (!payout) return undefined;
-  const address = v.exporter.toLowerCase() as Hex;
+  // Checksummed, as the rest of the app writes addresses: the order is signed with them
+  const address = getAddress(v.exporter);
   const name = v.name ?? `${address.slice(0, 6)}…${address.slice(-4)}`;
-  const party: Party = { id: `supplier:${address}`, name, short: name, place: t('Registered supplier'), address, tint: parseInt(address.slice(-2), 16) % 4 };
-  return { party, payoutAddress: payout as Hex };
+  const party: Party = { id: `supplier:${address.toLowerCase()}`, name, short: name, place: t('Registered supplier'), address, tint: parseInt(address.slice(-2), 16) % 4 };
+  return { party, payoutAddress: getAddress(payout) };
 }
 
 export function needFromApi(n: Need): NeedsYou {
@@ -154,7 +156,7 @@ export function withApi(base: KeelData, api: ApiClient, signers: () => Signers):
     verifiedSuppliers: registered,
     // A registered supplier is a party too: its orders show its name on the importer's phone
     party: async (id) => (await base.party(id)) ?? (id.startsWith('supplier:') ? (await registered()).find((r) => r.party.id === id)?.party : undefined),
-    partyByAddress: async (a) => (await base.partyByAddress(a)) ?? (await registered()).find((r) => r.party.address === a.toLowerCase())?.party,
+    partyByAddress: async (a) => (await base.partyByAddress(a)) ?? (await registered()).find((r) => r.party.address.toLowerCase() === a.toLowerCase())?.party,
     // Proposals still being signed, then the orders of the API in their escrow state. A fully
     // signed proposal is shown as its order, with the goods typed in the proposal.
     orders: () =>

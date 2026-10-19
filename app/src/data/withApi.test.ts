@@ -136,7 +136,7 @@ describe('withApi', () => {
     const d = withApi(base, api as unknown as ApiClient, () => ({ importer }));
     const list = await d.verifiedSuppliers();
     expect(list).toHaveLength(1);
-    expect(list[0]).toMatchObject({ payoutAddress: supplier.payoutAddresses[0], party: { name: 'Proveedor demo', address: supplier.exporter.toLowerCase() } });
+    expect(list[0]).toMatchObject({ payoutAddress: supplier.exporter, party: { name: 'Proveedor demo', address: supplier.exporter } });
     expect(await d.partyByAddress(supplier.exporter)).toMatchObject({ name: 'Proveedor demo' });
     expect(await d.party(list[0]!.party.id)).toMatchObject({ name: 'Proveedor demo' });
     // No importer wallet, or the API down: no supplier rather than a demo one the gate would refuse
