@@ -14,20 +14,25 @@
 |---|---|---|---|
 | 1 | Contracts and on-chain permissions | `contracts/` | @Mrnooqmal |
 | 2 | Policy engine, PDR, exchange rate and keys | `schemas/`, `engine/` | @darlopezp |
-| 3 | Invoice ingestion and quarantined extraction | `ingest/` | @dvni7 |
+| 3 | Document ingestion and quarantined extraction | `ingest/` | @dvni7 |
 | 4 | Product, onboarding and human channel | `app/`, `bot/` | @2Chrisss |
 | 5 | Red team, evidence, documentation and coordination | `redteam/`, `docs/`, `evidence/` | @Benjasncz2 |
 
 ## Integration points (Chile time)
 
-1. Monday Oct 12, 20:00: shared interfaces frozen. After this, a change to `schemas/` must be announced to all five areas.
-2. Wednesday Oct 14: addresses and ABIs published in `contracts/deployments/84532.json`.
-3. Friday Oct 16: one real end to end payment on testnet, visible in the activity log.
+The focus moved on October 13 from utility bill payments to trade escrow, so the first three points were replanned for Keel Trade. They are a proposal until Area 5 confirms them. Keel Personal is back in scope as the second mode, and its integration point has no date yet.
+
+1. Wednesday Oct 14, 20:00: shared interfaces of the escrow flow frozen (purchase order, shipment attestation, document extraction, PDR). The network and the payment token are decided the same day. After this, a change to `schemas/` must be announced to all five areas.
+2. Thursday Oct 15: addresses and ABIs published in `contracts/deployments/<chainId>.json`.
+3. Friday Oct 16: one real end to end order on the test network (signature, deposit, advance, shipment, balance), visible in the activity log.
 4. Sunday Oct 18, 20:00: feature freeze and final deployment. After this, only documents change.
 5. Monday Oct 19, 22:00: submission.
 
 ## Rules that apply everywhere
 
+* [docs/flujo/](docs/flujo/index.md) defines the goal of the project and the flow it implements. Before designing or creating any component, answer [docs/flujo/checklist-componente.md](docs/flujo/checklist-componente.md). If an idea contradicts `docs/flujo/`, raise it with the team and update those documents first.
+* The documentation is split into short files, one concept each. [docs/README.md](docs/README.md) explains how they are stored, linked and changed.
+* The payout address never comes from a document. In Keel Trade it comes from the purchase order signed by both parties; in Keel Personal, from the table of registered beneficiaries.
 * The project is called Keel in code, documents and deck.
 * There is no operational LLM. The only LLM is the quarantined extractor, and its output schema has no free text.
 * Keys never enter the repository. Use `.env` (see `.env.example`). The owner key never lives on a server.

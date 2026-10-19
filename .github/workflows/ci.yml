@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
 
 jobs:
@@ -10,9 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The engine tests compile the real contracts, which import OpenZeppelin
+          submodules: recursive
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run typecheck
@@ -29,3 +32,5 @@ jobs:
           submodules: recursive
       - uses: foundry-rs/foundry-toolchain@v1
       - run: forge build
+      # Fork tests need an RPC endpoint and secrets; they run locally, not in CI.
+      - run: forge test --no-match-path 'test/fork/*' -vv

@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
+import {IPDRVerifier} from "./IPDRVerifier.sol";
 import {PaymentIntent, PolicyDecision} from "./KeelTypes.sol";
 
-// Interface of the gate. Event and error names are fixed (shared interfaces, section 2.4).
+// Interface of the gate. Event and error names are fixed (docs/interfaces/eventos-y-errores.md).
 // EIP-712 domain: name = "Keel", version = "1", chainId, verifyingContract = PDRGate.
-interface IPDRGate {
+// The errors and events shared with the Trade gate (IntentMismatch, CalldataMismatch,
+// BadPolicySignature, MissingCosignature, StalePolicy, Expired, NonceUsed, GateIsPaused,
+// GatePaused) are declared in IPDRVerifier and inherited here, with the same names.
+interface IPDRGate is IPDRVerifier {
     event PaymentExecuted(bytes32 indexed intentHash, bytes32 pdrHash, uint8 tier, bytes32 indexed invoiceKey);
 
     // Only the names of the events below are fixed. Their parameters are a proposal
@@ -14,17 +18,8 @@ interface IPDRGate {
     event BeneficiaryChangeQueued(uint8 indexed aliasId, address previousRecipient, address newRecipient);
     event BeneficiaryChangeVetoed(uint8 indexed aliasId, address newRecipient);
     event AgentRoleRevoked(address indexed by);
-    event GatePaused(address indexed by);
 
-    error IntentMismatch();
-    error CalldataMismatch();
-    error BadPolicySignature();
-    error MissingCosignature();
-    error StalePolicy();
-    error Expired();
-    error NonceUsed();
     error InvoiceAlreadyPaid();
-    error GateIsPaused();
 
     function execute(
         PaymentIntent calldata intent,

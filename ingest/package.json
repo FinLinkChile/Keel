@@ -3,12 +3,36 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing/*": "./src/testing/*.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "start": "tsx src/index.ts"
+    "serve": "node --env-file-if-exists=../.env --import tsx scripts/serve.ts",
+    "extract": "node --env-file-if-exists=../.env --import tsx scripts/extract.ts",
+    "corpus": "node --import tsx scripts/corpus.ts",
+    "corpus:run": "node --env-file-if-exists=../.env --import tsx scripts/corpus-run.ts",
+    "carrier-forms": "node --import tsx scripts/carrier-forms.ts",
+    "carrier-forms:run": "node --env-file-if-exists=../.env --import tsx scripts/carrier-forms-run.ts",
+    "proforma:check": "node --env-file-if-exists=../.env --import tsx scripts/proforma-check.ts",
+    "llm:check": "node --env-file-if-exists=../.env --import tsx scripts/llm-check.ts",
+    "demo-docs": "node --env-file-if-exists=../.env --import tsx scripts/demo-documents.ts"
   },
   "dependencies": {
-    "@keel/schemas": "*"
+    "@anthropic-ai/sdk": "^0.133.0",
+    "@google/genai": "^2.28.0",
+    "@keel/schemas": "*",
+    "mailauth": "^7.3.0",
+    "mailparser": "^3.9.38",
+    "openai": "^7.32.0",
+    "pdfjs-dist": "^6.4.299",
+    "privacy-kit-cl": "0.3.0",
+    "viem": "^2.57.5"
+  },
+  "devDependencies": {
+    "@types/mailparser": "^3.9.0",
+    "fast-check": "^4.10.2",
+    "pdf-lib": "^1.17.1"
   }
 }

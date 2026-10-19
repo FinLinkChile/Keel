@@ -8,12 +8,32 @@ coverage/
 .env.*
 !.env.example
 
+# Local ingest state (hashes, change requests) and admin settings
+*.db
+ingest/settings.json
+
 # Foundry
 contracts/out/
 contracts/cache/
 contracts/broadcast/
+contracts/out-vectors/
 
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+# Deployment files written by tests (the real ones are contracts/deployments/<chainId>.json)
+contracts/deployments/test-*.json
+
+# Terraform (infra/terraform): providers, local state and real variable values never enter git
+infra/terraform/.terraform/
+infra/terraform/.build/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# Terraform plans and crash logs can hold account details
+infra/terraform/plan.bin
+*.tfplan
+crash.log

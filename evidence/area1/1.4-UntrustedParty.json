@@ -1,0 +1,98 @@
+{
+  "schema": "keel.area1.evidence/v1",
+  "chainId": 84532,
+  "contracts": {
+    "safe": "0x366E72921895dBFD7688822418BE43E02551Ee82",
+    "roles": "0xD60f4297ed883D9b567A5A511F0735b2A7b19592",
+    "tradeEscrow": "0x8346c6F1AfbaFF8140D35116fAF5ec07e4232970",
+    "fundingGate": "0x2bc56bbB5B47B493009531e751C8Bd90513e927f",
+    "token": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+  },
+  "caseId": "1.4",
+  "phase": 1,
+  "title": "Deposit for an order whose carrier is not registered",
+  "kind": "revert",
+  "setup": [
+    {
+      "label": "open order 1.4",
+      "hash": "0xb15454d0f6d0507b0d0efa1389e47de180eccfe0c8a95f631009657984e3d138",
+      "blockNumber": "48236358",
+      "from": "0x1dca5bc3e7a06eca0e50775dcb410a650148f14b",
+      "to": "0x8346c6f1afbaff8140d35116faf5ec07e4232970",
+      "status": "success",
+      "gasUsed": "433727",
+      "gasLimit": "546004"
+    }
+  ],
+  "revert": {
+    "tx": {
+      "label": "1.4 execute",
+      "hash": "0x67629b5c1d9de1964f23f5c09f0593b0bfe9a8444f12bfdd5be0393cf683e50c",
+      "blockNumber": "48236360",
+      "from": "0x2fdd1c7b6dd0fd3a41b2ec43631d3dbcbd504c63",
+      "to": "0x2bc56bbb5b47b493009531e751c8bd90513e927f",
+      "status": "reverted",
+      "gasUsed": "92981",
+      "gasLimit": "1000000"
+    },
+    "expected": {
+      "name": "UntrustedParty"
+    },
+    "simulated": {
+      "name": "UntrustedParty",
+      "args": [],
+      "data": "0x1f7438e8"
+    },
+    "actual": {
+      "name": "UntrustedParty",
+      "args": [],
+      "data": "0x1f7438e8",
+      "source": "replay"
+    },
+    "reproduce": "cast run 0x67629b5c1d9de1964f23f5c09f0593b0bfe9a8444f12bfdd5be0393cf683e50c --rpc-url \"$BASE_SEPOLIA_RPC_URL\""
+  },
+  "passed": true,
+  "details": {
+    "order": {
+      "orderId": "0x5f215aa2108d7aee4e60e260e3683902cf2c42b08c2507a9060b2aacd2dffb4b",
+      "importer": "0x366E72921895dBFD7688822418BE43E02551Ee82",
+      "exporter": "0x1dca5bC3e7A06eCa0E50775dcB410a650148f14b",
+      "payoutAddress": "0x43Ac05c12E9e0A4E537b2566786Fa68773feda62",
+      "token": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      "totalAmount": "1000000",
+      "advanceBps": 1000,
+      "shipmentDeadline": "1792845800",
+      "disputeWindow": "3600",
+      "carrier": "0x2fdD1c7B6dD0fd3a41b2Ec43631D3dBcbd504c63",
+      "arbiter": "0xF53ACde9Dd56abca283785124fA06F5366c06519",
+      "documentVerifier": "0xc7F2300AD6203D629d71aCe901e1B4e1b923A01C",
+      "incoterm": "0x464f420000000000000000000000000000000000000000000000000000000000",
+      "termsHash": "0xfe0cd3d288e7f59782077b8dafe0e81a1559cf5f982b05f70457f17f24fe345f",
+      "requiredDocsHash": "0x3928a70aa851d3336ff18e657064310718b9c894358f8a7b05750d61f22ee77c",
+      "nonce": "17350006630923746780"
+    },
+    "orderHash": "0x8ad260bbfa2a357a5cb289a8c4c1032cfbdfe2e695f24a755544b85872a35400",
+    "intent": {
+      "orderId": "0x5f215aa2108d7aee4e60e260e3683902cf2c42b08c2507a9060b2aacd2dffb4b",
+      "orderHash": "0x8ad260bbfa2a357a5cb289a8c4c1032cfbdfe2e695f24a755544b85872a35400",
+      "escrow": "0x8346c6F1AfbaFF8140D35116fAF5ec07e4232970",
+      "token": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      "amount": "1000000",
+      "deadline": "1792241904",
+      "nonce": "12661991863464288656"
+    },
+    "decision": {
+      "intentHash": "0x382448c502cc3a7e5cff3547ec5d98f95525d14623ee5babfbae42166385c99d",
+      "calldataHash": "0x2916cc167963b785aea7a728708a8a2c7cc6332d22c19c245e2228d1e08354e1",
+      "policyHash": "0x90e5e81523331cb4fe1695c8fdb7234776e15c1c31ba6f1df6807809fe4a160e",
+      "inputsHash": "0x183af7d930b6d0b11b0c58e27b82e351c00f935ab8021ba9cc6143bbb391ee89",
+      "tier": 1,
+      "expiresAt": "1792241606"
+    },
+    "pdrSignedBy": "0x2fdD1c7B6dD0fd3a41b2Ec43631D3dBcbd504c63"
+  },
+  "notes": [
+    "Carrier = DEMO_ATTACKER, a key the exporter could control: it would attest the shipment itself."
+  ],
+  "writtenAt": "2026-10-17T12:43:27.470Z"
+}
