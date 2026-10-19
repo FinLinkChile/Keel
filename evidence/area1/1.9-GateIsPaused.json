@@ -1,0 +1,117 @@
+{
+  "schema": "keel.area1.evidence/v1",
+  "chainId": 84532,
+  "contracts": {
+    "safe": "0x366E72921895dBFD7688822418BE43E02551Ee82",
+    "roles": "0xD60f4297ed883D9b567A5A511F0735b2A7b19592",
+    "tradeEscrow": "0x8346c6F1AfbaFF8140D35116fAF5ec07e4232970",
+    "fundingGate": "0x2bc56bbB5B47B493009531e751C8Bd90513e927f",
+    "token": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+  },
+  "caseId": "1.9",
+  "phase": 1,
+  "title": "Gate paused by the Safe: a deposit reverts, then unpause",
+  "kind": "revert",
+  "setup": [
+    {
+      "label": "open order 1.9",
+      "hash": "0xba97b8b39039796df9556f5b00b285f239215da4919d7680ccd0b640f5dd765a",
+      "blockNumber": "48236387",
+      "from": "0x1dca5bc3e7a06eca0e50775dcb410a650148f14b",
+      "to": "0x8346c6f1afbaff8140d35116faf5ec07e4232970",
+      "status": "success",
+      "gasUsed": "433715",
+      "gasLimit": "545988"
+    },
+    {
+      "label": "Safe: pause()",
+      "hash": "0xcccb64ef478dbf67803c10823b279fded96647d99c86742e866340761e0a6a2f",
+      "blockNumber": "48236390",
+      "from": "0x998207c916dcf1a0f14a24ddbf46332eedce6fd6",
+      "to": "0x366e72921895dbfd7688822418be43e02551ee82",
+      "status": "success",
+      "gasUsed": "83561",
+      "gasLimit": "121370"
+    },
+    {
+      "label": "Safe: unpause()",
+      "hash": "0x88732771f9193645507159ce77a25228b013bd3bca4f514bd9fbba3db7d0a0cb",
+      "blockNumber": "48236393",
+      "from": "0x998207c916dcf1a0f14a24ddbf46332eedce6fd6",
+      "to": "0x366e72921895dbfd7688822418be43e02551ee82",
+      "status": "success",
+      "gasUsed": "61633",
+      "gasLimit": "100716"
+    }
+  ],
+  "revert": {
+    "tx": {
+      "label": "1.9 execute",
+      "hash": "0x13060a7829a3fd75e7cc238af54c1bb46523d22ec6b8b1d79580a687ad4a9719",
+      "blockNumber": "48236391",
+      "from": "0x2fdd1c7b6dd0fd3a41b2ec43631d3dbcbd504c63",
+      "to": "0x2bc56bbb5b47b493009531e751c8bd90513e927f",
+      "status": "reverted",
+      "gasUsed": "37160",
+      "gasLimit": "1000000"
+    },
+    "expected": {
+      "name": "GateIsPaused"
+    },
+    "simulated": {
+      "name": "GateIsPaused",
+      "args": [],
+      "data": "0x0d9f3c84"
+    },
+    "actual": {
+      "name": "GateIsPaused",
+      "args": [],
+      "data": "0x0d9f3c84",
+      "source": "replay"
+    },
+    "reproduce": "cast run 0x13060a7829a3fd75e7cc238af54c1bb46523d22ec6b8b1d79580a687ad4a9719 --rpc-url \"$BASE_SEPOLIA_RPC_URL\""
+  },
+  "passed": true,
+  "details": {
+    "order": {
+      "orderId": "0x745da7578abd4d2e8b225d000ed711d4a614212b58b723c9ae7585e77293dece",
+      "importer": "0x366E72921895dBFD7688822418BE43E02551Ee82",
+      "exporter": "0x1dca5bC3e7A06eCa0E50775dcB410a650148f14b",
+      "payoutAddress": "0x43Ac05c12E9e0A4E537b2566786Fa68773feda62",
+      "token": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      "totalAmount": "1000000",
+      "advanceBps": 1000,
+      "shipmentDeadline": "1792845858",
+      "disputeWindow": "3600",
+      "carrier": "0xe5ea4525B51db068907D34998aFF9236Cef3cc76",
+      "arbiter": "0xF53ACde9Dd56abca283785124fA06F5366c06519",
+      "documentVerifier": "0xc7F2300AD6203D629d71aCe901e1B4e1b923A01C",
+      "incoterm": "0x464f420000000000000000000000000000000000000000000000000000000000",
+      "termsHash": "0xbbf43c1ec4c2f5021843e111f3c85fe79dd745776f8e8d1b036829aa08862bd8",
+      "requiredDocsHash": "0x3928a70aa851d3336ff18e657064310718b9c894358f8a7b05750d61f22ee77c",
+      "nonce": "16615286883163682252"
+    },
+    "intent": {
+      "orderId": "0x745da7578abd4d2e8b225d000ed711d4a614212b58b723c9ae7585e77293dece",
+      "orderHash": "0x8e9292a58a6fba4510f64ba3c2a3bddd3d08b6858f7fbd43b54792081eda89f4",
+      "escrow": "0x8346c6F1AfbaFF8140D35116fAF5ec07e4232970",
+      "token": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      "amount": "1000000",
+      "deadline": "1792241962",
+      "nonce": "7277672331230321176"
+    },
+    "decision": {
+      "intentHash": "0x0ff5c3e089ee144a8c6ac682672bf43d4f714b9ad5e329ebf904828f65e1b087",
+      "calldataHash": "0x92b718980569e7fb32241214cddbd8e1c19af672b18e904c43d1f5ee192efce6",
+      "policyHash": "0x90e5e81523331cb4fe1695c8fdb7234776e15c1c31ba6f1df6807809fe4a160e",
+      "inputsHash": "0x183af7d930b6d0b11b0c58e27b82e351c00f935ab8021ba9cc6143bbb391ee89",
+      "tier": 1,
+      "expiresAt": "1792241664"
+    },
+    "pdrSignedBy": "0x2fdD1c7B6dD0fd3a41b2Ec43631D3dBcbd504c63"
+  },
+  "notes": [
+    "The pause is the first check of execute (step a); the PDR here is not valid either, and is never reached."
+  ],
+  "writtenAt": "2026-10-17T12:44:35.501Z"
+}

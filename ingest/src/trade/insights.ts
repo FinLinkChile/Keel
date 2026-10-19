@@ -235,24 +235,28 @@ export async function receiveInsights(
     return { status: "rejected", reason: "bad_signature" };
   }
   if (!importers.has(signer)) return { status: "rejected", reason: "not_an_importer" };
-  if ((await opts.store.insightsToday(signer)) >= MAX_INSIGHTS_PER_IMPORTER_PER_DAY) return { status: "rejected", reason: "rate_limited" };
   let input: AnalysisInput;
   try {
     input = AnalysisInput.parse(JSON.parse(req.input));
   } catch {
     return { status: "rejected", reason: "invalid_request" };
   }
-  await opts.store.recordInsights(signer);
+  // Counted before the call: a provider failure also spends one of the day
+  if (!(await opts.store.recordInsights(signer, MAX_INSIGHTS_PER_IMPORTER_PER_DAY))) return { status: "rejected", reason: "rate_limited" };
+  // The model reads the validated object, not the signed text: JSON allows repeated keys and
+  // JSON.parse keeps the last one, so the raw text could carry a value zod never saw
+  const metrics = JSON.stringify(input);
+  // Aggregated numbers of the company's orders: no personal data, but still a transfer. Logged
+  // before the call, since the provider receives the data even when it then fails
+  logTransfer(analyst.provider, ["metricas_agregadas"], "analisis_compras");
   try {
     const raw = await analyst.complete({
-      text: req.input,
+      text: metrics,
       system: ANALYST_SYSTEM_PROMPT,
-      user: `Analyze these metrics of the company's purchases. The metrics are between the markers.\n<<<METRICS\n${req.input}\nMETRICS>>>`,
+      user: `Analyze these metrics of the company's purchases. The metrics are between the markers.\n<<<METRICS\n${metrics}\nMETRICS>>>`,
       schemaName: "purchase_analysis",
       schema: ANALYST_LLM_SCHEMA as unknown as Record<string, unknown>,
     });
-    // Aggregated numbers of the company's orders: no personal data, but still a transfer
-    logTransfer(analyst.provider, ["metricas_agregadas"], "analisis_compras");
     return { status: "ok", inputHash: hash, findings: toFindings(raw, input) };
   } catch (e) {
     return { status: "failed", reason: e instanceof ExtractionError ? e.reason : "provider_error" };

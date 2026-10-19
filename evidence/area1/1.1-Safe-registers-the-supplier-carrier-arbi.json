@@ -1,0 +1,122 @@
+{
+  "schema": "keel.area1.evidence/v1",
+  "chainId": 84532,
+  "contracts": {
+    "safe": "0x366E72921895dBFD7688822418BE43E02551Ee82",
+    "roles": "0xD60f4297ed883D9b567A5A511F0735b2A7b19592",
+    "tradeEscrow": "0x8346c6F1AfbaFF8140D35116fAF5ec07e4232970",
+    "fundingGate": "0x2bc56bbB5B47B493009531e751C8Bd90513e927f",
+    "token": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+  },
+  "caseId": "1.1",
+  "phase": 1,
+  "title": "Safe registers the supplier, carrier, arbiter and document verifier",
+  "kind": "state-change",
+  "setup": [
+    {
+      "label": "Safe: queueSupplier(DEMO_EXPORTER, DEMO_PAYOUT) (earlier run)",
+      "hash": "0xcb1d4939dc7ffc2da4fece44a3b178a0b5061309b2d633299450bd7d265f7300",
+      "blockNumber": "48234663",
+      "from": "0x998207c916dcf1a0f14a24ddbf46332eedce6fd6",
+      "to": "0x366e72921895dbfd7688822418be43e02551ee82",
+      "status": "success",
+      "gasUsed": "154628",
+      "gasLimit": "157022"
+    },
+    {
+      "label": "Safe: queueThirdParty(DEMO_CARRIER, CARRIER)",
+      "hash": "0xced01244aeccc55a354661c5ef701f99d5f3dff3f9ba25e1fcb32ab776c8f524",
+      "blockNumber": "48236276",
+      "from": "0x998207c916dcf1a0f14a24ddbf46332eedce6fd6",
+      "to": "0x366e72921895dbfd7688822418be43e02551ee82",
+      "status": "success",
+      "gasUsed": "138256",
+      "gasLimit": "188625"
+    },
+    {
+      "label": "Safe: queueThirdParty(DEMO_ARBITER, ARBITER)",
+      "hash": "0xdf8bd53290decf1d2c3aa2aa27f85ec954c57f732735a6db26f9722137063cf3",
+      "blockNumber": "48236278",
+      "from": "0x998207c916dcf1a0f14a24ddbf46332eedce6fd6",
+      "to": "0x366e72921895dbfd7688822418be43e02551ee82",
+      "status": "success",
+      "gasUsed": "138256",
+      "gasLimit": "188625"
+    },
+    {
+      "label": "Safe: queueThirdParty(POLICY_SIGNER_ADDRESS, VERIFIER)",
+      "hash": "0x224d0d71e0cb6a251d9296c7bf8b95c28d32cdce43221e4778f5793f01a44407",
+      "blockNumber": "48236280",
+      "from": "0x998207c916dcf1a0f14a24ddbf46332eedce6fd6",
+      "to": "0x366e72921895dbfd7688822418be43e02551ee82",
+      "status": "success",
+      "gasUsed": "138256",
+      "gasLimit": "188625"
+    },
+    {
+      "label": "Safe: queueSupplier(APP_EXPORTER, APP_PAYOUT)",
+      "hash": "0xafd4a2b0ff1c6a3cd6f5233aaced6857c7b9915cf55e3029d1502ea5dc022f43",
+      "blockNumber": "48236282",
+      "from": "0x998207c916dcf1a0f14a24ddbf46332eedce6fd6",
+      "to": "0x366e72921895dbfd7688822418be43e02551ee82",
+      "status": "success",
+      "gasUsed": "137528",
+      "gasLimit": "187744"
+    }
+  ],
+  "passed": true,
+  "details": {
+    "configDelay": "120",
+    "changes": [
+      {
+        "label": "queueSupplier(DEMO_EXPORTER, DEMO_PAYOUT)",
+        "changeId": "1",
+        "activatesAt": "1792237734",
+        "queuedEarlier": true
+      },
+      {
+        "label": "queueThirdParty(DEMO_CARRIER, CARRIER)",
+        "changeId": "2",
+        "activatesAt": "1792240960",
+        "queuedEarlier": false
+      },
+      {
+        "label": "queueThirdParty(DEMO_ARBITER, ARBITER)",
+        "changeId": "3",
+        "activatesAt": "1792240964",
+        "queuedEarlier": false
+      },
+      {
+        "label": "queueThirdParty(POLICY_SIGNER_ADDRESS, VERIFIER)",
+        "changeId": "4",
+        "activatesAt": "1792240968",
+        "queuedEarlier": false
+      },
+      {
+        "label": "queueSupplier(APP_EXPORTER, APP_PAYOUT)",
+        "changeId": "5",
+        "activatesAt": "1792240972",
+        "queuedEarlier": false
+      }
+    ],
+    "activatesAt": "1792240972",
+    "registryAfter": {
+      "supplier": true,
+      "attackerSupplier": false,
+      "carrier": true,
+      "arbiter": true,
+      "verifier": true,
+      "attackerCarrier": false,
+      "appSupplier": true
+    },
+    "appSupplier": {
+      "exporter": "0xC419891eE6bdEfa7aE285961C743047E34E1320d",
+      "payout": "0xC419891eE6bdEfa7aE285961C743047E34E1320d"
+    }
+  },
+  "notes": [
+    "Each change counted only from activatesAt = queue time + configDelay, enforced by FundingGate.",
+    "Changes marked queuedEarlier were sent by an earlier run of this step; their transaction is the one that emitted ChangeQueued."
+  ],
+  "writtenAt": "2026-10-17T12:42:54.668Z"
+}

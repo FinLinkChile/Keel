@@ -1,0 +1,59 @@
+{
+  "schema": "keel.area1.evidence/v1",
+  "chainId": 84532,
+  "contracts": {
+    "safe": "0x366E72921895dBFD7688822418BE43E02551Ee82",
+    "roles": "0xD60f4297ed883D9b567A5A511F0735b2A7b19592",
+    "tradeEscrow": "0x8346c6F1AfbaFF8140D35116fAF5ec07e4232970",
+    "fundingGate": "0x2bc56bbB5B47B493009531e751C8Bd90513e927f",
+    "token": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+  },
+  "caseId": "1.0",
+  "phase": 1,
+  "title": "Delay sets the gate policy hash",
+  "kind": "state-change",
+  "setup": [
+    {
+      "label": "Delay: queue setPolicyHash(0x22d230acf6e1e89c36d3228abfdac4d6bdc39dadaf4e35c1cac4fa224da4e702)",
+      "hash": "0x081c236df05278fa161732a37775e4d2fb74ea4f8f72dc8e8ebbfcfcf016b1b5",
+      "blockNumber": "48297500",
+      "from": "0x998207c916dcf1a0f14a24ddbf46332eedce6fd6",
+      "to": "0x9da7c60101d5988b56a6d76bf04e579c10ce2094",
+      "status": "success",
+      "gasUsed": "101591",
+      "gasLimit": "144278"
+    },
+    {
+      "label": "Delay: executeNextTx(setPolicyHash)",
+      "hash": "0xf2191dcb0b56be1deefc5381f04b34334d13c20f2f4a1a3c2d42c5f56fe7a94d",
+      "blockNumber": "48297592",
+      "from": "0x998207c916dcf1a0f14a24ddbf46332eedce6fd6",
+      "to": "0x9da7c60101d5988b56a6d76bf04e579c10ce2094",
+      "status": "success",
+      "gasUsed": "90359",
+      "gasLimit": "130691"
+    }
+  ],
+  "passed": true,
+  "details": {
+    "policyHashBefore": "0x90e5e81523331cb4fe1695c8fdb7234776e15c1c31ba6f1df6807809fe4a160e",
+    "policyHash": "0x22d230acf6e1e89c36d3228abfdac4d6bdc39dadaf4e35c1cac4fa224da4e702",
+    "delayNonce": "0",
+    "createdAt": "1792363288",
+    "txCooldown": "180",
+    "txExpiration": "86400",
+    "after": {
+      "policyHash": "0x22d230acf6e1e89c36d3228abfdac4d6bdc39dadaf4e35c1cac4fa224da4e702",
+      "carrierActive": true,
+      "arbiterActive": true,
+      "delayTxNonce": "1",
+      "delayQueueNonce": "1",
+      "paused": false
+    }
+  },
+  "notes": [
+    "The owner (a Delay module) queued FundingGate.setPolicyHash; after txCooldown anyone may run executeNextTx, here the owner did. The Delay calls the Safe, the Safe calls the gate.",
+    "Declared risk: without a ConfigGuard an owner of the Safe could call setPolicyHash directly; the cooldown is a convention the owner keeps."
+  ],
+  "writtenAt": "2026-10-18T22:44:34.437Z"
+}
