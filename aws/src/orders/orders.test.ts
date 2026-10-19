@@ -288,5 +288,6 @@ describe("demo auto-attestation (off by default)", () => {
     const view = (await call(orders, owner, "GET /orders/{orderId}", { params })).body;
     expect(view.shipment.attestation).toMatchObject({ orderId: po.orderId.toLowerCase(), docsHash: docsHash([BL, INVOICE] as Hex[]) });
     expect(await autoAttest(po.orderId, deps(true))).toBe("already_attested");
+    expect(view.documents).toEqual({ fileHashes: [BL, INVOICE], received: ["BILL_OF_LADING", "COMMERCIAL_INVOICE"] });
   });
 });

@@ -310,7 +310,8 @@ function DocumentRow({ order, docType, existing, last }: { order: Order; docType
   let detail: string;
   if (busy) detail = `${upload.fileName}, ${upload.phase === 'signing' ? t('signing') : t('uploading')}`;
   else if (upload?.phase === 'done') detail = outcome?.problem ? t(outcome.problem) : `${upload.fileName}, ${formatLocalDay(upload.at)}`;
-  else if (existing) detail = `${existing.fileName}, ${formatLocalDay(existing.uploadedAt)}`;
+  else if (existing?.fileName && existing.uploadedAt !== undefined) detail = `${existing.fileName}, ${formatLocalDay(existing.uploadedAt)}`;
+  else if (existing) detail = t('Received');
   else detail = t('Not uploaded yet');
 
   return (

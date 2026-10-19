@@ -44,7 +44,8 @@ export function orderFromView(v: OrderView, carrier: string, goods?: string): Or
     // The order exists on the API once both signed
     signedAt: v.createdAt,
     transportDoc: 'BILL_OF_LADING',
-    documents: [],
+    // The API keeps only accepted documents, without their file name or upload time
+    documents: (v.documents?.received ?? []).map((docType) => ({ docType, status: 'accepted' as const })),
     po,
     terms,
     escrowState: v.state,

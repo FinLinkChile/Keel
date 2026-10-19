@@ -39,6 +39,15 @@ async function viewFrom(state: string, over: Partial<OrderView> = {}): Promise<O
 }
 
 describe('orderFromView', () => {
+  it('shows the documents the API accepted, so a reload does not ask for them again', async () => {
+    const v = await viewFrom('ADVANCE_PAID', { documents: { fileHashes: ['0x01', '0x02'], received: ['BILL_OF_LADING', 'COMMERCIAL_INVOICE'] } });
+    expect(orderFromView(v, 'harbor-line').documents).toEqual([
+      { docType: 'BILL_OF_LADING', status: 'accepted' },
+      { docType: 'COMMERCIAL_INVOICE', status: 'accepted' },
+    ]);
+    expect(orderFromView(await viewFrom('ADVANCE_PAID'), 'harbor-line').documents).toEqual([]);
+  });
+
   it('shows the escrow state as the stage of the screens', async () => {
     const stages = await Promise.all(
       ['NONE', 'OPEN', 'ADVANCE_PAID', 'SHIPPED', 'DISPUTED', 'SETTLED', 'REFUNDED', 'RESOLVED', 'CANCELLED'].map(async (s) => orderFromView(await viewFrom(s), 'harbor-line').stage),

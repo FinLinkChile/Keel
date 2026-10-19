@@ -71,7 +71,8 @@ export interface OrderView {
   sigImporter: Hex;
   sigExporter: Hex;
   shipment?: { attestation: Raw; sigCarrier: Hex };
-  documents?: { fileHashes: Hex[] };
+  // received: the accepted documents (BILL_OF_LADING, AIR_WAYBILL, COMMERCIAL_INVOICE); older API versions omit it
+  documents?: { fileHashes: Hex[]; received?: RequiredDocType[] };
   closing?: {
     balanceApproval?: { sigImporter: Hex; attestationHash: Hex };
     cancel?: { cancelNonce: string; sigImporter?: Hex; sigExporter?: Hex };

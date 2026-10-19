@@ -5,7 +5,7 @@
 // balances in the wallet (the Safe's, and the exporter's payout addresses), left out when the
 // chain cannot be asked.
 import { BatchGetCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
-import type { Hex } from "@keel/schemas";
+import type { Hex, RequiredDocType } from "@keel/schemas";
 import { represents } from "../auth";
 import { type Env, table } from "../config";
 import { ddb, lower } from "../db";
@@ -29,8 +29,9 @@ export interface OrderView {
   sigImporter: Hex;
   sigExporter: Hex;
   shipment?: OrderItem["shipment"];
-  // Only the hashes of the files ingest read; the extractions stay server side
-  documents?: { fileHashes: Hex[] };
+  // Only the hashes of the files ingest read and which documents they are; the extractions stay
+  // server side
+  documents?: { fileHashes: Hex[]; received: RequiredDocType[] };
   closing?: OrderItem["closing"];
   // Escrow state from the indexer's mirror; "NONE" until it sees OrderOpened
   state: string;
@@ -45,12 +46,22 @@ export interface OrderView {
 
 export const stateOf = (o: Pick<OrderItem, "chain">) => o.chain?.state ?? "NONE";
 
+// The accepted documents by slot (../ingest/orders.ts extractionSlot): the transport slot holds
+// a bill of lading or an air waybill, as its extraction says
+function receivedDocs(extractions: Record<string, unknown> | undefined): RequiredDocType[] {
+  const out: RequiredDocType[] = [];
+  const transport = extractions?.["transport"] as { doc_type?: string } | undefined;
+  if (transport) out.push(transport.doc_type === "AIR_WAYBILL" ? "AIR_WAYBILL" : "BILL_OF_LADING");
+  if (extractions?.["invoice"]) out.push("COMMERCIAL_INVOICE");
+  return out;
+}
+
 export function orderView(o: OrderItem, you: Role[]): OrderView {
   const po = poFrom(o.order);
   const { documents, uploaders: _uploaders, ...rest } = o;
   return {
     ...rest,
-    ...(documents && { documents: { fileHashes: documents.fileHashes } }),
+    ...(documents && { documents: { fileHashes: documents.fileHashes, received: receivedDocs(documents.extractions) } }),
     state: stateOf(o),
     totalAmount: po.totalAmount.toString(),
     advance: advanceOf(po).toString(),

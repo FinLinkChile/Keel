@@ -296,7 +296,7 @@ locals {
       { actions = ["sqs:SendMessage"], resources = [aws_sqs_queue.notices.arn] },
       local.ssm_read,
       local.secrets["llm_keys"],
-    ], var.demo_auto_attest ? [local.secrets["carrier_private_key"]] : [])
+    ], var.demo_auto_attest ? [local.secrets["carrier_private_key"], local.secrets["rpc_url"]] : [])
     digest = [
       { actions = local.ddb_rw, resources = [local.tbl["ingest"]] },
       { actions = ["sqs:SendMessage"], resources = [aws_sqs_queue.notices.arn] },

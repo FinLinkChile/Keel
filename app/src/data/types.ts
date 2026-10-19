@@ -48,8 +48,9 @@ export type OrderStage =
 // A document already uploaded for an order, as the exporter sees it: only its outcome.
 export type OrderDocument = {
   docType: RequiredDocType;
-  fileName: string;
-  uploadedAt: number;
+  // Unknown for documents read from the Keel API, which keeps neither
+  fileName?: string;
+  uploadedAt?: number;
   status: 'accepted' | 'under_review';
 };
 

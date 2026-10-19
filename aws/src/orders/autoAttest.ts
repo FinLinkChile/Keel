@@ -12,7 +12,8 @@
 //
 // The attestation takes the BL number and the port of loading the extractor read, the docsHash of
 // every file of the order, and the on-board date of the BL, or now when that date is in the future
-// (the API refuses a future date; the document check then reports the mismatch).
+// (the API refuses a future date; the document check then reports the mismatch). The extractor
+// needs the secrets carrier_private_key and rpc_url (the signature check builds its RPC client).
 import type { Hex, ShipmentAttestation } from "@keel/schemas";
 import { EIP712_TYPES, keelDomain } from "@keel/schemas";
 import { blNumberHash, bytes32Text, docsHash } from "@keel/schemas/hash";
