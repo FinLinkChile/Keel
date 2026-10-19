@@ -95,11 +95,18 @@ describe('withApi', () => {
     };
     const d = withApi(base, api as unknown as ApiClient, () => ({ importer, exporter }));
     expect((await d.wallet('importer')).lockedMinor).toBe(3_500_000n);
+    expect((await d.wallet('importer')).availableMinor).toBe((await base.wallet('importer')).availableMinor);
     expect((await d.wallet('exporter')).lockedMinor).toBe(2n);
     const down = withApi(base, { wallet: async () => Promise.reject(new ApiError(0, 'network')) } as unknown as ApiClient, () => ({ importer }));
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     expect((await down.wallet('importer')).lockedMinor).toBe(0n);
     warn.mockRestore();
+  });
+
+  it("shows the Safe's balance on chain as available, in cents", async () => {
+    const api = { wallet: vi.fn(async () => [{ safe: '0x', byState: {}, locked: '0', pendingFunding: '0', available: '35000000', orders: [] }]) };
+    const d = withApi(base, api as unknown as ApiClient, () => ({ importer }));
+    expect((await d.wallet('importer')).availableMinor).toBe(3_500n);
   });
 
   it('lists and opens the orders of the API', async () => {

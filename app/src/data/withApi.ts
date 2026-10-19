@@ -152,7 +152,8 @@ export function withApi(base: KeelData, api: ApiClient, signers: () => Signers):
         async () => [],
       );
     },
-    // Available money and the agent's allowance are not in the API: they stay the base's
+    // Available money is the importer Safe's token balance on chain, when the API could read it.
+    // The agent's allowance is not in the API: it stays the base's
     wallet: async (role) => {
       const w = await base.wallet(role);
       const s = signers()[role];
@@ -161,9 +162,14 @@ export function withApi(base: KeelData, api: ApiClient, signers: () => Signers):
         'wallet',
         async () => {
           let locked = 0n;
-          if (role === 'importer') for (const safe of await api.wallet(s)) locked += BigInt(safe.locked);
-          else for (const v of await api.listOrders(s)) if (v.you.includes('exporter')) locked += BigInt(v.locked);
-          return { ...w, lockedMinor: tokenToCents(locked) };
+          let available: bigint | undefined;
+          if (role === 'importer') {
+            for (const safe of await api.wallet(s)) {
+              locked += BigInt(safe.locked);
+              if (safe.available !== undefined) available = (available ?? 0n) + BigInt(safe.available);
+            }
+          } else for (const v of await api.listOrders(s)) if (v.you.includes('exporter')) locked += BigInt(v.locked);
+          return { ...w, lockedMinor: tokenToCents(locked), ...(available !== undefined && { availableMinor: tokenToCents(available) }) };
         },
         async () => w,
       );

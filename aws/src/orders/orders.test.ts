@@ -82,6 +82,15 @@ describe("orders: visibility", () => {
     expect((await call(orders, exporter, "GET /wallet")).body.wallets).toEqual([]);
     expect((await call(orders, exporter, "GET /wallet", { query: { safe: SAFE } })).status).toBe(403);
   });
+
+  it("the wallet shows the Safe's token balance on chain, and still answers when the RPC does not", async () => {
+    chainState.balance = 35_000_000n;
+    expect((await call(orders, owner, "GET /wallet")).body.wallets[0]).toMatchObject({ safe: SAFE.toLowerCase(), available: "35000000" });
+    chainState.balance = undefined;
+    const r = await call(orders, owner, "GET /wallet");
+    expect(r.status).toBe(200);
+    expect(r.body.wallets[0]).not.toHaveProperty("available");
+  });
 });
 
 describe("needs-you", () => {

@@ -1,5 +1,6 @@
-// The two things the orders API asks the chain, both read-only: whether a signature is valid for
-// an address the way TradeEscrow will check it, and the escrow's current cancelNonceOf. Nothing
+// What the orders API asks the chain, all read-only: whether a signature is valid for an address
+// the way TradeEscrow will check it, the escrow's current cancelNonceOf, and a Safe's balance of
+// the order token (GET /wallet). Nothing
 // here signs or sends a transaction; submitting what the API stores is the agent's job.
 //
 // RPC endpoint: KEEL_RPC_URL when set (local runs), else the secret `rpc_url`.
@@ -42,12 +43,15 @@ export interface ChainDeps {
   verify: SignatureVerifier;
   // TradeEscrow.cancelNonceOf(orderId): (stateVersion << 8) | state
   cancelNonceOf(escrow: Hex, orderId: Hex): Promise<bigint>;
+  // ERC-20 balanceOf(holder) of `token`, in token minor units
+  balanceOf(token: Hex, holder: Hex): Promise<bigint>;
 }
 
 const ERC1271_MAGIC = "0x1626ba7e";
 const ABI = parseAbi([
   "function isValidSignature(bytes32 hash, bytes signature) view returns (bytes4)",
   "function cancelNonceOf(bytes32 orderId) view returns (uint256)",
+  "function balanceOf(address account) view returns (uint256)",
 ]);
 
 export const rpcUnavailable = () => new HttpError(502, "rpc_unavailable");
@@ -91,6 +95,13 @@ export function rpcChainDeps(client: Pick<PublicClient, "getCode" | "readContrac
     async cancelNonceOf(escrow, orderId) {
       try {
         return await client.readContract({ address: escrow, abi: ABI, functionName: "cancelNonceOf", args: [orderId] });
+      } catch {
+        throw rpcUnavailable();
+      }
+    },
+    async balanceOf(token, holder) {
+      try {
+        return await client.readContract({ address: token, abi: ABI, functionName: "balanceOf", args: [holder] });
       } catch {
         throw rpcUnavailable();
       }

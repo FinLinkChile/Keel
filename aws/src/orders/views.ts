@@ -1,7 +1,8 @@
 // Read-only views over the orders table for the app: one order, the caller's orders, what the
 // caller has to do now, and the Safe's wallet. Everything comes from DynamoDB; the chain state is
 // the indexer's mirror (`chain`), so it lags the chain by the indexer's delay and says so with
-// `chain.updatedBlock`. Nothing here asks the chain or changes anything.
+// `chain.updatedBlock`. Nothing here changes anything; the only chain read is the Safe's token
+// balance in the wallet, which is left out when the chain cannot be asked.
 import { BatchGetCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import type { Hex } from "@keel/schemas";
 import { represents } from "../auth";
@@ -9,6 +10,7 @@ import { type Env, table } from "../config";
 import { ddb, lower } from "../db";
 import { HttpError } from "../http";
 import type { OrderItem, ProposalItem } from "../tables";
+import { chainDeps } from "./chain";
 import { attestationHashOf, poFrom } from "./codec";
 import { getParties, identities, representedSafes } from "./parties";
 import { type Ctx, listProposals, queryIndex } from "./proposals";
@@ -187,7 +189,20 @@ export interface WalletView {
   locked: string;
   // Totals of signed orders not funded yet (NONE and OPEN): what the Safe will deposit
   pendingFunding: string;
+  // The Safe's balance of the order token on chain right now, token minor units: what it can still
+  // fund. Absent when the deployment publishes no token or the chain cannot be asked: the rest of
+  // the wallet does not depend on the RPC.
+  available?: string;
   orders: { orderId: Hex; label?: string; state: string; totalAmount: string; locked: string }[];
+}
+
+async function safeBalance(safe: string, ctx: Ctx): Promise<bigint | undefined> {
+  if (!ctx.token) return undefined;
+  try {
+    return await (await chainDeps(ctx.env)).balanceOf(ctx.token, safe as Hex);
+  } catch {
+    return undefined;
+  }
 }
 
 export async function wallet(signer: Hex, ctx: Ctx, only?: string): Promise<WalletView[]> {
@@ -212,7 +227,8 @@ export async function wallet(signer: Hex, ctx: Ctx, only?: string): Promise<Wall
       if (state === "NONE" || state === "OPEN") pending += po.totalAmount;
       rows.push({ orderId: o.orderId, ...(o.label && { label: o.label }), state, totalAmount: po.totalAmount.toString(), locked: held.toString() });
     }
-    out.push({ safe, byState, locked: locked.toString(), pendingFunding: pending.toString(), orders: rows });
+    const available = await safeBalance(safe, ctx);
+    out.push({ safe, byState, locked: locked.toString(), pendingFunding: pending.toString(), ...(available !== undefined && { available: available.toString() }), orders: rows });
   }
   return out;
 }

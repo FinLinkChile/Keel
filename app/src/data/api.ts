@@ -102,6 +102,8 @@ export interface WalletView {
   byState: Record<string, number>;
   locked: string;
   pendingFunding: string;
+  // The Safe's token balance on chain, token minor units; absent when the API could not ask the chain
+  available?: string;
   orders: { orderId: Hex; label?: string; state: string; totalAmount: string; locked: string }[];
 }
 

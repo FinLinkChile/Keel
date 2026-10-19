@@ -223,6 +223,8 @@ locals {
     orders_read = [
       { actions = local.ddb_read, resources = [local.tbl["proposals"], local.tbl_idx["proposals"], local.tbl["orders"], local.tbl_idx["orders"], local.tbl["parties"]] },
       local.ssm_read,
+      # GET /wallet lee el saldo del token de la Safe en la cadena
+      local.secrets["rpc_url"],
     ]
     # Propuestas, firmas de cierre y atestaciones: escriben propuestas y ordenes, leen partes, y
     # consultan la cadena para ERC-1271 y cancelNonceOf
