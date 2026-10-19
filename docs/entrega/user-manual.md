@@ -39,7 +39,7 @@ Two phones, or one phone and the web version, are enough to play both companies:
 
 ## The test wallets of the live flow
 
-To run the real flow on the deployment, the importer phone must sign with a key that is an owner of the importer's Safe, and the exporter phone with the key of the registered supplier. Those keys are **not printed in this manual or stored in the repository**: the team gives them to you separately, and they only control test funds on Base Sepolia. The public addresses they correspond to are:
+To run the real flow on the deployment, the importer phone must sign with a key that is an owner of the importer's Safe, and the exporter phone with the key of the registered supplier. Those keys are **not printed in this manual or stored in the repository**: they go only in a separate, confidential copy of this manual, for the people who need to try the flow. The importer key is an owner of the importer's Safe, so whoever holds it can act as the company, inside or outside the app. It only controls test funds on Base Sepolia. The public addresses they correspond to are:
 
 | What it is | Address | Where you see it |
 | --- | --- | --- |
@@ -103,7 +103,7 @@ The images use a random example key that controls nothing, so the address in the
 
 * **Do not tap Reset test wallet** on this screen: it deletes the keys of both roles from the phone, the importer's and the exporter's, and you would have to import them again. Nothing is deleted on the server.
 * **There is no Sign a test upload button in the live build.** That check only exists with the example orders of a development build, and the APK of this manual does not show it. If you see it in another build, ignore it: it only signs a sample message and sends nothing.
-* **Treat the keys as secrets**, even though they only control test funds. Do not paste them into chats or repositories. The team can rotate them after the evaluation.
+* **Treat the keys as secrets.** The importer key signs as the company, and both keys only control test funds on Base Sepolia. Do not paste them into chats or repositories. The team can rotate them after the evaluation.
 
 Each role keeps its own key: **Wallet check** lists the test wallet of the importer and of the exporter. If you loaded a key into the wrong role, choose the right role on **Connect** and import the right key there.
 
