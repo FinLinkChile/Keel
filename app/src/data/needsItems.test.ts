@@ -60,6 +60,16 @@ describe('notifications', () => {
     expect(needsItemText(items[1]!, 'importer').title).toBe("Verify Kowloon's account");
   });
 
+  it('tells the importer that a funded order waits for the exporter to ship, and asks nothing of it', async () => {
+    const [item] = await loadNeedsItems(data([{ kind: 'upload_documents', orderId: EXAMPLE }]), 'importer', isProposed);
+    expect(needsItemText(item!, 'importer')).toEqual({
+      title: 'PO-0157 is funded',
+      detail: 'Lingnan ships next. You approve the balance when the shipment is proven',
+    });
+    expect(needsItemText(item!, 'exporter').title).toBe('Upload documents for PO-0157');
+    expect(needsItemHref(item!, 'importer')).toEqual({ pathname: '/order/[orderId]', params: { orderId: EXAMPLE } });
+  });
+
   it('tells the importer why ingest refused an order, and opens the notifications', async () => {
     const [known, unknown] = await loadNeedsItems(
       data([
