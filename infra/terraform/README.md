@@ -40,6 +40,7 @@ La llave de los dueños de la Safe nunca entra aquí. Terraform no crea ni lee l
    | `relayer_private_key`, `policy_signer_private_key`, `pauser_private_key` | Solo con `key_source_* = "ssm"`: las llaves actuales, cuyas direcciones están registradas en `contracts/deployments/84532.json` |
    | `telegram_bot_token` | Token del bot. Sin webhook: si alguna vez se configuró uno, borrarlo con `deleteWebhook` |
    | `bot_inbound_token`, `bot_admin_token`, `directory_admin_token`, `ingest_webhook_token`, `ingest_admin_token` | Tokens de al menos 32 caracteres, todos distintos |
+   | `carrier_private_key` | Solo con `demo_auto_attest = true` (atajo de demo): la llave de prueba de la naviera registrada en las órdenes. Con el atajo, AWS firma la prueba de embarque sola y un BL inventado prueba un embarque |
    | `llm_keys` | JSON `{"anthropic": "…", "openai": "…", "gemini": "…", "compat": "…"}` con las que existan. Con un proxy de Anthropic, `anthropic` es el token del proxy y su URL va en la variable `anthropic_base_url` de Terraform, nunca en el secreto |
 
    Hasta que un secreto exista, la función que lo usa falla al leerlo (`ParameterNotFound`) en vez de seguir sin él.

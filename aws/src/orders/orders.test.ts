@@ -1,4 +1,5 @@
-import { structHash } from "@keel/schemas/hash";
+import type { Hex } from "@keel/schemas";
+import { docsHash, structHash } from "@keel/schemas/hash";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { handler as attest } from "../handlers/attest";
 import { handler as directory } from "../handlers/directory";
@@ -6,6 +7,8 @@ import { handler as orders } from "../handlers/orders";
 import { handler as proposals } from "../handlers/proposals";
 import { handler as registrar } from "../handlers/registrar";
 import { handler as signatures } from "../handlers/signatures";
+import { autoAttest } from "./autoAttest";
+import { ctxOf } from "./context";
 import type { FakeDdb } from "./fakeDdb";
 import {
   arbiter,
@@ -245,5 +248,45 @@ describe("directory", () => {
     const list = await call(directory, owner, "GET /suppliers");
     expect(list.body.safes).toEqual([{ safe: SAFE.toLowerCase(), suppliers: [expect.objectContaining({ name: "Shenzhen Agar Co", payoutAddresses: [payout.address.toLowerCase()] })] }]);
     expect((await call(directory, stranger, "GET /suppliers")).body.error).toBe("not_representative");
+  });
+});
+
+describe("demo auto-attestation (off by default)", () => {
+  const CARRIER_KEY = `0x${(0xca44).toString(16).padStart(64, "0")}`;
+  const deps = (on: boolean, key = CARRIER_KEY) => ({
+    env: { ...process.env, KEEL_DEMO_AUTO_ATTEST: on ? "1" : undefined },
+    carrierKey: async () => key,
+    context: () => ctxOf(),
+  });
+  const BL = "0x" + "11".repeat(32);
+  const INVOICE = "0x" + "22".repeat(32);
+  function withDocuments(orderId: string, invoice = true) {
+    const key = { orderId: orderId.toLowerCase() };
+    const extractions: Record<string, object> = {
+      transport: { doc_type: "BILL_OF_LADING", document_number: "HLIN26100142", on_board_date: String(now() - 3600), port_of_loading: "HKHKG" },
+    };
+    if (invoice) extractions.invoice = { order_number: "PO0001" };
+    ddb.put("orders", { ...ddb.get("orders", key)!, documents: { extractions, fileHashes: invoice ? [BL, INVOICE] : [BL] } });
+  }
+
+  it("stays off without the switch, and waits for the deposit and both documents", async () => {
+    const { po } = await signedOrder();
+    withDocuments(po.orderId);
+    expect(await autoAttest(po.orderId, deps(false))).toBe("off");
+    expect(await autoAttest(po.orderId, deps(true))).toBe("not_funded");
+    mirror(po.orderId, "ADVANCE_PAID");
+    withDocuments(po.orderId, false);
+    expect(await autoAttest(po.orderId, deps(true))).toBe("waiting_documents");
+  });
+
+  it("signs with the order's carrier and stores what POST /shipments would, once", async () => {
+    const { po, params } = await signedOrder();
+    mirror(po.orderId, "ADVANCE_PAID");
+    withDocuments(po.orderId);
+    expect(await autoAttest(po.orderId, deps(true, `0x${"bad".padStart(64, "0")}`))).toBe("carrier_mismatch");
+    expect(await autoAttest(po.orderId, deps(true))).toBe("attested");
+    const view = (await call(orders, owner, "GET /orders/{orderId}", { params })).body;
+    expect(view.shipment.attestation).toMatchObject({ orderId: po.orderId.toLowerCase(), docsHash: docsHash([BL, INVOICE] as Hex[]) });
+    expect(await autoAttest(po.orderId, deps(true))).toBe("already_attested");
   });
 });

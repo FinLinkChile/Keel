@@ -18,9 +18,13 @@
 // it as held, with the notice, and the uploader may upload the same file again.
 // Nothing here pays or changes an order's state. A message that fails is retried by SQS
 // (partial batch response) and ends in the queue's DLQ.
+// DEMO SHORTCUT, off by default: with KEEL_DEMO_AUTO_ATTEST=1, once the order has its bill of
+// lading and invoice, the carrier's attestation is signed and stored here (../orders/autoAttest.ts).
+// Its failure is logged and never fails the reading.
 import type { S3Event, SQSBatchResponse, SQSEvent } from "aws-lambda";
 import { fileHash as keccakFile, MAX_PDF_BYTES, readTradeDocument, READ_EXTRACTOR_FAILED, type Received, type TradeOutcome } from "@keel/ingest";
 import { parseDocumentKey } from "../ingest/objects";
+import { autoAttest, type AutoAttestResult } from "../orders/autoAttest";
 import { defaultRuntime, withTransfers, type IngestRuntime } from "../ingest/runtime";
 
 // A reading that has not finished after this long is taken over by the next delivery. Above
@@ -159,7 +163,22 @@ export function documentKeysOf(body: string): string[] {
     .map((r) => decodeURIComponent(r.s3.object.key.replace(/\+/g, " ")));
 }
 
-export function createExtractorHandler(runtime: () => IngestRuntime = () => defaultRuntime()) {
+// After a document of an order is read (now or by an earlier delivery): the demo attestation
+async function afterRead(key: string, attestOrder: (orderId: string) => Promise<AutoAttestResult>) {
+  const id = parseDocumentKey(key);
+  if (!id) return;
+  try {
+    const result = await attestOrder(id.orderId);
+    if (result !== "off") log({ event: "demo_auto_attest", orderId: id.orderId, result });
+  } catch (e) {
+    log({ event: "demo_auto_attest", orderId: id.orderId, result: "failed", error: (e as Error).message });
+  }
+}
+
+export function createExtractorHandler(
+  runtime: () => IngestRuntime = () => defaultRuntime(),
+  attestOrder: (orderId: string) => Promise<AutoAttestResult> = (orderId) => autoAttest(orderId),
+) {
   return async (event: SQSEvent): Promise<SQSBatchResponse> => {
     const rt = runtime();
     const batchItemFailures: SQSBatchResponse["batchItemFailures"] = [];
@@ -170,6 +189,7 @@ export function createExtractorHandler(runtime: () => IngestRuntime = () => defa
           const result = await readObject(rt, key, { lastAttempt });
           // Someone else holds a fresh claim: retry later rather than drop the message
           if (result === "being_read") throw new Error("reading in progress elsewhere");
+          if (result === "read" || result === "already_read") await afterRead(key, attestOrder);
         }
       } catch (e) {
         console.error(JSON.stringify({ event: "trade_document_read_failed", messageId: record.messageId, error: (e as Error).message }));

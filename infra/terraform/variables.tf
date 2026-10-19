@@ -190,6 +190,12 @@ variable "anthropic_base_url" {
   }
 }
 
+variable "demo_auto_attest" {
+  description = "ATAJO DE DEMO: el extractor firma la prueba de embarque con la llave de prueba de la naviera (secreto carrier_private_key) cuando la orden tiene BL y factura. Rompe la separacion de poderes: un BL inventado prueba un embarque. Solo en un despliegue de prueba"
+  type        = bool
+  default     = false
+}
+
 variable "log_block_range" {
   description = "Bloques por consulta eth_getLogs (KEEL_LOG_RANGE). La URL publica de Base Sepolia acepta 200; un proveedor pagado o Alchemy puede aceptar mas"
   type        = number
