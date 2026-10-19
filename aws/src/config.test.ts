@@ -1,6 +1,6 @@
 import { GetParametersByPathCommand, type SSMClient } from "@aws-sdk/client-ssm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { deployment, resetDeploymentCache } from "./config";
+import { ConfigError, DEFAULT_LOG_RANGE, deployment, logRange, resetDeploymentCache } from "./config";
 
 const ADDRESS = (n: number) => `0x${n.toString(16).padStart(40, "0")}`;
 
@@ -28,5 +28,17 @@ describe("deployment()", () => {
     // Cached once it works
     await deployment(env, ssm);
     expect(calls).toBe(2);
+  });
+});
+
+describe("logRange()", () => {
+  it("defaults to 200 blocks, what the public Base Sepolia endpoint allows per eth_getLogs", () => {
+    expect(DEFAULT_LOG_RANGE).toBe(200n);
+    expect(logRange({})).toBe(200n);
+  });
+
+  it("takes KEEL_LOG_RANGE for a provider that allows more, and refuses anything but a positive integer", () => {
+    expect(logRange({ KEEL_LOG_RANGE: "2000" })).toBe(2000n);
+    for (const bad of ["0", "-5", "2k", "1.5"]) expect(() => logRange({ KEEL_LOG_RANGE: bad })).toThrow(ConfigError);
   });
 });

@@ -24,7 +24,7 @@ import {
   toNotices,
 } from "@keel/engine";
 import type { LocalAccount } from "viem";
-import { ConfigError, type Env, required } from "../config";
+import { ConfigError, type Env, logRange, required } from "../config";
 import { lower } from "../db";
 import { loadKeys, type ServerKeys } from "../keys";
 import { acquire, type Lock } from "../lock";
@@ -62,7 +62,7 @@ export function defaultDeps(env: Env = process.env): AgentPassDeps {
       // Escrow logs are searched from the deployment block: RPC providers cap the range of getLogs
       // The receipt wait stays well inside the function timeout (viem waits 180 s by default): a
       // transaction mined after it is found by the next pass, which re-reads the order
-      const chain = rpcChain(await rpcUrl(env), relayer, { receiptTimeoutMs: RECEIPT_TIMEOUT_MS, ...(ctx.deployBlock > 0n && { fromBlock: ctx.deployBlock }) });
+      const chain = rpcChain(await rpcUrl(env), relayer, { receiptTimeoutMs: RECEIPT_TIMEOUT_MS, logRange: logRange(env), ...(ctx.deployBlock > 0n && { fromBlock: ctx.deployBlock }) });
       const id = await chain.chainId();
       if (id !== ctx.chainId) throw new ConfigError(`the RPC serves chain ${id}, not ${ctx.chainId}`);
       return chain;

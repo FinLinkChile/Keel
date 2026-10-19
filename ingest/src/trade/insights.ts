@@ -176,6 +176,16 @@ export function toFindings(raw: string, input: AnalysisInput): Finding[] {
   });
 }
 
+// Body of POST /trade/insights, on the local server and on AWS (aws/src/handlers/insights.ts)
+export const InsightsBody = z
+  .object({
+    issuedAt: z.number().int().positive(),
+    signature: z.string().regex(/^0x[0-9a-fA-F]{130}$/),
+    // The metrics as JSON text, exactly as signed
+    input: z.string().max(MAX_INPUT_BYTES),
+  })
+  .strict();
+
 export interface InsightsRequest {
   issuedAt: number;
   signature: Hex;
@@ -187,6 +197,16 @@ export type InsightsOutcome =
   | { status: "rejected"; reason: "too_large" | "invalid_request" | "bad_signature" | "stale_signature" | "not_an_importer" | "rate_limited" }
   | { status: "failed"; reason: ExtractionError["reason"] }
   | { status: "ok"; inputHash: Hex; findings: Finding[] };
+
+// HTTP status of each rejection, the same on both servers
+export const INSIGHTS_REJECTION_STATUS: Record<Extract<InsightsOutcome, { status: "rejected" }>["reason"], number> = {
+  too_large: 413,
+  invalid_request: 400,
+  bad_signature: 401,
+  stale_signature: 401,
+  not_an_importer: 403,
+  rate_limited: 429,
+};
 
 export const inputHash = (input: string): Hex => keccak256(stringToBytes(input)) as Hex;
 

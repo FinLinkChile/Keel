@@ -39,6 +39,17 @@ async function viewFrom(state: string, over: Partial<OrderView> = {}): Promise<O
 }
 
 describe('orderFromView', () => {
+  it('shows the documents the API accepted, so a reload does not ask for them again', async () => {
+    const details = { transport: { document_number: 'HLIN26100142', port_of_loading: 'HKHKG' }, invoice: { order_number: 'PO0001' } };
+    const v = await viewFrom('ADVANCE_PAID', { documents: { fileHashes: ['0x01', '0x02'], received: ['BILL_OF_LADING', 'COMMERCIAL_INVOICE'], details } });
+    expect(orderFromView(v, 'harbor-line').documentDetails).toEqual(details);
+    expect(orderFromView(v, 'harbor-line').documents).toEqual([
+      { docType: 'BILL_OF_LADING', status: 'accepted' },
+      { docType: 'COMMERCIAL_INVOICE', status: 'accepted' },
+    ]);
+    expect(orderFromView(await viewFrom('ADVANCE_PAID'), 'harbor-line').documents).toEqual([]);
+  });
+
   it('shows the escrow state as the stage of the screens', async () => {
     const stages = await Promise.all(
       ['NONE', 'OPEN', 'ADVANCE_PAID', 'SHIPPED', 'DISPUTED', 'SETTLED', 'REFUNDED', 'RESOLVED', 'CANCELLED'].map(async (s) => orderFromView(await viewFrom(s), 'harbor-line').stage),
@@ -92,14 +103,31 @@ describe('withApi', () => {
     const api = {
       wallet: vi.fn(async () => [{ safe: '0x', byState: {}, locked: '35000000000', pendingFunding: '0', orders: [] }]),
       listOrders: vi.fn(async () => [await viewFrom('SHIPPED', { you: ['exporter'], locked: '20000' })]),
+      payouts: vi.fn(async () => []),
     };
     const d = withApi(base, api as unknown as ApiClient, () => ({ importer, exporter }));
     expect((await d.wallet('importer')).lockedMinor).toBe(3_500_000n);
+    expect((await d.wallet('importer')).availableMinor).toBe((await base.wallet('importer')).availableMinor);
     expect((await d.wallet('exporter')).lockedMinor).toBe(2n);
     const down = withApi(base, { wallet: async () => Promise.reject(new ApiError(0, 'network')) } as unknown as ApiClient, () => ({ importer }));
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     expect((await down.wallet('importer')).lockedMinor).toBe(0n);
     warn.mockRestore();
+  });
+
+  it("shows the Safe's balance on chain as available, in cents", async () => {
+    const api = { wallet: vi.fn(async () => [{ safe: '0x', byState: {}, locked: '0', pendingFunding: '0', available: '35000000', orders: [] }]) };
+    const d = withApi(base, api as unknown as ApiClient, () => ({ importer }));
+    expect((await d.wallet('importer')).availableMinor).toBe(3_500n);
+  });
+
+  it("shows the exporter's payout balance on chain as available, in cents", async () => {
+    const api = {
+      listOrders: vi.fn(async () => []),
+      payouts: vi.fn(async () => [{ address: '0xa', available: '300000' }, { address: '0xb' }]),
+    };
+    const d = withApi(base, api as unknown as ApiClient, () => ({ exporter }));
+    expect((await d.wallet('exporter')).availableMinor).toBe(30n);
   });
 
   it('lists and opens the orders of the API', async () => {

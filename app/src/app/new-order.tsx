@@ -97,7 +97,7 @@ function NewOrderScreen() {
     setStep('signing');
     setPhase('reading');
     const result = await readProforma({
-      ingestUrl: config.ingestUrl,
+      ingestUrl: config.tradeReadUrl,
       chainId: config.chainId,
       signer: {
         address: () => signer.address(),

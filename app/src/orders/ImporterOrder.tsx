@@ -17,6 +17,7 @@ import { colors } from '@/ui/theme';
 import { tokenToCents } from '@/data/amounts';
 
 import { ClosingActions } from './ClosingActions';
+import { OrderComplete, ShipmentDocuments } from './ShipmentDocuments';
 import { Frame } from './parts';
 
 // 05 Order in progress, for the importer: the same timeline for every order, whether it came from
@@ -116,6 +117,8 @@ export function ImporterOrder({ orderId }: { orderId: Hex }) {
         </Text>
       )}
 
+      <OrderComplete order={order} role="importer" />
+
       {demoOnly ? (
         <Text size={14} leading={1.45} style={{ color: colors.yourTurn }}>
           {t(NOT_ON_THIS_PHONE)}
@@ -128,6 +131,8 @@ export function ImporterOrder({ orderId }: { orderId: Hex }) {
         </Text>
         <Steps steps={steps} />
       </View>
+
+      <ShipmentDocuments order={order} />
 
       <ClosingActions orderId={po.orderId} role="importer" />
 

@@ -7,6 +7,7 @@ import { tokenToCents } from '@/data/amounts';
 import { loadNeedsItems, needsItemHref, type NeedsItem } from '@/data/needsItems';
 import { useT } from '@/i18n';
 import { ActivityList } from '@/orders/ActivityList';
+import { ApiNotice } from '@/orders/ApiNotice';
 import { useSession } from '@/session';
 import { Amount } from '@/ui/Amount';
 import { Avatar } from '@/ui/Avatar';
@@ -81,6 +82,9 @@ export default function Home() {
           ) : null}
         </Pressable>
       </View>
+
+      {/* Before the money and the list: both may come from this phone while Keel is not answering */}
+      <ApiNotice />
 
       <WalletCard
         wallet={wallet}

@@ -107,3 +107,13 @@ resource "aws_lambda_permission" "schedule" {
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.schedule[each.key].arn
 }
+
+# Las funciones programadas corren de nuevo al minuto siguiente: si una falla, AWS no la reintenta
+# (por defecto lo hace dos veces), para no triplicar los errores, los registros y el costo cuando
+# falta algo que el reintento no arregla, como un secreto sin cargar.
+resource "aws_lambda_function_event_invoke_config" "schedule" {
+  for_each = local.schedules
+
+  function_name          = aws_lambda_function.fn[each.key].function_name
+  maximum_retry_attempts = 0
+}

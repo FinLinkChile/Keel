@@ -85,7 +85,8 @@ const safeMessage = (digest: Hex) => ({
 export const signAsSafe = (who: Account, primaryType: Struct, message: object): Promise<Hex> =>
   who.signTypedData(safeMessage(escrowDigest(CHAIN, ESCROW, primaryType, message)) as never);
 
-export const chainState = { cancelNonce: 0n, owners: [owner.address as Hex] };
+// balance: what the fake token answers to balanceOf; undefined makes the RPC fail
+export const chainState: { cancelNonce: bigint; owners: Hex[]; balance: bigint | undefined } = { cancelNonce: 0n, owners: [owner.address as Hex], balance: 0n };
 
 // The fake chain: SAFE has code and answers isValidSignature like a 1-of-1 Safe
 export function fakeChain(): ChainDeps {
@@ -93,6 +94,10 @@ export function fakeChain(): ChainDeps {
     getCode: (async ({ address }: { address: Hex }) => (isAddressEqual(address, SAFE) ? "0x6080" : undefined)) as never,
     readContract: (async ({ address, functionName, args }: { address: Hex; functionName: string; args: [Hex, Hex] }) => {
       if (functionName === "cancelNonceOf") return chainState.cancelNonce;
+      if (functionName === "balanceOf") {
+        if (chainState.balance === undefined) throw new Error("rpc down");
+        return chainState.balance;
+      }
       if (!isAddressEqual(address, SAFE)) throw new Error("no code");
       try {
         const signer = await recoverTypedDataAddress({ ...safeMessage(args[0]), signature: args[1] } as never);
@@ -123,6 +128,7 @@ export async function setup() {
   setDdb(ddb.asClient());
   setChainDeps(fakeChain());
   chainState.cancelNonce = 0n;
+  chainState.balance = 0n;
   resetDeploymentCache();
   const values: Record<string, string> = { "chain-id": String(CHAIN), escrow: ESCROW, safe: SAFE, token: TOKEN, "funding-gate": GATE, "deploy-block": "100" };
   const ssm = { send: async () => ({ Parameters: Object.entries(values).map(([k, v]) => ({ Name: `/keel/test/${k}`, Value: v })) }) } as unknown as SSMClient;
