@@ -133,8 +133,7 @@
             </div>
             <div class="pains" style="flex-direction:column;align-items:flex-start;margin-top:110px">${t.pains.map((p) => `<span class="chip a-pain"><span class="dot" style="background:#FF6A5C"></span>${p}</span>`).join('')}</div>
           </div>
-        </div>
-        <div class="source a-src">${t.source}</div>`,
+        </div>`,
       enter: (root, tl) => {
         intro(tl, root);
         tl.add($$(root, '.a-party'), { opacity: [0, 1], scale: [0.6, 1], duration: 700, delay: stagger(150), ease: 'outBack' }, 300);
@@ -149,7 +148,6 @@
         tl.add($(root, '.a-mail'), { opacity: [0, 1], y: [120, 0], rotate: [6, -2], duration: 1100, ease: 'outBack' }, 3600);
         tl.add($(root, '.a-stamp'), { opacity: [0, 1], scale: [2.4, 1], duration: 500, ease: 'outBack' }, 4700);
         tl.add($$(root, '.a-pain'), { opacity: [0, 1], x: [-30, 0], duration: 600, delay: stagger(140), ease: 'outExpo' }, 5300);
-        tl.add($(root, '.a-src'), { opacity: [0, 1], duration: 600 }, 5800);
       },
     },
     {

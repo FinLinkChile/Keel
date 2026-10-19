@@ -22,9 +22,8 @@ window.KEEL_TEXT = {
       question: 'Who pays first?',
       payFirst: 'Camila pays first', payFirstRisk: 'The supplier may never ship.',
       payLater: 'Camila pays later', payLaterRisk: 'The supplier will not ship without payment.',
-      pains: ['Slow bank transfers', '~USD 75 per transfer', 'Orders on paper and email'],
+      pains: ['Slow bank transfers', 'Bank fees on every transfer', 'Orders on paper and email'],
       mailFrom: 'From: accounts@lingnan-hk.co', mailSubject: 'New bank account', mailBody: 'Dear Camila, our bank changed. Please send the balance to this account:', mailAccount: 'HK 0099 7731 4410', stamp: 'FRAUD',
-      source: 'Costs and pains from an interview with a Chilean importer. Fake account email: the most common fraud in foreign trade.',
       notes: {
         time: '0:45',
         say: 'This is Camila. She buys for Andes Tech, an electronics company in Chile. She imports twenty-four thousand electronic components from Lingnan, a supplier in Hong Kong. The order is eighty-seven thousand dollars. So, who pays first? If Camila pays first, the supplier may never ship. If she waits, the supplier will not ship without payment. Today she uses bank transfers that are slow and expensive. And one day, an email arrives: "We changed our bank account." It looks real. It is fraud.',

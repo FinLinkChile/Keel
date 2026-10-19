@@ -22,9 +22,8 @@ window.KEEL_TEXT = {
       question: '¿Quién paga primero?',
       payFirst: 'Camila paga antes', payFirstRisk: 'El proveedor puede no embarcar nunca.',
       payLater: 'Camila paga después', payLaterRisk: 'El proveedor no embarca sin pago.',
-      pains: ['Transferencias lentas', '~USD 75 por transferencia', 'Órdenes en papel y correo'],
+      pains: ['Transferencias lentas', 'Comisión en cada transferencia', 'Órdenes en papel y correo'],
       mailFrom: 'De: accounts@lingnan-hk.co', mailSubject: 'Nueva cuenta bancaria', mailBody: 'Estimada Camila, cambiamos de banco. Por favor envíe el saldo a esta cuenta:', mailAccount: 'HK 0099 7731 4410', stamp: 'FRAUDE',
-      source: 'Costos y dolores de una entrevista con un importador chileno. El correo de cambio de cuenta es el fraude más común del comercio exterior.',
       notes: {
         time: '0:45',
         say: 'Ella es Camila. Compra para Andes Tech, una empresa de electrónica en Chile. Importa veinticuatro mil componentes electrónicos de Lingnan, un proveedor en Hong Kong. La orden es de ochenta y siete mil dólares. Entonces, ¿quién paga primero? Si Camila paga antes, el proveedor puede no embarcar nunca. Si espera, el proveedor no embarca sin pago. Hoy usa transferencias bancarias lentas y caras. Y un día llega un correo: "Cambiamos nuestra cuenta bancaria". Parece real. Es un fraude.',
