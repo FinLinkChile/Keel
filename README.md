@@ -264,6 +264,8 @@ Start it from `app/` (not from the repository root) with `npx expo start -c`. Wi
 
 For the same walk-through screen by screen, with screenshots, see the [user manual](docs/entrega/user-manual.md).
 
+To try the app without building it, install the test APK (`keel.apk`) from https://github.com/FinLinkChile/Keel/releases/latest , under **Assets**.
+
 1. **Importer:** create an order with the registered supplier and sign it.
 2. **Exporter:** open the order and sign it. The agent opens it in the escrow and funds it on its next pass (every minute on AWS). The advance reaches the exporter's payout address.
 3. **Exporter:** upload the bill of lading and the commercial invoice. Ingest reads them.

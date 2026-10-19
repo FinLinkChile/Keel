@@ -30,7 +30,7 @@ Keel Trade is deployed on **Base Sepolia**, a public test network, with test USD
 
 | You need | Details |
 | --- | --- |
-| The Android app (APK) | Install the Keel test build on an Android phone. It already points to the Keel API on AWS and to the contracts on Base Sepolia, so there is nothing to configure. Two phones let you play both companies, or use one phone and play them one after the other |
+| The Android app (APK) | Download `keel.apk` from https://github.com/FinLinkChile/Keel/releases/latest : the latest release of the Keel repository, under **Assets**. Install it on an Android phone, and if Android asks, allow the installation of apps from that source. It is the Keel test build. It already points to the Keel API on AWS and to the contracts on Base Sepolia, so there is nothing to configure. Two phones let you play both companies, or use one phone and play them one after the other |
 | The two test keys | One for the importer and one for the exporter, imported in the app (see below) |
 | One document kit | Three PDF files (proforma, bill of lading, commercial invoice) for one order of USD 1.00. See [The documents of the test order](#the-documents-of-the-test-order) |
 | Nothing else on your side | The two companies are already registered in the backend and the agent already runs on AWS. The carrier is not an app user: in this deployment AWS signs its attestation automatically (step 6) |
