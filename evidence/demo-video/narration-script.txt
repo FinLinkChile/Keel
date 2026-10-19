@@ -1,0 +1,31 @@
+This is Keel, by team FinLink. Keel is a company wallet run by an AI agent. It pays an international purchase order only when the proof exists.
+
+Pacifico Foods, a food importer in Chile, buys forty eight thousand dollars of agar from Lingnan, a supplier in Hong Kong. They have never met. So who pays first? If Pacifico pays first, the goods may never ship. If it pays later, the supplier will not ship at all. And one day an email arrives: we changed our bank account. It looks real. It is fraud.
+
+So we built Keel: a company wallet, run by an AI agent. The importer keeps its own key. The agent acts only inside the limits the company sets. And the money waits in a smart contract, until the proof exists.
+
+What you see next is the real app, talking to our API on AWS, with real transactions on Base Sepolia, a public test network. The order is one test dollar.
+
+Pacifico Foods signs up as an importer. The balance on screen comes from the company's Safe wallet, on chain.
+
+The importer starts a new order and uploads the supplier's proforma. On AWS, our quarantined AI reads it and returns typed fields only: the amount, the deadline, the incoterm and the HS code. It never returns the payee account. Thirty percent goes as an advance, seventy percent when the shipment is proven, and Harbor Line is the carrier. The order goes to Lingnan.
+
+Lingnan, the supplier, opens the same order. It sees exactly where it will be paid. That account is part of what both companies sign, so no email can change it later. Lingnan signs with its own wallet: a signature over structured data, not over a PDF.
+
+The importer signs last. It signs the terms; it does not send money. From here, the agent takes over.
+
+Within a minute, the agent on AWS checks the company's policy and deposits the dollar into the escrow, through the funding gate. In the same transaction, the contract pays the thirty cent advance to Lingnan. Every step leaves a hash on a public block explorer.
+
+Lingnan ships the goods and uploads the bill of lading and the invoice, each upload signed by its wallet. The AI reads them, and the rules engine compares them with the signed order: the order number, the amount and the HS code.
+
+Harbor Line, the carrier, signs that the cargo is on board: a second, independent signature, and the agent submits the shipment. The documents match the order, so the importer approves the balance with its own signature. Without it, the verifier releases it after the dispute window. The contract pays the seventy cents to Lingnan, and the order is complete.
+
+And if the supplier never ships? The deadline passes, and the balance goes back to the importer. Anyone can trigger the refund, so the importer depends on no one.
+
+What if the AI is tricked? The AI only reads. The engine decides. People authorize. The contract executes. A fake account email changes nothing, because the account comes from the signed order.
+
+And if someone steals the agent's key and tries to pay an account the company never approved, the funding gate rejects it on chain. Here is that rejection, with its own hash. The AI can fail. The money does not move.
+
+The agent also helps the importer buy better: trends, supplier dependence, and the cash coming up, fitted to the size of the company. It sees only numbers, with suppliers as S1 and S2, never documents or names. It cannot sign, and it cannot move money. Next, predictive models trained on each company's own data.
+
+Two companies signed once, and the money waited for the proof. Seven attacks rejected on chain, each with a public hash. Two hundred ninety four contract tests, all passing. And zero owner keys on a server. This is Keel. Thank you.

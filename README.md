@@ -11,19 +11,30 @@ Built for the 2026 Shenzhen FinTechathon, International Track, Topic F: Agent Wa
 
 ## Contents
 
-1. [How Keel Trade works](#how-keel-trade-works)
-2. [How Keel Personal works](#how-keel-personal-works)
-3. [Architecture](#architecture)
-4. [Repository layout](#repository-layout)
-5. [Live test deployment](#live-test-deployment)
-6. [Getting started](#getting-started)
-7. [Run everything locally](#run-everything-locally)
-8. [Deploy the contracts](#deploy-the-contracts)
-9. [Deploy the backend on AWS](#deploy-the-backend-on-aws)
-10. [Run the app against AWS](#run-the-app-against-aws)
-11. [Walk through an order end to end](#walk-through-an-order-end-to-end)
-12. [Security notes](#security-notes)
-13. [Documentation](#documentation)
+1. [Demo video](#demo-video)
+2. [How Keel Trade works](#how-keel-trade-works)
+3. [How Keel Personal works](#how-keel-personal-works)
+4. [Architecture](#architecture)
+5. [Repository layout](#repository-layout)
+6. [Live test deployment](#live-test-deployment)
+7. [Getting started](#getting-started)
+8. [Run everything locally](#run-everything-locally)
+9. [Deploy the contracts](#deploy-the-contracts)
+10. [Deploy the backend on AWS](#deploy-the-backend-on-aws)
+11. [Run the app against AWS](#run-the-app-against-aws)
+12. [Walk through an order end to end](#walk-through-an-order-end-to-end)
+13. [Security notes](#security-notes)
+14. [Documentation](#documentation)
+
+## Demo video
+
+[keel-demo-video.mp4](keel-demo-video.mp4) (4:18, English, 1080p) walks through Keel Trade. Its live part is a real run of the app against the Keel API on AWS and the contracts on Base Sepolia, recorded on 19 Oct 2026 with an order of one test dollar: the AI reads the proforma, both companies sign, the agent deposits and pays the advance, the exporter uploads the bill of lading and the invoice, Harbor Line attests the shipment and the balance is paid.
+
+The evidence of that run is in [evidence/demo-video/](evidence/demo-video/):
+
+* [execution-evidence.md](evidence/demo-video/execution-evidence.md): the order, the API calls and the transaction hash of every step, plus the on-chain rejection shown in the video.
+* [keel-demo-video.en.srt](evidence/demo-video/keel-demo-video.en.srt): English subtitles.
+* [narration-script.txt](evidence/demo-video/narration-script.txt): the narration script.
 
 ## How Keel Trade works
 
@@ -72,7 +83,7 @@ The backend runs in one of two ways: **locally** (ingest server, engine agent an
 | `app/` | React Native (Expo) app | 4 |
 | `bot/` | Telegram bot with template messages | 4 |
 | `redteam/` | Attack scenarios, adversarial corpus, metrics, on-chain evidence scripts | 5 |
-| `evidence/` | PDR records and on-chain evidence | 5 |
+| `evidence/` | PDR records, on-chain evidence and the evidence of the demo video run | 5 |
 | `docs/` | Project goal, flow, design, decisions and security analysis | 5 |
 
 Each folder has its own README with the details of how to run it.

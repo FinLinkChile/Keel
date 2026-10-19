@@ -1,0 +1,251 @@
+1
+00:00:00,500 --> 00:00:02,669
+This is Keel, by team FinLink.
+
+2
+00:00:02,719 --> 00:00:05,924
+Keel is a company wallet run by an AI agent.
+
+3
+00:00:05,974 --> 00:00:10,880
+It pays an international purchase order only when the proof exists.
+
+4
+00:00:11,830 --> 00:00:19,807
+Pacifico Foods, a food importer in Chile, buys forty eight thousand dollars of agar from Lingnan, a supplier in Hong Kong.
+
+5
+00:00:19,857 --> 00:00:21,123
+They have never met.
+
+6
+00:00:21,173 --> 00:00:22,308
+So who pays first?
+
+7
+00:00:22,358 --> 00:00:25,532
+If Pacifico pays first, the goods may never ship.
+
+8
+00:00:25,582 --> 00:00:28,953
+If it pays later, the supplier will not ship at all.
+
+9
+00:00:29,003 --> 00:00:32,769
+And one day an email arrives: we changed our bank account.
+
+10
+00:00:32,819 --> 00:00:33,690
+It looks real.
+
+11
+00:00:33,740 --> 00:00:34,480
+It is fraud.
+
+12
+00:00:35,430 --> 00:00:39,278
+So we built Keel: a company wallet, run by an AI agent.
+
+13
+00:00:39,328 --> 00:00:41,476
+The importer keeps its own key.
+
+14
+00:00:41,526 --> 00:00:45,374
+The agent acts only inside the limits the company sets.
+
+15
+00:00:45,424 --> 00:00:49,910
+And the money waits in a smart contract, until the proof exists.
+
+16
+00:00:50,860 --> 00:01:00,292
+What you see next is the real app, talking to our API on AWS, with real transactions on Base Sepolia, a public test network.
+
+17
+00:01:00,342 --> 00:01:02,510
+The order is one test dollar.
+
+18
+00:01:03,460 --> 00:01:06,108
+Pacifico Foods signs up as an importer.
+
+19
+00:01:06,158 --> 00:01:10,880
+The balance on screen comes from the company's Safe wallet, on chain.
+
+20
+00:01:11,830 --> 00:01:16,157
+The importer starts a new order and uploads the supplier's proforma.
+
+21
+00:01:16,207 --> 00:01:24,009
+On AWS, our quarantined AI reads it and returns typed fields only: the amount, the deadline, the incoterm and the HS code.
+
+22
+00:01:24,059 --> 00:01:26,262
+It never returns the payee account.
+
+23
+00:01:26,312 --> 00:01:33,407
+Thirty percent goes as an advance, seventy percent when the shipment is proven, and Harbor Line is the carrier.
+
+24
+00:01:33,457 --> 00:01:35,080
+The order goes to Lingnan.
+
+25
+00:01:36,030 --> 00:01:39,081
+Lingnan, the supplier, opens the same order.
+
+26
+00:01:39,131 --> 00:01:41,760
+It sees exactly where it will be paid.
+
+27
+00:01:41,810 --> 00:01:47,539
+That account is part of what both companies sign, so no email can change it later.
+
+28
+00:01:47,589 --> 00:01:53,460
+Lingnan signs with its own wallet: a signature over structured data, not over a PDF.
+
+29
+00:01:54,410 --> 00:01:56,088
+The importer signs last.
+
+30
+00:01:56,138 --> 00:01:59,185
+It signs the terms; it does not send money.
+
+31
+00:01:59,235 --> 00:02:01,490
+From here, the agent takes over.
+
+32
+00:02:02,440 --> 00:02:10,913
+Within a minute, the agent on AWS checks the company's policy and deposits the dollar into the escrow, through the funding gate.
+
+33
+00:02:10,963 --> 00:02:16,107
+In the same transaction, the contract pays the thirty cent advance to Lingnan.
+
+34
+00:02:16,157 --> 00:02:19,570
+Every step leaves a hash on a public block explorer.
+
+35
+00:02:20,520 --> 00:02:27,339
+Lingnan ships the goods and uploads the bill of lading and the invoice, each upload signed by its wallet.
+
+36
+00:02:27,389 --> 00:02:35,320
+The AI reads them, and the rules engine compares them with the signed order: the order number, the amount and the HS code.
+
+37
+00:02:36,270 --> 00:02:44,188
+Harbor Line, the carrier, signs that the cargo is on board: a second, independent signature, and the agent submits the shipment.
+
+38
+00:02:44,238 --> 00:02:49,854
+The documents match the order, so the importer approves the balance with its own signature.
+
+39
+00:02:49,904 --> 00:02:53,713
+Without it, the verifier releases it after the dispute window.
+
+40
+00:02:53,763 --> 00:02:58,320
+The contract pays the seventy cents to Lingnan, and the order is complete.
+
+41
+00:02:59,270 --> 00:03:01,290
+And if the supplier never ships?
+
+42
+00:03:01,340 --> 00:03:05,365
+The deadline passes, and the balance goes back to the importer.
+
+43
+00:03:05,415 --> 00:03:09,570
+Anyone can trigger the refund, so the importer depends on no one.
+
+44
+00:03:10,520 --> 00:03:12,344
+What if the AI is tricked?
+
+45
+00:03:12,394 --> 00:03:13,641
+The AI only reads.
+
+46
+00:03:13,691 --> 00:03:15,011
+The engine decides.
+
+47
+00:03:15,061 --> 00:03:16,236
+People authorize.
+
+48
+00:03:16,286 --> 00:03:17,822
+The contract executes.
+
+49
+00:03:17,872 --> 00:03:24,020
+A fake account email changes nothing, because the account comes from the signed order.
+
+50
+00:03:24,970 --> 00:03:33,641
+And if someone steals the agent's key and tries to pay an account the company never approved, the funding gate rejects it on chain.
+
+51
+00:03:33,691 --> 00:03:36,437
+Here is that rejection, with its own hash.
+
+52
+00:03:36,487 --> 00:03:37,502
+The AI can fail.
+
+53
+00:03:37,552 --> 00:03:39,100
+The money does not move.
+
+54
+00:03:40,050 --> 00:03:49,047
+The agent also helps the importer buy better: trends, supplier dependence, and the cash coming up, fitted to the size of the company.
+
+55
+00:03:49,097 --> 00:03:54,217
+It sees only numbers, with suppliers as S1 and S2, never documents or names.
+
+56
+00:03:54,267 --> 00:03:57,006
+It cannot sign, and it cannot move money.
+
+57
+00:03:57,056 --> 00:04:01,020
+Next, predictive models trained on each company's own data.
+
+58
+00:04:01,970 --> 00:04:06,158
+Two companies signed once, and the money waited for the proof.
+
+59
+00:04:06,208 --> 00:04:10,055
+Seven attacks rejected on chain, each with a public hash.
+
+60
+00:04:10,105 --> 00:04:13,610
+Two hundred ninety four contract tests, all passing.
+
+61
+00:04:13,660 --> 00:04:15,798
+And zero owner keys on a server.
+
+62
+00:04:15,848 --> 00:04:16,686
+This is Keel.
+
+63
+00:04:16,736 --> 00:04:17,370
+Thank you.
