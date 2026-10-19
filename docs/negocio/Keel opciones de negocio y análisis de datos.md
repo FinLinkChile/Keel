@@ -4,6 +4,8 @@ Oct 16, 2026 · @Daniela Ávila · actualizado el 18 de octubre de 2026
 
 ## Decisión: Keel es rentista, asociado a un banco
 
+**[PROPUESTA, por evaluar]** El banco socio es una propuesta del equipo para hacer rentable el proyecto, con un banco como WeBank como socio posible y respaldo. **No hay ningún acuerdo ni conversación con WeBank ni con otro banco**, y la integración bancaria no está construida: queda como evaluación en los próximos pasos ([alcance](../flujo/alcance.md)). Los ingresos pueden venir del rendimiento del dinero retenido en el escrow, de comisiones por servicio (por ejemplo en el caso híbrido de crédito) o de ambos. Lo que Keel sí propone eliminar son las comisiones de los bancos intermediarios en cada transferencia, dejando un solo banco que garantiza que el dinero existe.
+
 **Modelo elegido (18 de octubre de 2026):** Keel gana con la plata que queda depositada y bloqueada en las órdenes. Esa plata se trabaja en instrumentos de inversión seguros y Keel se queda con la utilidad. **El cliente no paga comisión**: ese es el beneficio que lo atrae.
 
 **Siempre a través de un banco socio.** El banco recibe y mantiene los fondos bajo su licencia (cuenta segregada o depósito tokenizado), los invierte y comparte la utilidad con Keel. Keel no capta dinero del público ni invierte por su cuenta: aporta la orden firmada, el control del bloqueo y los datos verificados.
