@@ -35,9 +35,7 @@ Keel Trade is deployed on **Base Sepolia**, a public test network, with test USD
 | One document kit | Three PDF files (proforma, bill of lading, commercial invoice) for one order of USD 1.00. See [The documents of the test order](#the-documents-of-the-test-order) |
 | Nothing else on your side | The two companies are already registered in the backend and the agent already runs on AWS. The carrier is not an app user: in this deployment AWS signs its attestation automatically (step 6) |
 
-If you run the app from the source code instead of the APK (web version or Expo Go), it reads its address and the contract addresses from `app/.env`. That is covered at the end, in [Running from source](#running-from-source).
-
-Two phones, or one phone and the web version, are enough to play both companies: the importer and the exporter. The order is always between those two.
+Two phones, or one phone and the web version, are enough to play both companies: the importer and the exporter. The web version is at [keel-app-finlink.vercel.app](https://keel-app-finlink.vercel.app). The order is always between those two.
 
 ## The test wallets of the live flow
 
@@ -46,7 +44,7 @@ To run the real flow on the deployment, the importer phone must sign with a key 
 | What it is | Address | Where you see it |
 | --- | --- | --- |
 | **Importer wallet**, the key you import. It is an owner of the importer's Safe and signs for it | `0xDAAb8A39035c26bff57B35827E91145BbB4Be52B` | **Connected wallet** in **Wallet check** |
-| Importer **Safe** (Pacífico Foods): the company account that holds the funds. It is not a key, so you never import it | `0x366E72921895dBFD7688822418BE43E02551Ee82` | The balance on the importer's **Home** |
+| Importer **Safe**: the company account that holds the funds. It is not a key, so you never import it | `0x366E72921895dBFD7688822418BE43E02551Ee82` | The balance on the importer's **Home** |
 | **Exporter wallet**, the key you import. It is also the payout account of Lingnan | `0xC419891eE6bdEfa7aE285961C743047E34E1320d` | **Connected wallet** in **Wallet check**, and **Paid only to this account** on the order |
 | Carrier, Harbor Line (demo key). AWS signs with it in this deployment | `0xB4B5591aFF224D76dE4D59F9fD832f5aC26B7708` | The transaction on the block explorer |
 | `TradeEscrow`: the contract that holds each order | `0x8346c6F1AfbaFF8140D35116fAF5ec07e4232970` | The block explorer |
@@ -59,17 +57,19 @@ How to load a key into the app is explained in section 1, [Load your test key](#
 
 The images come from two sources, and each one says which:
 
-* **Live run.** Screen recordings of the app (390 x 844 pixels) made on 19 Oct 2026 while it ran against the real AWS API and Base Sepolia, with order PO-0002 of one test dollar. Every step of the flow is shown with them, and each image says *Live run*.
+* **Live run.** Screen recordings of the app made while it ran against the real AWS API and Base Sepolia, with order PO-0002 of one test dollar. Every step of the flow is shown with them, and each image says *Live run*.
 * **Test build.** The few screens that exist only in a test build, **Connect** with its **Wallet check** link and the **Wallet check** screens, come from a local build of the same app. The key in those images is a random one that controls nothing.
 
 # 1. Sign up and connect
 
 The first time, the app asks who your company is, as a Chilean bank would. The form comes filled with the demo company, Pacífico Foods SpA, and every field can be changed. The identity check with TOC is **simulated** in this version: nothing is captured or sent, you only tick the box. Your details stay on the phone.
 
-| | | |
-| --- | --- | --- |
-| <img src="manual/signup-1-country.png" width="220"> | <img src="manual/signup-2-representative.png" width="220"> | <img src="manual/signup-3-identity.png" width="220"> |
-| *Live run.* Step 1: the country. Chile is open, China comes next. | Step 3: the person who signs for the company, with the RUT of the ID card. (Step 2 asks for the company: its RUT, legal name, sector and sales.) | Step 4: validate the identity (simulated), then **Enter Keel**. |
+| | |
+| --- | --- |
+| <img src="manual/signup-1-country.png" width="220"> | <img src="manual/signup-2-company.png" width="220"> |
+| *Live run.* **Step 1 of 4**: the country. Chile is open, China comes next. | **Step 2 of 4**: the company, with its RUT, legal name, sector and sales. The form comes filled with the demo company. |
+| <img src="manual/signup-3-representative.png" width="220"> | <img src="manual/signup-4-identity.png" width="220"> |
+| *Live run.* **Step 3 of 4**: the person who signs for the company, with the RUT of the ID card. | *Live run.* **Step 4 of 4**: validate the identity (simulated), then **Enter Keel**. |
 
 The labels **EN** and **ES** at the top switch the language at any time.
 
@@ -85,7 +85,7 @@ Then comes **Connect**:
 
 ## Load your test key (before anything else)
 
-The test keys are in Annex A of the PDF version of this manual, or the team gives them to you. There is one key for the importer and one for the exporter, and each one only works for its own company. The app signs every order, upload and approval with the key of the role you are in, so without the right key the app signs with the placeholder wallet, which the deployment does not know.
+The test keys are in Annex A of the PDF version of this manual. There is one key for the importer and one for the exporter, and each one only works for its own company. The app signs every order, upload and approval with the key of the role you are in, so without the right key the app signs with the placeholder wallet, which the deployment does not know.
 
 1. On **Connect**, with the role already selected, tap **Wallet check**, the small underlined link under the wallet card. It appears only in test builds.
 2. On **Wallet check**, find **Import test key, importer** (or **exporter**). The label shows which role the key will go to. If it names the wrong role, go back and change it on **Connect**.
@@ -139,7 +139,7 @@ Six steps, two companies, one agent. The first two are signatures, the rest happ
           |                    |                    |
           +--------------------+--------------------+
                                |
- 4 Agent deposits and pays the advance (within a minute)
+ 4 Agent opens the order, deposits and pays the advance (about 1 minute)
                                |
  5 Exporter ships and uploads the documents
                                |
@@ -150,19 +150,29 @@ Six steps, two companies, one agent. The first two are signatures, the rest happ
 
 ## The documents of the test order
 
-The flow needs three PDF files, and they are not made up on the spot: the engine compares them with the order that both companies signed. They come in ready-made **kits** delivered with this manual (they are not in the repository). Each kit is for one order of **USD 1.00**, one kilo of agar powder from Lingnan to Pacífico, FOB Hong Kong, with Harbor Line as the carrier.
+The flow needs three PDF files, and they are not made up on the spot: the engine compares them with the order that both companies signed. They come in ready-made **kits**, in the folder [`docs/entrega/documents/`](documents/) of the repository (and also delivered next to this PDF). Each kit is for one order of **USD 1.00**, one kilo of agar powder from Lingnan to Pacífico, FOB Hong Kong, with Harbor Line as the carrier, and has three files that share the order number:
 
-| Kit | Order number | 1. Proforma (importer) | 2. Bill of lading (exporter) | 3. Commercial invoice (exporter) |
-| --- | --- | --- | --- | --- |
-| `kit-1` | `PO-0301` | `PO-0301-1-proforma.pdf` | `PO-0301-2-bill-of-lading.pdf`, B/L `HLIN-2610-0301` | `PO-0301-3-commercial-invoice.pdf` |
-| `kit-2` | `PO-0302` | `PO-0302-1-proforma.pdf` | `PO-0302-2-bill-of-lading.pdf`, B/L `HLIN-2610-0302` | `PO-0302-3-commercial-invoice.pdf` |
-| `kit-3` | `PO-0303` | `PO-0303-1-proforma.pdf` | `PO-0303-2-bill-of-lading.pdf`, B/L `HLIN-2610-0303` | `PO-0303-3-commercial-invoice.pdf` |
+* `PO-0xxx-1-proforma.pdf`: the importer uploads it when it creates the order.
+* `PO-0xxx-2-bill-of-lading.pdf` and `PO-0xxx-3-commercial-invoice.pdf`: the exporter uploads them once the advance is paid.
+
+| Kit | Order number to type in the app | Bill of lading | Folder |
+| --- | --- | --- | --- |
+| `kit-1` | `PO0401` | `HLIN-2610-0401` | [`documents/kit-1/`](documents/kit-1/) |
+| `kit-2` | `PO0402` | `HLIN-2610-0402` | [`documents/kit-2/`](documents/kit-2/) |
+| `kit-3` | `PO0403` | `HLIN-2610-0403` | [`documents/kit-3/`](documents/kit-3/) |
+| `kit-4` | `PO0404` | `HLIN-2610-0404` | [`documents/kit-4/`](documents/kit-4/) |
+| `kit-5` | `PO0405` | `HLIN-2610-0405` | [`documents/kit-5/`](documents/kit-5/) |
+| `kit-6` | `PO0406` | `HLIN-2610-0406` | [`documents/kit-6/`](documents/kit-6/) |
+| `kit-7` | `PO0407` | `HLIN-2610-0407` | [`documents/kit-7/`](documents/kit-7/) |
+| `kit-8` | `PO0408` | `HLIN-2610-0408` | [`documents/kit-8/`](documents/kit-8/) |
+| `kit-9` | `PO0409` | `HLIN-2610-0409` | [`documents/kit-9/`](documents/kit-9/) |
+| `kit-10` | `PO0410` | `HLIN-2610-0410` | [`documents/kit-10/`](documents/kit-10/) |
 
 Rules that keep the test from failing:
 
-* **Use the three files of the same kit for one order.** The invoice carries the order number, the amount (1.00 USD) and the HS code (1302.31), and the engine checks them against the signed order. The app writes the order number without the hyphen (`PO0301`), and that is fine.
+* **Use the three files of the same kit for one order.** The invoice carries the order number, the amount (1.00 USD) and the HS code (1302.31), and the engine checks them against the signed order. The app writes the order number without the hyphen (`PO0401`), and that is fine.
 * **Never reuse a kit.** The escrow contract accepts each bill of lading number only once. If a second order uses the same bill of lading, the contract refuses it with `BillOfLadingAlreadyUsed` and the order never reaches the balance. For a new attempt, take the next kit.
-* **Set the order number of the kit when you create the order.** The app proposes its own number (the next of the importer's sequence), and the engine compares the invoice with it. In the terms of the new order, tap **Correct a term** and type the number of the kit without the hyphen (`PO0301`). After reading the proforma the terms should also show a total of 1.00, FOB, HS code 130231 and ship by 20 Nov 2026.
+* **Set the order number of the kit when you create the order.** The app proposes its own number (the next of the importer's sequence), and the engine compares the invoice with it. In the terms of the new order, tap **Correct a term** and type the number of the kit without the hyphen (`PO0401`). After reading the proforma the terms should also show a total of 1.00, FOB, HS code 130231 and ship by 20 Nov 2026.
 * **Do it before 20 Nov 2026.** That is the shipment deadline printed on the proformas. After it the order can no longer be shipped.
 * **The date of the bill of lading is 19 Nov 2026, on purpose.** The shortcut of step 6 signs the carrier's attestation with the time of the signature when the printed date is in the future, and the escrow does not accept an on-board date earlier than the deposit. As a result the engine may report a difference in the on-board date. This does not stop the importer from approving the balance.
 
@@ -170,14 +180,19 @@ To play the exporter's uploads and the importer's proforma you need these files 
 
 ## Step 1. The importer proposes the order
 
-Tap **+**, choose the supplier, and upload the supplier's proforma (**Choose file** or **Scan**): the first file of your kit. If you have no proforma, **Fill in by hand** lets you type the terms, but the order cannot be sent without a proforma attached.
+1. Tap **+**, in the middle of the bottom bar, to start a new order.
+2. Tap **Choose a supplier** and pick **Lingnan Hydrocolloids**.
+3. Upload the supplier's proforma with **Choose file** (or **Scan**): the first file of your kit. The file appears with the number of terms the agent read from it. If you have no proforma, **Fill in by hand** lets you type the terms, but the order cannot be sent without a proforma attached.
+4. **Add the title of the order.** The agent does not fill it in: type what is being bought in the field **What is being bought**, for example `Agar powder, food grade, 1 kg sample`. It is the name the order carries on both phones, in lists and on the order screen.
+5. Check the total (1.00 for these kits) and the **Advance when both sign**: 30% on signing, 70% when the shipment is proven.
+6. Check the terms, set the order number as explained below, and tap **Send to Lingnan**.
 
 On AWS, the quarantined AI reads the proforma and returns typed fields only: amount, deadline, incoterm and HS code. It never returns the payee account. **You check what it read before anyone signs**, and you can correct any term.
 
 | | | |
 | --- | --- | --- |
 | <img src="manual/live-04-proforma-read.png" width="220"> | <img src="manual/live-05-goods-typed.png" width="220"> | <img src="manual/live-06-terms-send.png" width="220"> |
-| *Live run.* The proforma is uploaded and the agent reads 10 terms. You type what is being bought. | The goods typed, the total of 1.00 and the **Advance when both sign**: 30% on signing, 70% when the shipment is proven. | All the terms it read, expanded: **Proof from** (the carrier), **Order number**, **HS code** and **Disputes settled by** (the arbiter). **Send to Lingnan** sends the order. |
+| *Live run.* The proforma is uploaded and the agent reads 10 terms. The title field, **What is being bought**, is still empty. | The title typed, the total of 1.00 and the **Advance when both sign**. | All the terms it read, expanded: **Proof from** (the carrier), **Order number**, **HS code** and **Disputes settled by** (the arbiter). **Send to Lingnan** sends the order. |
 
 | | |
 | --- | --- |
@@ -186,7 +201,7 @@ On AWS, the quarantined AI reads the proforma and returns typed fields only: amo
 
 If a term is missing or wrong, the fields are marked in red with what to fix, and **Send to Lingnan** does nothing until they are right.
 
-**Check the order number before you send.** The app does not read it from the proforma: it proposes the next number of the importer's sequence (**PO0002** in the images). The engine compares the invoice with it later, so change it to the number of your kit (for example `PO0301`, letters and digits, no hyphen): tap **Correct a term**, edit **Order number**, and tap **Done**. You can also change the **Advance when both sign** (0%, 30%, 50% or other).
+**Check the order number before you send.** The app does not read it from the proforma: it proposes the next number of the importer's sequence (**PO0002** in the images). The engine compares the invoice with it later, so change it to the number of your kit (for example `PO0401`, letters and digits, no hyphen): tap **Correct a term**, edit **Order number**, and tap **Done**. You can also change the **Advance when both sign** (0%, 30%, 50% or other).
 
 ## Step 2. The exporter reviews and signs
 
@@ -214,11 +229,13 @@ The importer opens the order from **Needs you**. It reads the same terms, and th
 | <img src="manual/live-12-importer-review.png" width="220"> | <img src="manual/live-13-importer-once-you-sign.png" width="220"> | <img src="manual/live-14-importer-signed.png" width="220"> |
 | *Live run.* **Review before you sign**: the purchase order, with the exporter's signature already on it. | The account where Lingnan will be paid, locked once both sign, and **Once you sign**, with the tick and **Sign** at the bottom. | After signing: **Nothing has been paid yet**, and **Locked in escrow** waits to be opened by the agent. |
 
+> **Wait about 1 minute.** After the importer signs, the agent on AWS opens the order in the escrow on its next pass, and that takes about a minute. Until then the order says **Locked in escrow** with **Waiting to be opened**.
+
 **Once you sign**: you sign the terms, you do not send money. The agent deposits the full amount after both signatures. The money can only go to the account shown, or back to you if there is no proof of shipment by the deadline. You cannot pull it back on your own: to stop it, open a dispute or cancel together.
 
 ## Step 4. The agent deposits and pays the advance
 
-You do nothing. The agent on AWS checks the company's policy and, on its next pass (every minute), opens the order in the escrow and deposits the full amount from the importer's Safe. In the same transaction, the contract pays the advance to the exporter. Each step leaves a transaction hash on Base Sepolia.
+**The agent takes about 1 minute to open the order.** You do nothing. The agent on AWS checks the company's policy and, on its next pass (every minute), opens the order in the escrow and deposits the full amount from the importer's Safe. In the same transaction, the contract pays the advance to the exporter. Each step leaves a transaction hash on Base Sepolia.
 
 | | |
 | --- | --- |
