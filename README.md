@@ -184,6 +184,8 @@ The full procedure is in [infra/terraform/README.md](infra/terraform/README.md) 
    ```hcl
    region             = "us-east-2"
    alert_email        = "you@example.com"   # alarms and budget by email
+   app_origin         = "https://keel-app.vercel.app"   # the app's origin: CORS and the bot's links
+   extra_app_origins  = ["http://localhost:8081"]      # more origins allowed by CORS, such as the local app
    anthropic_base_url = ""                  # https URL of an Anthropic proxy, or empty for the Anthropic API
    log_block_range    = 200                 # blocks per eth_getLogs; 10 on Alchemy's free tier
    key_source_pauser  = "ssm"               # "" runs the monitor in alert-only mode

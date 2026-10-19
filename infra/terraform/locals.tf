@@ -3,6 +3,9 @@ locals {
   cfg_prefix     = "/keel/${var.chain_id}"
   secrets_prefix = "/keel-secrets/${var.chain_id}/"
 
+  # Los origenes que aceptan CORS (API y subida de documentos a S3): el de la app y los extra
+  app_origins = distinct(concat([var.app_origin], var.extra_app_origins))
+
   # Cada secreto es un SecureString que se crea a mano (aws ssm put-parameter, README.md): Terraform
   # no los gestiona para que su valor nunca quede en el estado. Cada funcion lee solo los suyos.
   secret_names = [
