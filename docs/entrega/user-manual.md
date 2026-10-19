@@ -146,6 +146,8 @@ Six steps, two companies, one agent. The first two are signatures, the rest happ
  6 Carrier attests, importer approves, balance is paid
 ```
 
+**The app updates itself.** While it is open, every screen reads again every 15 seconds and when you come back to it from another app. A new item in **Needs you**, a document that becomes **Accepted** or the steps of an order change on their own, and you do not need to restart the app. The agent and the engine take a minute or so, so after an action give it a minute before you think something is stuck.
+
 ## The documents of the test order
 
 The flow needs three PDF files, and they are not made up on the spot: the engine compares them with the order that both companies signed. They come in ready-made **kits** delivered with this manual (they are not in the repository). Each kit is for one order of **USD 1.00**, one kilo of agar powder from Lingnan to Pacífico, FOB Hong Kong, with Harbor Line as the carrier.
@@ -240,7 +242,7 @@ When the exporter has shipped, its order shows **Ship by … and send the docume
 
 1. Tap **Upload**, choose the bill of lading or the invoice of the same kit (a PDF up to 10 MB or a photo up to 5 MB) and confirm with **Confirm and upload**.
 2. Each upload is signed by the exporter's wallet: *you sign these exact bytes for this order*. Keel only tells you the outcome.
-3. The AI reads the document and the rules engine compares it with the signed order: the order number, the amount and the HS code. Until a document is accepted it shows **Under review**.
+3. The row says **Uploaded** as soon as the file has left the phone. The AI then reads the document and the rules engine compares it with the signed order: the order number, the amount and the HS code. Within a minute or so the row changes by itself to **Accepted**, or to **Under review** if something does not match.
 
 ## Step 6. The carrier attests and the balance is paid
 
@@ -248,7 +250,7 @@ The carrier signs that the cargo is on board, and the contract needs that second
 
 This is a **demo shortcut** (`demo_auto_attest`), switched on in this test deployment so the demo runs without someone playing the carrier. It has a cost that should be said plainly: here the server signs for the carrier, so a fabricated bill of lading would prove a shipment. In a real deployment the carrier signs independently (see the security notes of the README and [flujo/amenazas.md](../flujo/amenazas.md)). In the recorded run of 19 Oct 2026 the team sent the attestation by hand with `aws/scripts/carrier-attest.ts`.
 
-The shortcut does nothing when the order names a carrier other than Harbor Line, when the order is not funded yet, or while the documents are not read. If the order stays at **Shipment and documents** after both uploads, wait a minute and check that both documents show **Accepted**.
+The shortcut does nothing when the order names a carrier other than Harbor Line, when the order is not funded yet, or while the documents are not read. If the order stays at **Shipment and documents** after both uploads, wait a minute and check that both documents show **Accepted**; the screen updates by itself.
 
 Then the importer closes the order:
 
@@ -300,7 +302,7 @@ Adding a supplier and the test transfer that verifies it are not available in th
 | **The agent could not read this file** | The proforma is not readable | Fill in the terms by hand and keep the file attached |
 | The importer cannot sign | The key you imported is not an owner of the importer's Safe, or the app is on the exporter role | Check the address in **Wallet check** against the importer address in the table at the start, and select **I import** |
 | The exporter cannot sign or be paid | The key you imported is not the registered supplier, or the app is on the importer role | Check the address against the exporter address in the table, and select **I export** |
-| The advance has not arrived | The agent runs once a minute | Wait a minute and refresh the order. Each payment has a hash on Base Sepolia |
+| The advance has not arrived, or **Needs you** shows nothing new | The agent runs once a minute, and the app reads again every 15 seconds | Wait a minute. If nothing changes after two, close the app and open it again. Each payment has a hash on Base Sepolia |
 
 Anything else that fails leaves a message with its reason on the screen, and a refusal from the backend shows as a notice. Signing never waits for the backend.
 
