@@ -22,7 +22,7 @@ This manual shows how to use the Keel app and how one purchase order moves throu
 * [6. Troubleshooting](#6-troubleshooting)
 * [Running from source](#running-from-source)
 
-The flow behind every screen is in [flujo/flujo-clave.md](../flujo/flujo-clave.md). The evidence of the live run, with every transaction hash, is in [evidence/demo-video/execution-evidence.md](../../evidence/demo-video/execution-evidence.md).
+The flow behind every screen is in [docs/flujo/flujo-clave.md](../flujo/flujo-clave.md). The evidence of the live run, with every transaction hash, is in [evidence/demo-video/execution-evidence.md](../../evidence/demo-video/execution-evidence.md).
 
 # What you need
 
@@ -150,7 +150,7 @@ Six steps, two companies, one agent. The first two are signatures, the rest happ
 
 ## The documents of the test order
 
-The flow needs three PDF files, and they are not made up on the spot: the engine compares them with the order that both companies signed. They come in ready-made **kits**, in the folder [`docs/entrega/documents/`](documents/) of the repository (and also delivered next to this PDF). Each kit is for one order of **USD 1.00**, one kilo of agar powder from Lingnan to Pacífico, FOB Hong Kong, with Harbor Line as the carrier, and has three files that share the order number:
+The flow needs three PDF files, and they are not made up on the spot: the engine compares them with the order that both companies signed. They come in ready-made **kits**, in the folder [`docs/entrega/documents/`](documents/) of the repository: https://github.com/FinLinkChile/Keel/tree/dev/docs/entrega/documents . They are also delivered next to this PDF. Each kit is for one order of **USD 1.00**, one kilo of agar powder from Lingnan to Pacífico, FOB Hong Kong, with Harbor Line as the carrier, and has three files that share the order number:
 
 * `PO-0xxx-1-proforma.pdf`: the importer uploads it when it creates the order.
 * `PO-0xxx-2-bill-of-lading.pdf` and `PO-0xxx-3-commercial-invoice.pdf`: the exporter uploads them once the advance is paid.
@@ -265,7 +265,7 @@ When the exporter has shipped, its order shows **Ship by … and send the docume
 
 The carrier signs that the cargo is on board, and the contract needs that second signature before it pays the balance. Harbor Line is not an app user, and **in this deployment you do not have to do anything**: once the order is funded and the exporter has uploaded the bill of lading and the invoice, AWS signs the carrier's attestation itself with the test key of Harbor Line. The order becomes **Shipped** on its own within a minute or two.
 
-This is a **demo shortcut** (`demo_auto_attest`), switched on in this test deployment so the demo runs without someone playing the carrier. It has a cost that should be said plainly: here the server signs for the carrier, so a fabricated bill of lading would prove a shipment. In a real deployment the carrier signs independently (see the security notes of the README and [flujo/amenazas.md](../flujo/amenazas.md)). In the recorded run of 19 Oct 2026 the team sent the attestation by hand with `aws/scripts/carrier-attest.ts`.
+This is a **demo shortcut** (`demo_auto_attest`), switched on in this test deployment so the demo runs without someone playing the carrier. It has a cost that should be said plainly: here the server signs for the carrier, so a fabricated bill of lading would prove a shipment. In a real deployment the carrier signs independently (see the security notes of the README and [docs/flujo/amenazas.md](../flujo/amenazas.md)). In the recorded run of 19 Oct 2026 the team sent the attestation by hand with `aws/scripts/carrier-attest.ts`.
 
 The shortcut does nothing when the order names a carrier other than Harbor Line, when the order is not funded yet, or while the documents are not read. If the order stays at **Shipment and documents** after both uploads, wait a minute and check that both documents show **Accepted**; the screen updates by itself.
 
@@ -296,7 +296,7 @@ In **Orders**, an order goes through these states: **Review** (waiting for a sig
 | Both agree to stop | The funds not yet released go back to the importer | **Sign cancellation**. It needs both signatures, so the other side sees **Cancel … ?** in **Needs you** |
 | An email or a document names a new bank account | Nothing changes: the payout account is the one both signed | Ignore it. A different account requires a new signed order |
 
-The refund, the dispute and the cancellation follow [flujo/disputa-y-cancelacion.md](../flujo/disputa-y-cancelacion.md) and [flujo/paso-6-reembolso.md](../flujo/paso-6-reembolso.md).
+The refund, the dispute and the cancellation follow [docs/flujo/disputa-y-cancelacion.md](../flujo/disputa-y-cancelacion.md) and [docs/flujo/paso-6-reembolso.md](../flujo/paso-6-reembolso.md).
 
 # 5. The agent and supplier tabs
 
@@ -339,6 +339,6 @@ Only for the team and for anyone who runs the web version or Expo Go. The APK ha
 
 # What this manual does not cover
 
-* **Keel Personal** (bills): the app marks it as not available in this version. It is designed in [personal/keel-personal.md](../personal/keel-personal.md).
+* **Keel Personal** (bills): the app marks it as not available in this version. It is designed in [docs/personal/keel-personal.md](../personal/keel-personal.md).
 * **The Telegram bot**: it only sends template notices and signs nothing, see [bot/README.md](../../bot/README.md).
 * **Deploying the backend and the contracts**: see the [README](../../README.md#deploy-the-backend-on-aws).
