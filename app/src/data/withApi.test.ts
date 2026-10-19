@@ -147,7 +147,10 @@ describe('withApi', () => {
     expect(warn).toHaveBeenCalledTimes(1);
     // The exporter's phone: its importer wallet represents no Safe, which is not an outage
     const notMine = { suppliers: async () => Promise.reject(new ApiError(403, 'not_representative')) };
-    expect(await withApi(base, notMine as unknown as ApiClient, () => ({ importer })).verifiedSuppliers()).toEqual([]);
+    // ... and its list is its own company, so the exporter's review finds its registered payout
+    const ownId = (await base.account('exporter')).party;
+    const exporterPhone = await withApi(base, notMine as unknown as ApiClient, () => ({ importer })).verifiedSuppliers();
+    expect(exporterPhone.map((r) => r.party.id)).toEqual([ownId]);
     expect(warn).toHaveBeenCalledTimes(1);
     warn.mockRestore();
   });

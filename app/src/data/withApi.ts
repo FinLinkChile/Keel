@@ -126,9 +126,10 @@ export function withApi(base: KeelData, api: ApiClient, signers: () => Signers):
     try {
       safes = await api.suppliers(s);
     } catch (e) {
-      // This phone's importer wallet represents no Safe (the exporter's phone has one too): it has
-      // no suppliers, and that is not an API failure to warn about
-      if (isApiError(e, 'not_representative')) return [];
+      // This phone's importer wallet represents no Safe: it is the exporter's phone, which has an
+      // importer test wallet too. That is not an API failure. Its list is its own company, so the
+      // exporter's review finds the payout account registered for it, as without the API.
+      if (isApiError(e, 'not_representative')) return ownCompany();
       throw e;
     }
     const out: SupplierRecord[] = [];
@@ -137,6 +138,12 @@ export function withApi(base: KeelData, api: ApiClient, signers: () => Signers):
       if (r) out.push(r);
     }
     return out;
+  }
+  // The exporter's own company and payout account, from the base (the demo binds them to this
+  // phone's exporter wallet). Never offered to an importer: the importer's list is the API's.
+  async function ownCompany(): Promise<SupplierRecord[]> {
+    const own = (await base.account('exporter')).party;
+    return (await base.verifiedSuppliers()).filter((r) => r.party.id === own);
   }
   const registered = () => orElse('suppliers', suppliers, async () => []);
 
