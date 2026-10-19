@@ -1,8 +1,9 @@
 // Read-only views over the orders table for the app: one order, the caller's orders, what the
 // caller has to do now, and the Safe's wallet. Everything comes from DynamoDB; the chain state is
 // the indexer's mirror (`chain`), so it lags the chain by the indexer's delay and says so with
-// `chain.updatedBlock`. Nothing here changes anything; the only chain read is the Safe's token
-// balance in the wallet, which is left out when the chain cannot be asked.
+// `chain.updatedBlock`. Nothing here changes anything; the only chain reads are the token
+// balances in the wallet (the Safe's, and the exporter's payout addresses), left out when the
+// chain cannot be asked.
 import { BatchGetCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import type { Hex } from "@keel/schemas";
 import { represents } from "../auth";
@@ -196,13 +197,35 @@ export interface WalletView {
   orders: { orderId: Hex; label?: string; state: string; totalAmount: string; locked: string }[];
 }
 
-async function safeBalance(safe: string, ctx: Ctx): Promise<bigint | undefined> {
+async function tokenBalance(holder: string, ctx: Ctx): Promise<bigint | undefined> {
   if (!ctx.token) return undefined;
   try {
-    return await (await chainDeps(ctx.env)).balanceOf(ctx.token, safe as Hex);
+    return await (await chainDeps(ctx.env)).balanceOf(ctx.token, holder as Hex);
   } catch {
     return undefined;
   }
+}
+
+export interface PayoutView {
+  // A payout address of the caller's orders as exporter, lowercase
+  address: string;
+  // Its balance of the order token on chain, token minor units: the advances and balances the
+  // escrow paid there, plus anything else the address holds. Absent when the chain cannot be asked.
+  available?: string;
+}
+
+// The exporter's side of the wallet: the payout addresses of its orders and what each holds
+export async function payouts(signer: Hex, ctx: Ctx): Promise<PayoutView[]> {
+  const addresses = new Set<string>();
+  for (const v of await listOrders(signer, ctx)) {
+    if (v.you.includes("exporter")) addresses.add(lower(poFrom(v.order).payoutAddress));
+  }
+  const out: PayoutView[] = [];
+  for (const address of addresses) {
+    const available = await tokenBalance(address, ctx);
+    out.push({ address, ...(available !== undefined && { available: available.toString() }) });
+  }
+  return out;
 }
 
 export async function wallet(signer: Hex, ctx: Ctx, only?: string): Promise<WalletView[]> {
@@ -227,7 +250,7 @@ export async function wallet(signer: Hex, ctx: Ctx, only?: string): Promise<Wall
       if (state === "NONE" || state === "OPEN") pending += po.totalAmount;
       rows.push({ orderId: o.orderId, ...(o.label && { label: o.label }), state, totalAmount: po.totalAmount.toString(), locked: held.toString() });
     }
-    const available = await safeBalance(safe, ctx);
+    const available = await tokenBalance(safe, ctx);
     out.push({ safe, byState, locked: locked.toString(), pendingFunding: pending.toString(), ...(available !== undefined && { available: available.toString() }), orders: rows });
   }
   return out;

@@ -1,5 +1,9 @@
 # Historial de la documentación
 
+## 2026-10-19
+
+* **Actualización (código) [PROPUESTA] del Área 5 (Benjamín, con Claude): el exportador ve en la app el saldo de su cuenta de cobro.** `GET /wallet` agrega `payouts`: las direcciones de cobro de las órdenes donde quien firma es el exportador, con su saldo USDC en la cadena. La app muestra la suma como disponible del exportador, así ve el anticipo que le pagó el escrow; antes era siempre 0. Es todo lo que tiene esa dirección, no solo lo que pagó Keel. Pruebas: `aws/src/orders/orders.test.ts` y `app/src/data/withApi.test.ts`. **Afecta a las Áreas 2 y 4.** Por qué: en la prueba el anticipo llegó a la cuenta de cobro y la app no lo mostraba.
+
 ## 2026-10-18
 
 * **Actualización (código e infraestructura) [PROPUESTA] del Área 5 (Benjamín, con Claude): la app muestra el saldo de la Safe en la cadena.** `GET /wallet` agrega `available`, el saldo USDC de la Safe que lee la función de consulta de órdenes con `balanceOf` (por eso su rol puede leer el secreto `rpc_url`); si el RPC no responde, la ruta contesta igual, sin ese campo. La app lo muestra como disponible en la Home del importador; antes era siempre 0 con la API. Pruebas: `aws/src/orders/orders.test.ts` y `app/src/data/withApi.test.ts`. **Afecta a las Áreas 2 y 4.** Por qué: para probar la demo hay que ver cuánto puede fondear la Safe.

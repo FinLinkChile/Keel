@@ -20,7 +20,7 @@ La regla común: la API no decide nada y cada ruta exige su firma o su token. Un
 | GET | `/proposals`, `/proposals/{orderId}` | Propuestas | Las partes | Petición firmada | Nuevo |
 | POST | `/proposals/{orderId}/exporter-signature`, `/importer-signature`, `/reject` | Propuestas | Exportador o importador | Firma de la `PurchaseOrder` | Nuevo |
 | GET | `/orders`, `/orders/{orderId}` | Consulta de órdenes | Las partes | Petición firmada | Nuevo |
-| GET | `/needs-you`, `/wallet` | Consulta de órdenes | Importador o exportador | Petición firmada | Nuevo. `/wallet` incluye `available`, el saldo del token de la Safe leído en la cadena; si el RPC no responde, la ruta contesta sin ese campo |
+| GET | `/needs-you`, `/wallet` | Consulta de órdenes | Importador o exportador | Petición firmada | Nuevo. `/wallet` incluye `available`, el saldo del token de la Safe leído en la cadena, y `payouts`, el saldo de cada dirección de cobro de las órdenes del exportador; si el RPC no responde, la ruta contesta sin esos saldos |
 | GET | `/suppliers` | Directorio | Importador | Petición firmada | Nuevo |
 | GET | `/trade-setup` | Directorio | Cualquiera (datos públicos del despliegue: escrow, gate, Safe, token, `chainId`) | Ninguna | Nuevo |
 | POST | `/suppliers` | Directorio | Operador | Token de administración | Nuevo |

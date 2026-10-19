@@ -92,6 +92,7 @@ describe('withApi', () => {
     const api = {
       wallet: vi.fn(async () => [{ safe: '0x', byState: {}, locked: '35000000000', pendingFunding: '0', orders: [] }]),
       listOrders: vi.fn(async () => [await viewFrom('SHIPPED', { you: ['exporter'], locked: '20000' })]),
+      payouts: vi.fn(async () => []),
     };
     const d = withApi(base, api as unknown as ApiClient, () => ({ importer, exporter }));
     expect((await d.wallet('importer')).lockedMinor).toBe(3_500_000n);
@@ -107,6 +108,15 @@ describe('withApi', () => {
     const api = { wallet: vi.fn(async () => [{ safe: '0x', byState: {}, locked: '0', pendingFunding: '0', available: '35000000', orders: [] }]) };
     const d = withApi(base, api as unknown as ApiClient, () => ({ importer }));
     expect((await d.wallet('importer')).availableMinor).toBe(3_500n);
+  });
+
+  it("shows the exporter's payout balance on chain as available, in cents", async () => {
+    const api = {
+      listOrders: vi.fn(async () => []),
+      payouts: vi.fn(async () => [{ address: '0xa', available: '300000' }, { address: '0xb' }]),
+    };
+    const d = withApi(base, api as unknown as ApiClient, () => ({ exporter }));
+    expect((await d.wallet('exporter')).availableMinor).toBe(30n);
   });
 
   it('lists and opens the orders of the API', async () => {
